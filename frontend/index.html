@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chuculat - Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --chocolate:       #3F2021;
+    --chocolate-light: #5C3A3B;
+    --cereza:  #EC6197;
+    --azul:    #00ABE1;
+    --verde:   #62B22A;
+    --naranja: #F1896C;
+    --morado:  #9C27B0;
+    --crema:   #F5F0EB;
+    --beige:   #E8E0D5;
+    --blanco:  #FFFFFF;
+    --gris:    #8A7E78;
+    --sidebar-w: 220px;
+}
+
+html, body { height: 100%; margin: 0; padding: 0; width: 100%; }
+body { font-family: 'Montserrat', Arial, sans-serif; background: var(--crema); }
+/* Full-width: rompe el max-width / padding del contenedor de GHL */
+#app {
+    display: block;
+    position: relative;
+    width: 100vw;
+    max-width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    background: var(--crema);
+    overflow-x: hidden;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+    background: var(--chocolate);
+    position: sticky; top: 0; z-index: 200;
+    display: flex; align-items: stretch;
+    box-shadow: 0 2px 16px rgba(0,0,0,.22);
+    overflow: visible;
+}
+.topbar-logo {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 18px; flex-shrink: 0;
+    border-right: 1px solid rgba(255,255,255,.1);
+}
+.topbar-logo img { height: 34px; filter: brightness(0) invert(1); opacity: .9; }
+
+/* Segment toggle */
+.segment-toggle {
+    display: flex; gap: 4px; padding: 8px 14px; align-items: center;
+    border-right: 1px solid rgba(255,255,255,.1); flex-shrink: 0;
+}
+.seg-btn {
+    padding: 6px 14px; border: none; border-radius: 8px;
+    font-family: 'Montserrat', sans-serif; font-size: 11px; font-weight: 700;
+    cursor: pointer; transition: all .2s; text-transform: uppercase; letter-spacing: .5px;
+    background: rgba(255,255,255,.08); color: rgba(255,255,255,.5); white-space: nowrap;
+}
+.seg-btn.active { background: var(--cereza); color: var(--blanco); }
+.seg-btn:hover:not(.active) { background: rgba(255,255,255,.15); color: rgba(255,255,255,.8); }
+
+/* Nav items row */
+.topbar-nav {
+    display: none; flex: 1; overflow-x: auto; align-items: stretch;
+    scrollbar-width: none;
+}
+.topbar-nav::-webkit-scrollbar { display: none; }
+.topbar-nav.show { display: flex; }
+.nav-section-label { display: none; }
+.nav-item {
+    display: flex; align-items: center; gap: 6px; padding: 0 14px;
+    color: rgba(255,255,255,.65); font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .2s; border-bottom: 3px solid transparent;
+    text-decoration: none; white-space: nowrap; flex-shrink: 0;
+}
+.nav-item:hover { color: var(--blanco); background: rgba(255,255,255,.06); }
+.nav-item.active { color: var(--blanco); border-bottom-color: var(--cereza); background: rgba(255,255,255,.1); }
+.nav-icon { font-size: 14px; }
+.nav-badge {
+    background: var(--cereza); color: var(--blanco);
+    font-size: 9px; font-weight: 700; padding: 1px 6px;
+    border-radius: 50px; min-width: 18px; text-align: center;
+}
+.sidebar-footer { display: none; }
+
+/* ── MAIN ── */
+.main-content { padding: 28px 28px 60px; }
+.panel { display: none; }
+.panel.show { display: block; }
+
+/* ── SECTION TITLE ── */
+.dash-section { scroll-margin-top: 24px; }
+.section-title { color: var(--chocolate); font-size: .95rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid var(--beige); }
+.section-title span { background: var(--naranja); color: var(--blanco); font-size: 11px; padding: 2px 10px; border-radius: 50px; font-weight: 700; }
+.section-note { color: var(--gris); font-size: 11px; font-style: italic; margin: -6px 0 16px; }
+
+/* ── KPI FILTER BAR ── */
+.kpi-filter-bar, .date-filter-bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--blanco); padding: 14px 20px; border-radius: 14px;
+    border: 1px solid var(--beige); box-shadow: 0 4px 16px rgba(63,32,33,.07); margin-bottom: 20px;
+}
+.kpi-filter-bar label, .date-filter-bar label { color: var(--gris); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-filter-bar input[type="date"], .date-filter-bar input[type="date"] { padding: 7px 12px; border: 2px solid var(--beige); border-radius: 8px; font-family: 'Montserrat', sans-serif; font-size: 13px; color: var(--chocolate); background: var(--crema); outline: none; cursor: pointer; }
+.kpi-filter-bar input[type="date"]:focus, .date-filter-bar input[type="date"]:focus { border-color: var(--chocolate); }
+.kpi-filter-period, .table-count { color: var(--gris); font-size: 11px; font-weight: 600; padding: 5px 12px; background: var(--crema); border-radius: 50px; border: 1px solid var(--beige); white-space: nowrap; }
+.kpi-filter-period { margin-left: auto; }
+.kpi-filter-note { width: 100%; color: var(--gris); font-size: 10px; font-style: italic; margin-top: -4px; }
+.btn-filter { padding: 9px 20px; background: var(--chocolate); color: var(--blanco); border: none; border-radius: 50px; font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .2s; }
+.btn-filter:hover { background: var(--chocolate-light); }
+.btn-filter.secondary { background: var(--crema); color: var(--chocolate); border: 2px solid var(--beige); }
+
+/* ── KPI GRID ── */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 36px; }
+.kpi-card { background: var(--blanco); border-radius: 14px; padding: 24px 16px; text-align: center; border: 1px solid var(--beige); box-shadow: 0 4px 16px rgba(63,32,33,.07); position: relative; overflow: hidden; transition: transform .2s, box-shadow .2s; }
+.kpi-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(63,32,33,.12); }
+.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+.kpi-card.otorgados::before { background: var(--azul); }
+.kpi-card.redimidos::before { background: var(--cereza); }
+.kpi-card.tasa::before      { background: var(--verde); }
+.kpi-card.recompras::before { background: var(--naranja); }
+.kpi-card.ventas::before    { background: var(--azul); }
+.kpi-card.b2c::before       { background: var(--cereza); }
+.kpi-card.b2b-kpi::before   { background: var(--naranja); }
+.kpi-card.export-kpi::before{ background: var(--morado); }
+.kpi-card.meta::before      { background: var(--verde); }
+.kpi-icon  { font-size: 26px; margin-bottom: 8px; }
+.kpi-label { color: var(--gris); font-size: 10px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; margin-bottom: 8px; }
+.kpi-value { font-size: 2rem; font-weight: 800; color: var(--chocolate); line-height: 1; }
+.kpi-card.otorgados .kpi-value, .kpi-card.ventas .kpi-value { color: var(--azul); }
+.kpi-card.redimidos .kpi-value, .kpi-card.b2c .kpi-value   { color: var(--cereza); }
+.kpi-card.tasa      .kpi-value, .kpi-card.meta .kpi-value   { color: var(--verde); }
+.kpi-card.recompras .kpi-value, .kpi-card.b2b-kpi .kpi-value{ color: var(--naranja); }
+.kpi-card.export-kpi .kpi-value { color: var(--morado); }
+.kpi-sub { color: var(--gris); font-size: 11px; margin-top: 6px; font-weight: 500; }
+.kpi-filtered-badge { display: inline-block; background: rgba(0,171,225,.12); color: var(--azul); font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 50px; margin-top: 6px; text-transform: uppercase; letter-spacing: 1px; }
+
+/* ── META PROGRESS BAR ── */
+.meta-bar-wrap { background: var(--blanco); border-radius: 14px; border: 1px solid var(--beige); box-shadow: 0 4px 16px rgba(63,32,33,.07); padding: 20px 24px; margin-bottom: 28px; }
+.meta-bar-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.meta-bar-label span { color: var(--chocolate); font-size: 13px; font-weight: 700; }
+.meta-bar-label small { color: var(--gris); font-size: 11px; }
+.meta-bar-track { background: var(--beige); border-radius: 50px; height: 20px; overflow: hidden; position: relative; }
+.meta-bar-fill  { height: 100%; border-radius: 50px; background: linear-gradient(90deg, var(--verde), var(--azul)); transition: width .8s ease; min-width: 0; }
+.meta-bar-pct   { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 700; color: var(--chocolate); }
+
+/* ── CHART CARDS ── */
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+.chart-card { background: var(--blanco); border-radius: 14px; border: 1px solid var(--beige); box-shadow: 0 4px 16px rgba(63,32,33,.07); padding: 20px; }
+.chart-card.full { grid-column: 1 / -1; }
+.chart-title { color: var(--chocolate); font-size: .85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+.chart-wrap { position: relative; height: 260px; }
+.chart-wrap.tall { height: 320px; }
+
+/* ── TABLE CARD ── */
+.table-section { background: var(--blanco); border-radius: 14px; border: 1px solid var(--beige); box-shadow: 0 4px 16px rgba(63,32,33,.07); overflow: hidden; margin-bottom: 32px; width: 100%; }
+.table-header { padding: 16px 20px; border-bottom: 1px solid var(--beige); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.table-header h2 { color: var(--chocolate); font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.table-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.search-wrap { position: relative; }
+.search-wrap::before { content: "🔍"; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: .6; pointer-events: none; }
+.search-wrap input { padding: 8px 14px 8px 36px; border: 2px solid var(--beige); border-radius: 50px; font-family: 'Montserrat', sans-serif; font-size: 13px; color: var(--chocolate); background: var(--crema); outline: none; width: 200px; max-width: 100%; transition: all .3s; }
+.search-wrap input:focus { border-color: var(--chocolate); background: var(--blanco); box-shadow: 0 0 0 3px rgba(63,32,33,.08); }
+.filter-select { padding: 9px 14px; border: 2px solid var(--beige); border-radius: 50px; font-family: 'Montserrat', sans-serif; font-size: 13px; color: var(--chocolate); background: var(--crema); outline: none; cursor: pointer; }
+.table-wrap { overflow-x: auto; width: 100%; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead tr { background: var(--crema); border-bottom: 2px solid var(--beige); }
+th { padding: 11px 12px; text-align: left; color: var(--gris); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; white-space: nowrap; cursor: pointer; user-select: none; }
+th:hover { color: var(--chocolate); }
+th .si { display: inline-block; margin-left: 4px; opacity: .4; }
+th.sort-asc .si, th.sort-desc .si { opacity: 1; color: var(--chocolate); }
+tbody tr { border-bottom: 1px solid var(--beige); transition: background .15s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--crema); }
+td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-break: break-word; }
+.td-name { font-weight: 600; }
+.td-pts  { font-weight: 700; font-size: 14px; }
+.td-pts.azul   { color: var(--azul); }
+.td-pts.cereza { color: var(--cereza); }
+.td-pts.verde  { color: var(--verde); }
+.td-pts.morado { color: var(--morado); }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 50px; font-size: 11px; font-weight: 700; }
+.badge-alta  { background: #e8f5e9; color: #2e7d32; }
+.badge-media { background: #fff8e1; color: #f57f17; }
+.badge-baja  { background: #fce4ec; color: #c62828; }
+.badge-none  { background: var(--beige); color: var(--gris); }
+.badge-recompra { background: #fff3e0; color: #e65100; font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 50px; }
+.badge-b2b { background: rgba(241,137,108,.15); color: var(--naranja); }
+.badge-vencido { background: #fce4ec; color: #c62828; }
+.badge-ok      { background: #e8f5e9; color: #2e7d32; }
+.empty-row td { text-align: center; padding: 40px; color: var(--gris); font-size: 14px; }
+
+/* ── LOADING ── */
+.dash-loading { text-align: center; padding: 50px 20px; color: var(--gris); }
+.loading-spinner { width: 46px; height: 46px; border: 4px solid var(--beige); border-top-color: var(--cereza); border-right-color: var(--azul); border-bottom-color: var(--verde); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 14px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── PAGINACIÓN ── */
+.pagination { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; border-top: 1px solid var(--beige); flex-wrap: wrap; gap: 10px; }
+.pagination-info { color: var(--gris); font-size: 12px; font-weight: 600; }
+.pagination-controls { display: flex; align-items: center; gap: 6px; }
+.page-btn { min-width: 34px; height: 34px; padding: 0 10px; border: 2px solid var(--beige); border-radius: 8px; background: var(--blanco); color: var(--chocolate); font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; }
+.page-btn:hover:not(:disabled) { border-color: var(--chocolate); background: var(--crema); }
+.page-btn.active { background: var(--chocolate); border-color: var(--chocolate); color: var(--blanco); }
+.page-btn:disabled { opacity: .35; cursor: default; }
+.page-ellipsis { color: var(--gris); font-size: 13px; padding: 0 4px; }
+
+/* ── HISTORIAL ── */
+.tl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+.tl-card { background: var(--blanco); border-radius: 14px; padding: 20px 16px; text-align: center; border: 1px solid var(--beige); box-shadow: 0 4px 16px rgba(63,32,33,.07); }
+.tl-card::before { content: ''; display: block; height: 4px; border-radius: 2px; margin-bottom: 12px; }
+.tl-card.tl-suma::before    { background: var(--azul); }
+.tl-card.tl-redim::before   { background: var(--cereza); }
+.tl-card.tl-eventos::before { background: var(--naranja); }
+.tl-card.tl-suma    .kpi-value { color: var(--azul); }
+.tl-card.tl-redim   .kpi-value { color: var(--cereza); }
+.tl-card.tl-eventos .kpi-value { color: var(--naranja); }
+.log-badge-suma      { background: #e3f2fd; color: #1565c0; padding: 3px 10px; border-radius: 50px; font-size: 11px; font-weight: 700; }
+.log-badge-redencion { background: #fce4ec; color: #c62828; padding: 3px 10px; border-radius: 50px; font-size: 11px; font-weight: 700; }
+
+/* ── ENCUESTAS ── */
+.survey-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 32px; align-items: start; }
+.survey-card { background: var(--blanco); border-radius: 14px; border: 1px solid var(--beige); box-shadow: 0 4px 16px rgba(63,32,33,.07); overflow: hidden; }
+.survey-card-header { padding: 18px 20px 14px; border-bottom: 1px solid var(--beige); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.survey-card-header h3 { color: var(--chocolate); font-size: .9rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+.survey-count-badge { background: var(--cereza); color: var(--blanco); font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 50px; white-space: nowrap; }
+.survey-card-body { padding: 18px 20px 22px; }
+.survey-question { margin-bottom: 22px; }
+.survey-question:last-child { margin-bottom: 0; }
+.survey-q-label { color: var(--chocolate); font-size: 12.5px; font-weight: 700; margin-bottom: 10px; }
+.survey-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+.survey-bar-label { width: 42%; min-width: 110px; color: var(--gris); font-size: 11px; font-weight: 600; text-align: right; line-height: 1.25; }
+.survey-bar-track { flex: 1; background: var(--crema); border: 1px solid var(--beige); border-radius: 50px; height: 18px; position: relative; overflow: hidden; }
+.survey-bar-fill { height: 100%; border-radius: 50px; transition: width .6s ease; }
+.survey-bar-count { width: 56px; color: var(--chocolate); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.survey-text-answers { background: var(--crema); border: 1px solid var(--beige); border-radius: 10px; padding: 10px 14px; max-height: 180px; overflow-y: auto; }
+.survey-text-answer { color: var(--chocolate); font-size: 12px; padding: 7px 0; border-bottom: 1px dashed var(--beige); }
+.survey-text-answer:last-child { border-bottom: none; }
+.survey-text-answer .sta-meta { color: var(--gris); font-size: 10px; display: block; margin-top: 2px; }
+.survey-empty { color: var(--gris); font-size: 13px; text-align: center; padding: 30px 10px; }
+.survey-respondents { padding: 0 20px 18px; }
+.survey-respondents summary { cursor: pointer; color: var(--gris); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 8px 0; }
+.survey-respondents li { color: var(--chocolate); font-size: 12px; padding: 4px 0 4px 8px; list-style: none; border-bottom: 1px dashed var(--beige); }
+.survey-respondents li:last-child { border-bottom: none; }
+.survey-respondents li span { color: var(--gris); font-size: 10px; }
+
+/* ── CANAL DIST BARS ── */
+.canal-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 28px; }
+.canal-card { background: var(--blanco); border-radius: 14px; padding: 20px; border: 1px solid var(--beige); box-shadow: 0 4px 16px rgba(63,32,33,.07); text-align: center; }
+.canal-card::before { content:''; display:block; height:4px; border-radius:2px; margin-bottom:12px; }
+.canal-card.b2c-canal::before { background: var(--cereza); }
+.canal-card.b2b-canal::before { background: var(--naranja); }
+.canal-card.exp-canal::before { background: var(--morado); }
+.canal-card.fac-canal::before { background: var(--azul); }
+.canal-label { color: var(--gris); font-size:10px; text-transform:uppercase; letter-spacing:2px; font-weight:700; margin-bottom:8px; }
+.canal-value { font-size:1.5rem; font-weight:800; margin-bottom:4px; }
+.canal-card.b2c-canal .canal-value { color: var(--cereza); }
+.canal-card.b2b-canal .canal-value { color: var(--naranja); }
+.canal-card.exp-canal .canal-value { color: var(--morado); }
+.canal-card.fac-canal .canal-value { color: var(--azul); }
+.canal-pct { color: var(--gris); font-size:11px; }
+
+/* ── CARTERA AGING ── */
+.aging-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 24px; }
+.aging-card { background: var(--blanco); border-radius: 12px; padding: 16px 12px; text-align: center; border: 1px solid var(--beige); box-shadow: 0 4px 16px rgba(63,32,33,.07); }
+.aging-card::before { content:''; display:block; height:4px; border-radius:2px; margin-bottom:10px; }
+.aging-card.a-total::before   { background: var(--chocolate); }
+.aging-card.a-180::before     { background: #b71c1c; }
+.aging-card.a-120::before     { background: var(--cereza); }
+.aging-card.a-90::before      { background: var(--naranja); }
+.aging-card.a-31::before      { background: #f9a825; }
+.aging-card.a-pv::before      { background: var(--verde); }
+.aging-label { color: var(--gris); font-size:9px; text-transform:uppercase; letter-spacing:1.5px; font-weight:700; margin-bottom:6px; }
+.aging-value { font-size:1.1rem; font-weight:800; color: var(--chocolate); line-height:1.1; }
+.aging-card.a-total .aging-value   { color: var(--chocolate); }
+.aging-card.a-180   .aging-value   { color: #b71c1c; }
+.aging-card.a-120   .aging-value   { color: var(--cereza); }
+.aging-card.a-90    .aging-value   { color: var(--naranja); }
+.aging-card.a-31    .aging-value   { color: #f9a825; }
+.aging-card.a-pv    .aging-value   { color: var(--verde); }
+.aging-pct { color: var(--gris); font-size:10px; margin-top:4px; font-weight:600; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1024px) {
+    :root { --sidebar-w: 190px; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .main-content { padding: 20px 16px 60px; }
+    .chart-grid { grid-template-columns: 1fr; }
+    .canal-grid { grid-template-columns: 1fr 1fr; }
+    .aging-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+    .topbar-logo img { height: 26px; }
+    .segment-toggle { padding: 6px 8px; }
+    .main-content { padding: 16px 12px 40px; }
+    .tl-grid, .chart-grid, .survey-grid { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+    .chart-card.full { grid-column: 1; }
+    .aging-grid { grid-template-columns: repeat(2, 1fr); }
+    .canal-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+    .aging-grid { grid-template-columns: 1fr 1fr; }
+    .canal-grid { grid-template-columns: 1fr; }
+    .nav-item { padding: 0 8px; font-size: 11px; }
+    .nav-icon { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+<!-- ─── TOP BAR ──────────────────────────────────── -->
+<header class="topbar">
+    <div class="topbar-logo">
+        <img src="https://assets.cdn.filesafe.space/jzrg6bPH71ccLohGddsN/media/69fd5ac4bc1f77cc35de6a72.png" alt="Chuculat">
+    </div>
+    <div class="segment-toggle">
+        <button class="seg-btn active" id="segB2C" onclick="setSegment('b2c')">🍫 B2C</button>
+        <button class="seg-btn"        id="segB2B" onclick="setSegment('b2b')">🏢 Ventas</button>
+    </div>
+    <nav class="topbar-nav nav-b2c show" id="navB2C">
+        <a class="nav-item active" href="#sec-kpis"      onclick="b2cNav(this)"><span class="nav-icon">📊</span> KPIs</a>
+        <a class="nav-item" href="#sec-recompras"        onclick="b2cNav(this)"><span class="nav-icon">🔁</span> Recompras <span class="nav-badge" id="navBadgeRecompras">0</span></a>
+        <a class="nav-item" href="#sec-clientes"         onclick="b2cNav(this)"><span class="nav-icon">👥</span> Clientes <span class="nav-badge" id="navBadgeClientes">0</span></a>
+        <a class="nav-item" href="#sec-historial"        onclick="b2cNav(this)"><span class="nav-icon">📅</span> Actividad</a>
+        <a class="nav-item" href="#sec-logs"             onclick="b2cNav(this)"><span class="nav-icon">🗒️</span> Log</a>
+        <a class="nav-item" href="#sec-encuestas"        onclick="b2cNav(this)"><span class="nav-icon">📝</span> Encuestas <span class="nav-badge" id="navBadgeEncuestas">0</span></a>
+    </nav>
+    <nav class="topbar-nav nav-b2b" id="navB2B">
+        <a class="nav-item" href="#sec-b2b-resumen"  onclick="b2bNav(this)"><span class="nav-icon">📊</span> Resumen</a>
+        <a class="nav-item" href="#sec-b2b-meta"     onclick="b2bNav(this)"><span class="nav-icon">🎯</span> Meta Mensual</a>
+        <a class="nav-item" href="#sec-b2b-canal"    onclick="b2bNav(this)"><span class="nav-icon">🔀</span> Canal</a>
+        <a class="nav-item" href="#sec-b2b-cats"     onclick="b2bNav(this)"><span class="nav-icon">🍩</span> Categorías</a>
+        <a class="nav-item" href="#sec-b2b-mensual"  onclick="b2bNav(this)"><span class="nav-icon">📈</span> Mensual</a>
+        <a class="nav-item" href="#sec-b2b-top10"    onclick="b2bNav(this)"><span class="nav-icon">🏆</span> Productos</a>
+        <a class="nav-item" href="#sec-b2b-export"   onclick="b2bNav(this)"><span class="nav-icon">🌍</span> Exportación <span class="nav-badge" id="navBadgeExport">0</span></a>
+        <a class="nav-item" href="#sec-b2b-pivot"    onclick="b2bNav(this)"><span class="nav-icon">🧮</span> Tablas Dinámicas</a>
+        <a class="nav-item" href="#sec-b2b-clientes" onclick="b2bNav(this)"><span class="nav-icon">🏢</span> Clientes <span class="nav-badge" id="navBadgeB2B">0</span></a>
+        <a class="nav-item" href="#sec-b2b-cartera"  onclick="b2bNav(this)"><span class="nav-icon">📋</span> Cartera <span class="nav-badge" id="navBadgeCartera">0</span></a>
+    </nav>
+</header>
+
+<!-- ─── MAIN ─────────────────────────────────────── -->
+<main class="main-content">
+
+<!-- ══════════════════ PANEL B2C ══════════════════ -->
+<div class="panel show" id="panelB2C">
+
+    <!-- KPIs -->
+    <section class="dash-section" id="sec-kpis">
+        <div class="section-title">📊 KPIs Generales</div>
+        <div class="kpi-filter-bar">
+            <label>Desde</label><input type="date" id="kpiDateFrom">
+            <label>Hasta</label><input type="date" id="kpiDateTo">
+            <button class="btn-filter" onclick="applyKpiFilter()">Aplicar</button>
+            <button class="btn-filter secondary" onclick="clearKpiFilter()">Todo el tiempo</button>
+            <span class="kpi-filter-period" id="kpiPeriodLabel">Todo el tiempo</span>
+            <p class="kpi-filter-note">⚙️ Filtra por fecha de última actualización del contacto en GHL</p>
+        </div>
+        <div class="kpi-grid">
+            <div class="kpi-card otorgados"><div class="kpi-icon">🏅</div><div class="kpi-label">Puntos Otorgados</div><div class="kpi-value" id="kpiOtorgados">—</div><div class="kpi-sub" id="kpiOtorgadosSub">Total histórico acumulado</div><div class="kpi-filtered-badge" id="kpiOtorgadosBadge" style="display:none">Filtrado</div></div>
+            <div class="kpi-card redimidos"><div class="kpi-icon">🎁</div><div class="kpi-label">Puntos Redimidos</div><div class="kpi-value" id="kpiRedimidos">—</div><div class="kpi-sub" id="kpiRedimidosSub">Total canjeado</div><div class="kpi-filtered-badge" id="kpiRedimidosBadge" style="display:none">Filtrado</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">📊</div><div class="kpi-label">Tasa de Redención</div><div class="kpi-value" id="kpiTasa">—</div><div class="kpi-sub" id="kpiTasaSub">Redimidos / Otorgados × 100</div><div class="kpi-filtered-badge" id="kpiTasaBadge" style="display:none">Filtrado</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">🔁</div><div class="kpi-label">Recompras (período)</div><div class="kpi-value" id="kpiRecompras">—</div><div class="kpi-sub" id="kpiRecomprasSub">Clientes con más de 1 compra</div></div>
+        </div>
+    </section>
+
+    <!-- Recompras -->
+    <section class="dash-section" id="sec-recompras">
+        <div class="section-title">🔁 Recompras por período<span id="repurchaseBadge">0</span></div>
+        <div class="date-filter-bar">
+            <label>Desde</label><input type="date" id="repDateFrom">
+            <label>Hasta</label><input type="date" id="repDateTo">
+            <button class="btn-filter" onclick="applyRepurchaseFilter()">Aplicar</button>
+            <button class="btn-filter secondary" onclick="clearRepurchaseFilter()">Últimos 30 días</button>
+            <span class="table-count" id="repPeriodLabel">—</span>
+        </div>
+        <div class="table-section">
+            <div class="table-header"><h2>👥 Clientes con Recompras</h2>
+                <div class="table-controls">
+                    <div class="search-wrap"><input type="text" id="searchRepurchase" placeholder="Buscar..." oninput="renderRepurchaseTable()"></div>
+                    <span class="table-count" id="countRepurchase">0 clientes</span>
+                </div>
+            </div>
+            <div class="dash-loading" id="loadingRepurchase"><div class="loading-spinner"></div><p>Cargando...</p></div>
+            <div class="table-wrap" id="wrapRepurchase" style="display:none">
+                <table><thead><tr>
+                    <th onclick="sortRepurchase('contactName')"     data-col="contactName">    Nombre  <i class="si">⇅</i></th>
+                    <th onclick="sortRepurchase('phone')"           data-col="phone">          Teléfono<i class="si">⇅</i></th>
+                    <th onclick="sortRepurchase('compras')"         data-col="compras">        Compras <i class="si">⇅</i></th>
+                    <th onclick="sortRepurchase('ultimaCompra')"    data-col="ultimaCompra">   Última  <i class="si">⇅</i></th>
+                    <th onclick="sortRepurchase('primeraCompra')"   data-col="primeraCompra">  Primera <i class="si">⇅</i></th>
+                    <th onclick="sortRepurchase('puntosOtorgados')" data-col="puntosOtorgados">Pts.    <i class="si">⇅</i></th>
+                </tr></thead><tbody id="bodyRepurchase"></tbody></table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Todos los clientes -->
+    <section class="dash-section" id="sec-clientes">
+        <div class="section-title">📋 Todos los Clientes</div>
+        <div class="table-section">
+            <div class="table-header"><h2>👥 Base Completa</h2>
+                <div class="table-controls">
+                    <div class="search-wrap"><input type="text" id="tableSearch" placeholder="Nombre, cédula, teléfono..." oninput="resetPage(); renderTable()"></div>
+                    <select class="filter-select" id="filterTasa" onchange="resetPage(); renderTable()">
+                        <option value="">Todos</option>
+                        <option value="alta">Tasa alta (≥50%)</option>
+                        <option value="media">Tasa media (20–49%)</option>
+                        <option value="baja">Tasa baja (&lt;20%)</option>
+                        <option value="sin">Sin redenciones</option>
+                    </select>
+                    <select class="filter-select" id="pageSize" onchange="resetPage(); renderTable()">
+                        <option value="10">10/pág</option>
+                        <option value="20">20/pág</option>
+                        <option value="50" selected>50/pág</option>
+                        <option value="100">100/pág</option>
+                    </select>
+                    <span class="table-count" id="tableCount">0 clientes</span>
+                </div>
+            </div>
+            <div class="dash-loading" id="dashLoading"><div class="loading-spinner"></div><p>Cargando contactos...</p></div>
+            <div class="table-wrap" id="tableWrap" style="display:none">
+                <table><thead><tr>
+                    <th onclick="sortBy('fullName')"       data-col="fullName">      Nombre      <i class="si">⇅</i></th>
+                    <th onclick="sortBy('identification')" data-col="identification">Cédula/NIT  <i class="si">⇅</i></th>
+                    <th onclick="sortBy('phone')"          data-col="phone">         Teléfono    <i class="si">⇅</i></th>
+                    <th onclick="sortBy('historicPoints')" data-col="historicPoints">Otorgados   <i class="si">⇅</i></th>
+                    <th onclick="sortBy('redeemedPoints')" data-col="redeemedPoints">Redimidos   <i class="si">⇅</i></th>
+                    <th onclick="sortBy('totalPoints')"    data-col="totalPoints">   Saldo       <i class="si">⇅</i></th>
+                    <th onclick="sortBy('tasaNum')"        data-col="tasaNum">       Tasa        <i class="si">⇅</i></th>
+                </tr></thead><tbody id="tableBody"></tbody></table>
+            </div>
+            <div class="pagination" id="paginationBar" style="display:none">
+                <span class="pagination-info" id="paginationInfo"></span>
+                <div class="pagination-controls" id="paginationControls"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Historial -->
+    <section class="dash-section" id="sec-historial">
+        <div class="section-title">📅 Actividad por Período</div>
+        <div class="date-filter-bar">
+            <label>Desde</label><input type="date" id="dateFrom">
+            <label>Hasta</label><input type="date" id="dateTo">
+            <button class="btn-filter" onclick="applyDateFilter()">Aplicar</button>
+            <button class="btn-filter secondary" onclick="clearDateFilter()">Últimos 30 días</button>
+            <span class="table-count" id="logPeriodLabel">—</span>
+        </div>
+        <div class="tl-grid">
+            <div class="tl-card tl-suma"><div class="kpi-label">Puntos Sumados (período)</div><div class="kpi-value" id="tlSuma">—</div><div class="kpi-sub" id="tlSumaSub">—</div></div>
+            <div class="tl-card tl-redim"><div class="kpi-label">Puntos Redimidos (período)</div><div class="kpi-value" id="tlRedim">—</div><div class="kpi-sub" id="tlRedimSub">—</div></div>
+            <div class="tl-card tl-eventos"><div class="kpi-label">Total Eventos</div><div class="kpi-value" id="tlEventos">—</div><div class="kpi-sub" id="tlEventosSub">—</div></div>
+        </div>
+        <div class="table-section">
+            <div class="table-header"><h2>📆 Resumen Diario</h2><span class="table-count" id="timelineCount">0 días</span></div>
+            <div class="dash-loading" id="loadingTimeline"><div class="loading-spinner"></div><p>Cargando historial...</p></div>
+            <div class="table-wrap" id="wrapTimeline" style="display:none">
+                <table><thead><tr><th>Fecha</th><th>Pts. Sumados</th><th>Pts. Redimidos</th><th>Neto del día</th><th>Eventos</th></tr></thead>
+                <tbody id="bodyTimeline"></tbody></table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Log -->
+    <section class="dash-section" id="sec-logs">
+        <div class="section-title">🗒️ Log de Eventos Individuales</div>
+        <div class="table-section">
+            <div class="table-header"><h2>📋 Todos los Eventos</h2>
+                <div class="table-controls">
+                    <div class="search-wrap"><input type="text" id="logSearch" placeholder="Buscar por nombre, tipo..." oninput="renderLogTable()"></div>
+                    <select class="filter-select" id="logTypeFilter" onchange="renderLogTable()">
+                        <option value="">Todos los tipos</option>
+                        <option value="suma_puntos">Solo sumas</option>
+                        <option value="redencion">Solo redenciones</option>
+                    </select>
+                    <span class="table-count" id="logCount">0 eventos</span>
+                </div>
+            </div>
+            <div class="table-wrap" id="wrapLogs" style="display:none">
+                <table><thead><tr><th>Fecha / Hora</th><th>Tipo</th><th>Cliente</th><th>Teléfono</th><th>Puntos</th><th>Fuente</th></tr></thead>
+                <tbody id="bodyLogs"></tbody></table>
+            </div>
+            <div class="dash-loading" id="loadingLogs"><div class="loading-spinner"></div><p>Cargando eventos...</p></div>
+        </div>
+    </section>
+
+    <!-- Encuestas -->
+    <section class="dash-section" id="sec-encuestas">
+        <div class="section-title">📝 Encuestas de Experiencia<span id="surveyTotalBadge">0</span></div>
+        <div class="dash-loading" id="loadingSurveys"><div class="loading-spinner"></div><p>Cargando encuestas...</p></div>
+        <div class="survey-grid" id="surveyGrid" style="display:none">
+            <div class="survey-card" id="cardExperiencias">
+                <div class="survey-card-header"><h3>🍫 Experiencias</h3><span class="survey-count-badge" id="countExperiencias">0 respuestas</span></div>
+                <div class="survey-card-body" id="bodyExperiencias"></div>
+                <div class="survey-respondents" id="respExperiencias"></div>
+            </div>
+            <div class="survey-card" id="cardChuculatologia">
+                <div class="survey-card-header"><h3>☕ Chuculatología</h3><span class="survey-count-badge" id="countChuculatologia">0 respuestas</span></div>
+                <div class="survey-card-body" id="bodyChuculatologia"></div>
+                <div class="survey-respondents" id="respChuculatologia"></div>
+            </div>
+        </div>
+    </section>
+
+</div><!-- /panelB2C -->
+
+<!-- ══════════════════ PANEL VENTAS (B2B) ══════════════════ -->
+<div class="panel" id="panelB2B">
+
+    <!-- Filtro de fechas -->
+    <div class="date-filter-bar" style="margin-bottom:24px">
+        <label>Desde</label><input type="date" id="b2bDateFrom">
+        <label>Hasta</label><input type="date" id="b2bDateTo">
+        <button class="btn-filter" onclick="applyB2BFilter()">Aplicar</button>
+        <button class="btn-filter secondary" onclick="clearB2BFilter()">Año actual</button>
+        <span class="kpi-filter-period" id="b2bPeriodLabel">Cargando...</span>
+    </div>
+    <div class="dash-loading" id="loadingB2B"><div class="loading-spinner"></div><p>Consultando Siigo... la primera carga puede tomar unos segundos.</p></div>
+    <div id="b2bContent" style="display:none">
+
+    <!-- Resumen -->
+    <section class="dash-section" id="sec-b2b-resumen">
+        <div class="section-title">📊 Resumen de Ventas</div>
+        <p class="section-note">💡 Todos los montos son <strong>subtotal sin IVA</strong>. Clasificación por centro de costo de Siigo (B2C 168 · B2B 166 · Exportación 315).</p>
+        <div class="kpi-grid">
+            <div class="kpi-card ventas"><div class="kpi-icon">💰</div><div class="kpi-label">Total Ventas</div><div class="kpi-value" id="b2bKpiTotal">—</div><div class="kpi-sub" id="b2bKpiTotalSub">—</div></div>
+            <div class="kpi-card b2c"><div class="kpi-icon">🛍️</div><div class="kpi-label">Ventas B2C</div><div class="kpi-value" id="b2bKpiB2C">—</div><div class="kpi-sub" id="b2bKpiB2CSub">—</div></div>
+            <div class="kpi-card b2b-kpi"><div class="kpi-icon">🏢</div><div class="kpi-label">Ventas B2B</div><div class="kpi-value" id="b2bKpiB2B">—</div><div class="kpi-sub" id="b2bKpiB2BSub">—</div></div>
+            <div class="kpi-card export-kpi"><div class="kpi-icon">🌍</div><div class="kpi-label">Exportación</div><div class="kpi-value" id="b2bKpiExport">—</div><div class="kpi-sub" id="b2bKpiExportSub">—</div></div>
+        </div>
+        <div class="meta-bar-wrap">
+            <div class="meta-bar-label">
+                <span>📈 Progreso vs Meta Anual $1.600.000.000 <small>(subtotal)</small></span>
+                <small id="metaBarInfo">—</small>
+            </div>
+            <div class="meta-bar-track">
+                <div class="meta-bar-fill" id="metaBarFill" style="width:0%"></div>
+                <span class="meta-bar-pct" id="metaBarPct">0%</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Meta Mensual -->
+    <section class="dash-section" id="sec-b2b-meta">
+        <div class="section-title">🎯 Meta Mensual con Redistribución</div>
+        <p class="section-note">Meta anual <strong>$1.600.000.000</strong> repartida por mes según % de participación. Al cerrar un mes, el faltante se <strong>redistribuye</strong> proporcionalmente entre los meses restantes (real = subtotal sin IVA).</p>
+        <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+            <div class="kpi-card meta"><div class="kpi-icon">🏁</div><div class="kpi-label">Avance Anual</div><div class="kpi-value" id="metaAnualPct">—</div><div class="kpi-sub" id="metaAnualSub">—</div></div>
+            <div class="kpi-card ventas"><div class="kpi-icon">📅</div><div class="kpi-label">Meta Mes Actual (ajustada)</div><div class="kpi-value" id="metaMesActual">—</div><div class="kpi-sub" id="metaMesActualSub">—</div></div>
+            <div class="kpi-card b2b-kpi"><div class="kpi-icon">⚖️</div><div class="kpi-label">Faltante Redistribuido</div><div class="kpi-value" id="metaFaltante">—</div><div class="kpi-sub" id="metaFaltanteSub">a los meses restantes</div></div>
+        </div>
+        <div class="table-section">
+            <div class="table-header"><h2>📆 Cumplimiento mes a mes</h2><span class="table-count" id="metaYearLabel">—</span></div>
+            <div class="table-wrap">
+                <table><thead><tr>
+                    <th>Mes</th><th>% Part.</th><th>Meta Base</th><th>Meta Ajustada</th><th>Real</th><th>Cumplimiento</th><th>Estado</th>
+                </tr></thead><tbody id="bodyMeta"></tbody></table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Canal -->
+    <section class="dash-section" id="sec-b2b-canal">
+        <div class="section-title">🔀 Ventas por Canal <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
+        <div class="canal-grid">
+            <div class="canal-card b2c-canal"><div class="canal-label">B2C · Consumidor</div><div class="canal-value" id="canalB2CVal">—</div><div class="canal-pct" id="canalB2CPct">—</div></div>
+            <div class="canal-card b2b-canal"><div class="canal-label">B2B · Empresas</div><div class="canal-value" id="canalB2BVal">—</div><div class="canal-pct" id="canalB2BPct">—</div></div>
+            <div class="canal-card exp-canal"><div class="canal-label">🌍 Exportación</div><div class="canal-value" id="canalExpVal">—</div><div class="canal-pct" id="canalExpPct">—</div></div>
+            <div class="canal-card fac-canal"><div class="canal-label">Facturas Procesadas</div><div class="canal-value" id="canalFacturas">—</div><div class="canal-pct" id="canalFacturasSub">—</div></div>
+        </div>
+    </section>
+
+    <!-- Categorías -->
+    <section class="dash-section" id="sec-b2b-cats">
+        <div class="section-title">🍩 Ventas por Categoría <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
+        <div class="chart-grid">
+            <div class="chart-card">
+                <div class="chart-title">Distribución porcentual</div>
+                <div class="chart-wrap"><canvas id="chartDonut"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">Subtotal por categoría (COP)</div>
+                <div class="chart-wrap"><canvas id="chartBarCat"></canvas></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tendencia Mensual -->
+    <section class="dash-section" id="sec-b2b-mensual">
+        <div class="section-title">📈 Tendencia Mensual <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
+        <div class="chart-card full" style="margin-bottom:28px">
+            <div class="chart-title">Ventas mes a mes por canal</div>
+            <div class="chart-wrap tall"><canvas id="chartLine"></canvas></div>
+        </div>
+    </section>
+
+    <!-- Productos -->
+    <section class="dash-section" id="sec-b2b-top10">
+        <div class="section-title">🏆 Productos del Período <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· ordenados por dinero (subtotal)</small></div>
+        <div class="table-section">
+            <div class="table-header"><h2>🏆 Ranking por Ventas</h2>
+                <div class="table-controls">
+                    <div class="search-wrap"><input type="text" id="searchProd" placeholder="Buscar producto..." oninput="renderB2BTop10()"></div>
+                    <select class="filter-select" id="prodLimit" onchange="renderB2BTop10()">
+                        <option value="10">Top 10</option>
+                        <option value="25">Top 25</option>
+                        <option value="50">Top 50</option>
+                        <option value="0">Todos</option>
+                    </select>
+                    <span class="table-count" id="top10Count">10 productos</span>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table><thead><tr>
+                    <th>#</th><th>Código</th><th>Producto</th><th>Categoría</th>
+                    <th>💵 Dinero (subtotal)</th><th>📦 Unidades</th><th>Facturas</th>
+                </tr></thead><tbody id="bodyTop10"></tbody></table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Exportación -->
+    <section class="dash-section" id="sec-b2b-export">
+        <div class="section-title">🌍 Reporte de Exportación <span id="exportBadge">0</span></div>
+        <p class="section-note">Ventas del centro de costo <strong>Exportación (315)</strong> · subtotal sin IVA.</p>
+        <div class="kpi-grid">
+            <div class="kpi-card export-kpi"><div class="kpi-icon">🌍</div><div class="kpi-label">Total Exportación</div><div class="kpi-value" id="expKpiTotal">—</div><div class="kpi-sub" id="expKpiTotalSub">—</div></div>
+            <div class="kpi-card ventas"><div class="kpi-icon">🧾</div><div class="kpi-label">Facturas</div><div class="kpi-value" id="expKpiFacturas">—</div><div class="kpi-sub">de exportación</div></div>
+            <div class="kpi-card b2b-kpi"><div class="kpi-icon">🏢</div><div class="kpi-label">Clientes</div><div class="kpi-value" id="expKpiClientes">—</div><div class="kpi-sub">destinos / compradores</div></div>
+            <div class="kpi-card meta"><div class="kpi-icon">📊</div><div class="kpi-label">% del Total</div><div class="kpi-value" id="expKpiPct">—</div><div class="kpi-sub">participación en ventas</div></div>
+        </div>
+        <div class="chart-card full" style="margin-bottom:28px">
+            <div class="chart-title">Exportación mes a mes (COP subtotal)</div>
+            <div class="chart-wrap"><canvas id="chartExpLine"></canvas></div>
+        </div>
+        <div class="table-section">
+            <div class="table-header"><h2>📦 Productos Exportados</h2><span class="table-count" id="expProdCount">0 productos</span></div>
+            <div class="table-wrap">
+                <table><thead><tr>
+                    <th>#</th><th>Producto</th><th>Categoría</th><th>💵 Dinero (subtotal)</th><th>📦 Unidades</th><th>Facturas</th>
+                </tr></thead><tbody id="bodyExpProd"></tbody></table>
+            </div>
+        </div>
+        <div class="table-section">
+            <div class="table-header"><h2>🏢 Clientes de Exportación</h2><span class="table-count" id="expCliCount">0 clientes</span></div>
+            <div class="table-wrap">
+                <table><thead><tr>
+                    <th>Cliente</th><th>NIT / ID</th><th>💵 Total (subtotal)</th><th>Facturas</th><th>Última</th><th>Primera</th>
+                </tr></thead><tbody id="bodyExpCli"></tbody></table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tablas Dinámicas -->
+    <section class="dash-section" id="sec-b2b-pivot">
+        <div class="section-title">🧮 Tablas Dinámicas</div>
+        <p class="section-note">Cruza dimensiones × meses, como una tabla dinámica de Excel. Elige qué analizar, la medida y los meses.</p>
+        <div class="kpi-filter-bar" style="gap:16px">
+            <div><label style="display:block;margin-bottom:4px">Analizar por</label>
+                <select class="filter-select" id="pivotDim" onchange="renderPivot()">
+                    <option value="categorias">Categoría</option>
+                    <option value="productos">Producto</option>
+                    <option value="centros">Centro de costo</option>
+                </select>
+            </div>
+            <div><label style="display:block;margin-bottom:4px">Medida</label>
+                <select class="filter-select" id="pivotMeasure" onchange="renderPivot()">
+                    <option value="subtotal">💵 Subtotal ($)</option>
+                    <option value="qty">📦 Cantidad (und)</option>
+                </select>
+            </div>
+            <div style="flex:1;min-width:220px"><label style="display:block;margin-bottom:4px">Meses</label>
+                <div id="pivotMonths" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+            </div>
+            <div><label style="display:block;margin-bottom:4px">Buscar</label>
+                <div class="search-wrap"><input type="text" id="pivotSearch" placeholder="Filtrar filas..." oninput="renderPivot()"></div>
+            </div>
+        </div>
+        <div class="table-section">
+            <div class="table-header"><h2 id="pivotTitle">Categoría × Mes</h2>
+                <div class="table-controls">
+                    <select class="filter-select" id="pivotLimit" onchange="renderPivot()">
+                        <option value="15">Top 15</option>
+                        <option value="30">Top 30</option>
+                        <option value="0" selected>Todas</option>
+                    </select>
+                    <span class="table-count" id="pivotCount">0 filas</span>
+                </div>
+            </div>
+            <div class="table-wrap"><table id="pivotTable"><thead id="pivotHead"></thead><tbody id="pivotBody"></tbody></table></div>
+        </div>
+    </section>
+
+    <!-- Clientes B2B -->
+    <section class="dash-section" id="sec-b2b-clientes">
+        <div class="section-title">🏢 Clientes B2B <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
+        <div class="table-section">
+            <div class="table-header"><h2>🏢 Empresas Activas</h2>
+                <div class="table-controls">
+                    <div class="search-wrap"><input type="text" id="searchB2BClientes" placeholder="Buscar empresa, NIT..." oninput="renderB2BClientes()"></div>
+                    <span class="table-count" id="countB2BClientes">0 empresas</span>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table><thead><tr>
+                    <th onclick="sortB2BClientes('name')"         data-col="name">        Empresa         <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('identification')"data-col="identification">NIT            <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('totalCompras')" data-col="totalCompras"> Total Compras   <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('facturas')"     data-col="facturas">     Facturas        <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('ultimaCompra')" data-col="ultimaCompra"> Última Compra   <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('primeraCompra')"data-col="primeraCompra">Primera Compra  <i class="si">⇅</i></th>
+                </tr></thead><tbody id="bodyB2BClientes"></tbody></table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Cartera B2B -->
+    <section class="dash-section" id="sec-b2b-cartera">
+        <div class="section-title">📋 Cartera · Cuentas por Cobrar <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
+        <div class="aging-grid">
+            <div class="aging-card a-total"><div class="aging-label">Total Cartera</div><div class="aging-value" id="agingTotal">—</div><div class="aging-pct">Pendiente total</div></div>
+            <div class="aging-card a-180"><div class="aging-label">&gt;180 días</div><div class="aging-value" id="aging180">—</div><div class="aging-pct" id="aging180Pct">—</div></div>
+            <div class="aging-card a-90"><div class="aging-label">&gt;90 días</div><div class="aging-value" id="aging90">—</div><div class="aging-pct" id="aging90Pct">—</div></div>
+            <div class="aging-card a-31"><div class="aging-label">&gt;31 días</div><div class="aging-value" id="aging31">—</div><div class="aging-pct" id="aging31Pct">—</div></div>
+            <div class="aging-card a-pv"><div class="aging-label">Por Vencer</div><div class="aging-value" id="agingPV">—</div><div class="aging-pct" id="agingPVPct">—</div></div>
+        </div>
+        <div class="table-section">
+            <div class="table-header"><h2>💳 Aging por Cliente</h2>
+                <div class="table-controls">
+                    <div class="search-wrap"><input type="text" id="searchCartera" placeholder="Buscar empresa, NIT..." oninput="_renderCarteraTable()"></div>
+                    <span class="table-count" id="countCartera">0 clientes</span>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table><thead><tr>
+                    <th>Cliente</th><th>NIT</th><th>Deuda Total</th>
+                    <th style="color:#b71c1c">&gt;180d</th>
+                    <th style="color:var(--naranja)">&gt;90d</th>
+                    <th style="color:#f9a825">&gt;31d</th>
+                    <th style="color:var(--verde)">Por Vencer</th>
+                    <th>Facturas</th>
+                </tr></thead><tbody id="bodyCartera"></tbody></table>
+            </div>
+        </div>
+    </section>
+
+    </div><!-- /b2bContent -->
+</div><!-- /panelB2B -->
+
+</main>
+</div><!-- /app -->
+
+<script>
+// ── ENDPOINTS ────────────────────────────────────────────────────────────
+const CONTACTS_URL = 'https://app.rioagencymarketing.com/webhook/get-all-contacts';
+const STATS_URL    = 'https://app.rioagencymarketing.com/webhook/get-stats';
+const LOGS_URL     = 'https://app.rioagencymarketing.com/webhook/get-logs';
+const SURVEYS_URL  = 'https://app.rioagencymarketing.com/webhook/get-surveys';
+const VENTAS_URL   = 'https://app.rioagencymarketing.com/webhook/get-ventas';
+
+const BLOCKED_IDS        = new Set(['222222222222', '7777777777777']);
+const BLOCKED_CONTACT_IDS = new Set(['FYD7IoPRDq8u2rR7mDzF']);
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const CHART_COLORS = ['#EC6197','#00ABE1','#62B22A','#F1896C','#3F2021','#9C27B0','#607D8B','#795548','#FF9800','#4CAF50','#2196F3','#E91E63'];
+
+// ── HELPERS ──────────────────────────────────────────────────────────────
+const fmt    = n => Number(n).toLocaleString('es-CO');
+const fmtCOP = n => '$' + Number(n).toLocaleString('es-CO');
+const esc    = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function fmtDate(d) {
+    if (!d) return '—';
+    try { const [y,m,day]=d.split('-'); return `${day} de ${MESES[parseInt(m,10)-1]} ${String(y).slice(2)}`; } catch(e){ return d; }
+}
+function fmtTime(ts) {
+    if (!ts) return '—';
+    try { return new Date(ts).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}); } catch(e){ return '—'; }
+}
+function tsToDate(ts) {
+    if (!ts) return '';
+    try { const d=typeof ts==='number'?new Date(ts):new Date(ts); return isNaN(d)?'':d.toISOString().split('T')[0]; } catch(e){ return ''; }
+}
+function isLogBlocked(e) {
+    return BLOCKED_IDS.has(String(e.siigoId||'').trim()) || BLOCKED_CONTACT_IDS.has(String(e.contactId||'').trim());
+}
+// El segmento B2C del programa de puntos: excluye empresas del panel de lealtad.
+const B2B_NAME_KEYWORDS = /\b(s\.?a\.?s\.?|ltda\.?|s\.?a\.?|s\.?a\.?s|factura|corp|inc|empresa|group|grupo|distribu|comercial|industria|soluciones|servicios)\b/i;
+const B2B_NAME_EXACT = /laura\s+catalina\s+le[oó]n/i;
+function isNIT(raw) {
+    const s = String(raw || '').trim();
+    if (/^\d{8,9}-\d$/.test(s)) return true;
+    const d = s.replace(/[^0-9]/g, '');
+    if (d.length !== 9 && d.length !== 10) return false;
+    return /^(800|811|812|813|820|830|832|860|890|891|892|899|900|901|902)/.test(d);
+}
+function isB2BContact(c) {
+    const name = String(c.fullName || '');
+    if (B2B_NAME_KEYWORDS.test(name) || B2B_NAME_EXACT.test(name)) return true;
+    return isNIT(c.identification);
+}
+function isB2BLog(e) {
+    const name = String(e.contactName || '');
+    if (B2B_NAME_KEYWORDS.test(name) || B2B_NAME_EXACT.test(name)) return true;
+    return isNIT(e.siigoId);
+}
+
+// ── SEGMENT ──────────────────────────────────────────────────────────────
+let currentSegment = 'b2c';
+let b2bLoaded = false;
+
+function setSegment(seg) {
+    currentSegment = seg;
+    document.getElementById('segB2C').classList.toggle('active', seg==='b2c');
+    document.getElementById('segB2B').classList.toggle('active', seg==='b2b');
+    document.getElementById('navB2C').classList.toggle('show', seg==='b2c');
+    document.getElementById('navB2B').classList.toggle('show', seg==='b2b');
+    document.getElementById('panelB2C').classList.toggle('show', seg==='b2c');
+    document.getElementById('panelB2B').classList.toggle('show', seg==='b2b');
+    if (seg==='b2b' && !b2bLoaded) { b2bLoaded=true; loadB2B(); }
+}
+
+// ── NAV ──────────────────────────────────────────────────────────────────
+function b2cNav(el) {
+    document.querySelectorAll('#navB2C .nav-item').forEach(i=>i.classList.remove('active'));
+    el.classList.add('active');
+}
+function b2bNav(el) {
+    document.querySelectorAll('#navB2B .nav-item').forEach(i=>i.classList.remove('active'));
+    el.classList.add('active');
+}
+const obsB2C = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+        if (!e.isIntersecting || currentSegment!=='b2c') return;
+        const map = {'sec-kpis':'#sec-kpis','sec-recompras':'#sec-recompras','sec-clientes':'#sec-clientes','sec-historial':'#sec-historial','sec-logs':'#sec-logs','sec-encuestas':'#sec-encuestas'};
+        document.querySelectorAll('#navB2C .nav-item').forEach(i=>i.classList.toggle('active',i.getAttribute('href')===map[e.target.id]));
+    });
+}, { threshold: 0.3 });
+document.querySelectorAll('#panelB2C .dash-section').forEach(s=>obsB2C.observe(s));
+
+// ── B2C DATA ─────────────────────────────────────────────────────────────
+let allContacts=[], allLogs=[], filteredLogs=[], statsGlobal={};
+let kpiFromDate='', kpiToDate='';
+let repFromDate='', repToDate='';
+let sortCol='fullName', sortDir='asc';
+let sortColR='compras', sortDirR='desc';
+let currentPage=1;
+
+async function loadData() {
+    try {
+        const [cr, sr] = await Promise.all([fetch(CONTACTS_URL), fetch(STATS_URL)]);
+        const contactsData = await cr.json();
+        statsGlobal = await sr.json();
+        const statsMap={};
+        for (const s of (statsGlobal.contacts||[])) statsMap[s.id]=s;
+        allContacts = (contactsData.contacts||[])
+            .filter(c=>{ const id=String(c.identification||'').trim(); return !BLOCKED_IDS.has(id) && !!c.phone && !isB2BContact(c); })
+            .map(c=>{ const ex=statsMap[c.id]||{}; const h=parseInt(ex.historicPoints||0); const r=parseInt(ex.redeemedPoints||0);
+                return {...c, totalPoints:parseInt(c.totalPoints||0), historicPoints:h, redeemedPoints:r, tasaNum:h>0?Math.round(r/h*100):0, updatedAt:tsToDate(c.dateUpdated||c.dateAdded||'')}; });
+        document.getElementById('navBadgeClientes').textContent=allContacts.length;
+        document.getElementById('dashLoading').style.display='none';
+        document.getElementById('tableWrap').style.display='block';
+        renderKPIsFromStats(); renderTable();
+    } catch(err) {
+        document.getElementById('dashLoading').innerHTML='<p style="color:#D32F2F;padding:30px;">❌ Error cargando datos.</p>';
+    }
+}
+
+function renderKPIsFromStats() {
+    const ot=statsGlobal.totalOtorgados||0, re=statsGlobal.totalRedimidos||0, ta=statsGlobal.tasa||0;
+    document.getElementById('kpiOtorgados').textContent=fmt(ot);
+    document.getElementById('kpiRedimidos').textContent=fmt(re);
+    document.getElementById('kpiTasa').textContent=ta+'%';
+    document.getElementById('kpiOtorgadosSub').textContent='Total histórico acumulado';
+    document.getElementById('kpiRedimidosSub').textContent='Total canjeado';
+    document.getElementById('kpiTasaSub').textContent='Redimidos / Otorgados × 100';
+    document.getElementById('kpiPeriodLabel').textContent='Todo el tiempo';
+    ['kpiOtorgadosBadge','kpiRedimidosBadge','kpiTasaBadge'].forEach(id=>document.getElementById(id).style.display='none');
+    kpiFromDate=''; kpiToDate='';
+}
+
+function applyKpiFilter() {
+    const from=document.getElementById('kpiDateFrom').value, to=document.getElementById('kpiDateTo').value;
+    if (!from&&!to){ clearKpiFilter(); return; }
+    kpiFromDate=from; kpiToDate=to;
+    if (!allLogs.length){ setTimeout(applyKpiFilter,500); return; }
+    const logs=allLogs.filter(e=>(!from||e.date>=from)&&(!to||e.date<=to));
+    const ot=logs.filter(e=>e.type==='suma_puntos').reduce((s,e)=>s+(e.points||0),0);
+    const re=logs.filter(e=>e.type==='redencion').reduce((s,e)=>s+(e.points||0),0);
+    const ta=ot>0?Math.round(re/ot*100):0;
+    const dias=new Set(logs.map(e=>e.date)).size;
+    const label=from&&to?`${fmtDate(from)} → ${fmtDate(to)}`:from?`Desde ${fmtDate(from)}`:`Hasta ${fmtDate(to)}`;
+    document.getElementById('kpiOtorgados').textContent=fmt(ot);
+    document.getElementById('kpiRedimidos').textContent=fmt(re);
+    document.getElementById('kpiTasa').textContent=ta+'%';
+    document.getElementById('kpiOtorgadosSub').textContent=`${logs.length} evento(s) · ${dias} día(s)`;
+    document.getElementById('kpiRedimidosSub').textContent=`${logs.filter(e=>e.type==='redencion').length} redenciones`;
+    document.getElementById('kpiTasaSub').textContent='Calculado del período';
+    document.getElementById('kpiPeriodLabel').textContent=label;
+    ['kpiOtorgadosBadge','kpiRedimidosBadge','kpiTasaBadge'].forEach(id=>document.getElementById(id).style.display='inline-block');
+}
+function clearKpiFilter(){ document.getElementById('kpiDateFrom').value=''; document.getElementById('kpiDateTo').value=''; renderKPIsFromStats(); }
+
+async function loadLogs() {
+    try {
+        const res=await fetch(LOGS_URL);
+        const data=await res.json();
+        allLogs=(data.logs||[]).filter(e=>!isLogBlocked(e) && !isB2BLog(e)).slice().reverse();
+        ['loadingTimeline','loadingLogs','loadingRepurchase'].forEach(id=>document.getElementById(id).style.display='none');
+        ['wrapTimeline','wrapLogs','wrapRepurchase'].forEach(id=>document.getElementById(id).style.display='block');
+        applyDateFilter(); applyRepurchaseFilter();
+    } catch(e) {
+        const msg='<p style="color:var(--gris);padding:20px;text-align:center">Sin datos de log aún.</p>';
+        ['loadingTimeline','loadingLogs','loadingRepurchase'].forEach(id=>document.getElementById(id).innerHTML=msg);
+    }
+}
+
+// Recompras
+(function(){ const to=new Date(), from=new Date(); from.setDate(from.getDate()-30);
+    repFromDate=from.toISOString().split('T')[0]; repToDate=to.toISOString().split('T')[0];
+    document.getElementById('repDateFrom').value=repFromDate; document.getElementById('repDateTo').value=repToDate; })();
+
+function applyRepurchaseFilter(){
+    repFromDate=document.getElementById('repDateFrom').value; repToDate=document.getElementById('repDateTo').value;
+    document.getElementById('repPeriodLabel').textContent=repFromDate&&repToDate?`${fmtDate(repFromDate)} → ${fmtDate(repToDate)}`:'Todo el historial';
+    renderRepurchaseTable();
+}
+function clearRepurchaseFilter(){ const to=new Date(), from=new Date(); from.setDate(from.getDate()-30);
+    document.getElementById('repDateFrom').value=from.toISOString().split('T')[0]; document.getElementById('repDateTo').value=to.toISOString().split('T')[0]; applyRepurchaseFilter(); }
+
+function calcRepurchases() {
+    const eventos=allLogs.filter(e=>{ if(e.type!=='suma_puntos') return false; if(repFromDate&&e.date<repFromDate) return false; if(repToDate&&e.date>repToDate) return false; return true; });
+    const map={};
+    for (const e of eventos) { const key=e.contactId||e.phone||e.contactName; if(!key) continue;
+        if(!map[key]) map[key]={contactId:e.contactId||'',contactName:e.contactName||'—',phone:e.phone||'—',compras:0,puntosOtorgados:0,ultimaCompra:'',primeraCompra:''};
+        map[key].compras++; map[key].puntosOtorgados+=e.points||0;
+        if(!map[key].ultimaCompra||e.date>map[key].ultimaCompra) map[key].ultimaCompra=e.date;
+        if(!map[key].primeraCompra||e.date<map[key].primeraCompra) map[key].primeraCompra=e.date; }
+    return Object.values(map).filter(c=>c.compras>1);
+}
+function renderRepurchaseTable() {
+    const q=document.getElementById('searchRepurchase').value.toLowerCase().trim();
+    let rows=calcRepurchases(); if(q) rows=rows.filter(c=>(c.contactName+' '+c.phone).toLowerCase().includes(q));
+    rows.sort((a,b)=>{ const av=a[sortColR]??'',bv=b[sortColR]??''; return typeof av==='number'?(sortDirR==='asc'?av-bv:bv-av):(sortDirR==='asc'?String(av).localeCompare(String(bv),'es'):String(bv).localeCompare(String(av),'es')); });
+    document.getElementById('countRepurchase').textContent=rows.length+' clientes';
+    document.getElementById('repurchaseBadge').textContent=rows.length;
+    document.getElementById('navBadgeRecompras').textContent=rows.length;
+    document.getElementById('kpiRecompras').textContent=rows.length;
+    document.getElementById('kpiRecomprasSub').textContent=repFromDate&&repToDate?`${fmtDate(repFromDate)} → ${fmtDate(repToDate)}`:'Clientes con más de 1 compra';
+    const tbody=document.getElementById('bodyRepurchase');
+    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="6">🍫 Sin recompras en el período</td></tr>'; return; }
+    tbody.innerHTML=rows.map(c=>`<tr><td class="td-name">${esc(c.contactName)}</td><td>${esc(c.phone)}</td><td><span class="badge-recompra">🔁 ${c.compras}</span></td><td>${fmtDate(c.ultimaCompra)}</td><td>${fmtDate(c.primeraCompra)}</td><td class="td-pts azul">${fmt(c.puntosOtorgados)}</td></tr>`).join('');
+}
+function sortRepurchase(col){ sortDirR=sortColR===col?(sortDirR==='asc'?'desc':'asc'):'desc'; sortColR=col;
+    document.querySelectorAll('#wrapRepurchase th[data-col]').forEach(th=>{ th.classList.remove('sort-asc','sort-desc'); const si=th.querySelector('.si'); if(th.dataset.col===col){th.classList.add(sortDirR==='asc'?'sort-asc':'sort-desc');si.textContent=sortDirR==='asc'?'↑':'↓';}else si.textContent='⇅'; });
+    renderRepurchaseTable(); }
+
+// Tabla general
+function resetPage(){ currentPage=1; }
+function renderTable() {
+    const q=document.getElementById('tableSearch').value.toLowerCase().trim();
+    const filter=document.getElementById('filterTasa').value;
+    const size=parseInt(document.getElementById('pageSize').value);
+    let rows=allContacts.filter(c=>{ if(q){const h=(c.fullName+' '+c.identification+' '+c.phone).toLowerCase(); if(!h.includes(q)) return false;}
+        if(filter==='alta') return c.tasaNum>=50; if(filter==='media') return c.tasaNum>=20&&c.tasaNum<50;
+        if(filter==='baja') return c.tasaNum>0&&c.tasaNum<20; if(filter==='sin') return c.tasaNum===0; return true; });
+    rows.sort((a,b)=>{ const av=a[sortCol]??'',bv=b[sortCol]??''; return typeof av==='number'?(sortDir==='asc'?av-bv:bv-av):(sortDir==='asc'?String(av).localeCompare(String(bv),'es'):String(bv).localeCompare(String(av),'es')); });
+    const total=rows.length, totalPages=Math.max(1,Math.ceil(total/size));
+    if(currentPage>totalPages) currentPage=totalPages;
+    const start=(currentPage-1)*size, paged=rows.slice(start,start+size);
+    document.getElementById('tableCount').textContent=total+' clientes';
+    const tbody=document.getElementById('tableBody');
+    if(!total){ tbody.innerHTML='<tr class="empty-row"><td colspan="7">🍫 No se encontraron clientes</td></tr>'; document.getElementById('paginationBar').style.display='none'; return; }
+    tbody.innerHTML=paged.map(c=>{ const t=c.tasaNum; let bc,bt;
+        if(c.historicPoints===0){bc='badge-none';bt='Sin pts.';}else if(t>=50){bc='badge-alta';bt=t+'%';}else if(t>=20){bc='badge-media';bt=t+'%';}else{bc='badge-baja';bt=t+'%';}
+        return `<tr><td class="td-name">${esc(c.fullName||'—')}</td><td>${esc(c.identification||'—')}</td><td>${esc(c.phone||'—')}</td><td class="td-pts azul">${fmt(c.historicPoints)}</td><td class="td-pts cereza">${fmt(c.redeemedPoints)}</td><td class="td-pts verde">${fmt(c.totalPoints)}</td><td><span class="badge ${bc}">${bt}</span></td></tr>`; }).join('');
+    const bar=document.getElementById('paginationBar'), info=document.getElementById('paginationInfo'), ctrl=document.getElementById('paginationControls');
+    bar.style.display='flex'; info.textContent=`${start+1}–${Math.min(start+size,total)} de ${fmt(total)}`;
+    const prev=`<button class="page-btn" ${currentPage===1?'disabled':''} onclick="goPage(${currentPage-1})">‹</button>`;
+    const next=`<button class="page-btn" ${currentPage===totalPages?'disabled':''} onclick="goPage(${currentPage+1})">›</button>`;
+    let btns=''; for(let p=1;p<=totalPages;p++){ if(p===1||p===totalPages||(p>=currentPage-2&&p<=currentPage+2)) btns+=`<button class="page-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`; else if(p===currentPage-3||p===currentPage+3) btns+=`<span class="page-ellipsis">…</span>`; }
+    ctrl.innerHTML=prev+btns+next;
+}
+function goPage(p){ currentPage=p; renderTable(); document.getElementById('sec-clientes').scrollIntoView({behavior:'smooth',block:'start'}); }
+function sortBy(col){ sortDir=sortCol===col?(sortDir==='asc'?'desc':'asc'):'asc'; sortCol=col; currentPage=1;
+    document.querySelectorAll('#tableWrap th[data-col]').forEach(th=>{ th.classList.remove('sort-asc','sort-desc'); const si=th.querySelector('.si'); if(th.dataset.col===col){th.classList.add(sortDir==='asc'?'sort-asc':'sort-desc');si.textContent=sortDir==='asc'?'↑':'↓';}else si.textContent='⇅'; });
+    renderTable(); }
+
+// Historial
+(function(){ const to=new Date(), from=new Date(); from.setDate(from.getDate()-30);
+    document.getElementById('dateTo').value=to.toISOString().split('T')[0]; document.getElementById('dateFrom').value=from.toISOString().split('T')[0]; })();
+
+function applyDateFilter() {
+    const from=document.getElementById('dateFrom').value, to=document.getElementById('dateTo').value;
+    filteredLogs=allLogs.filter(e=>(!from||e.date>=from)&&(!to||e.date<=to));
+    document.getElementById('logPeriodLabel').textContent=from&&to?`${fmtDate(from)} → ${fmtDate(to)}`:'Todo el historial';
+    renderTimelineKPIs(); renderTimelineTable(); renderLogTable();
+}
+function clearDateFilter(){ const to=new Date(),from=new Date(); from.setDate(from.getDate()-30); document.getElementById('dateTo').value=to.toISOString().split('T')[0]; document.getElementById('dateFrom').value=from.toISOString().split('T')[0]; applyDateFilter(); }
+
+function renderTimelineKPIs() {
+    const suma=filteredLogs.filter(e=>e.type==='suma_puntos').reduce((s,e)=>s+e.points,0);
+    const redim=filteredLogs.filter(e=>e.type==='redencion').reduce((s,e)=>s+e.points,0);
+    const dias=new Set(filteredLogs.map(e=>e.date)).size;
+    document.getElementById('tlSuma').textContent=fmt(suma);
+    document.getElementById('tlRedim').textContent=fmt(redim);
+    document.getElementById('tlEventos').textContent=filteredLogs.length;
+    document.getElementById('tlSumaSub').textContent=`En ${dias} día(s) con actividad`;
+    document.getElementById('tlRedimSub').textContent=suma>0?`${Math.round(redim/suma*100)}% de lo otorgado`:'—';
+    document.getElementById('tlEventosSub').textContent=`${dias} días con actividad`;
+}
+function renderTimelineTable() {
+    const byDate={};
+    for(const e of filteredLogs){ if(!byDate[e.date]) byDate[e.date]={suma:0,redim:0,eventos:0}; byDate[e.date].eventos++; if(e.type==='suma_puntos') byDate[e.date].suma+=e.points; if(e.type==='redencion') byDate[e.date].redim+=e.points; }
+    const rows=Object.entries(byDate).sort((a,b)=>b[0].localeCompare(a[0]));
+    document.getElementById('timelineCount').textContent=rows.length+' días';
+    const tbody=document.getElementById('bodyTimeline');
+    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="5">Sin actividad en el período</td></tr>'; return; }
+    tbody.innerHTML=rows.map(([date,d])=>{ const neto=d.suma-d.redim; return `<tr><td><strong>${fmtDate(date)}</strong></td><td class="td-pts azul">${fmt(d.suma)}</td><td class="td-pts cereza">${fmt(d.redim)}</td><td style="font-weight:700;color:${neto>=0?'var(--verde)':'var(--cereza)'}">${neto>=0?'+':''}${fmt(neto)}</td><td>${d.eventos}</td></tr>`; }).join('');
+}
+function renderLogTable() {
+    const q=document.getElementById('logSearch').value.toLowerCase().trim();
+    const type=document.getElementById('logTypeFilter').value;
+    const rows=filteredLogs.filter(e=>{ if(type&&e.type!==type) return false; if(q&&!(e.contactName+' '+e.type+' '+e.phone).toLowerCase().includes(q)) return false; return true; });
+    document.getElementById('logCount').textContent=rows.length+' eventos';
+    const tbody=document.getElementById('bodyLogs');
+    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="6">Sin eventos para los filtros aplicados</td></tr>'; return; }
+    tbody.innerHTML=rows.map(e=>{ const hora=fmtTime(e.timestamp); const badge=e.type==='suma_puntos'?`<span class="log-badge-suma">🏅 Suma</span>`:`<span class="log-badge-redencion">🎁 Redención</span>`;
+        return `<tr><td>${fmtDate(e.date)} <span style="color:var(--gris);font-size:11px">${hora}</span></td><td>${badge}</td><td class="td-name">${esc(e.contactName||'—')}</td><td>${esc(e.phone||'—')}</td><td class="td-pts ${e.type==='suma_puntos'?'azul':'cereza'}">${fmt(e.points)}</td><td style="color:var(--gris);font-size:12px">${esc(e.source||'—')}</td></tr>`; }).join('');
+}
+
+// Encuestas
+const SURVEY_DEFS = {
+    experiencias: { title:'Experiencias', questions: [
+        {id:'JRPwosOSS2qb3aWpY2II',label:'¿Qué experiencia realizaste hoy?',type:'single',options:['Cacao Maestro','El Camino del Chocolate','Wonka por un día','Oompa Loompa por un día']},
+        {id:'qfVQZ2eZoIdBpMCQ0Uxl',label:'¿Cómo calificarías tu experiencia en general?',type:'single',options:['Excelente','Muy buena','Buena','Regular','Mala']},
+        {id:'I9mUDaEH8mrGsxls75ys',label:'Frente a tus expectativas, la experiencia:',type:'single',options:['Superó las expectativas','Cumplió las expectativas','Cumplió parcialmente las expectativas','No cumplió las expectativas','No había expectativas previas']},
+        {id:'9B4GwlZ1jMFKDH2RkhYF',label:'¿Qué parte de la experiencia te resultó más interesante?',type:'multi',options:['Conocer el proceso del cacao al chocolate','La cata o degustación','Aprender sobre la industria del chocolate','Ver la producción / la planta','La experiencia en general','Otras']},
+        {id:'Diat1g5q6OLj9NIQfvPz',label:'¿Cómo conociste esta experiencia?',type:'single',options:['Búsqueda en Google','Redes sociales','Recomendación de alguien','Pasó por la tienda','Agencia, guía u operador turístico','Otras']},
+        {id:'4jXb4pPqHYYgGXiBZYP1',label:'¿Recomendarías esta experiencia a alguien más?',type:'single',options:['Sin duda','Probablemente sí','No está seguro','Probablemente no','No']},
+        {id:'heKvmjtc0yap8OSinkRh',label:'¿Cuáles?',type:'text'},
+        {id:'SXK3mzzvl6tyOrWiBpGJ',label:'Si pudieras mejorar algo de la experiencia, ¿qué sería?',type:'text'}
+    ]},
+    chuculatologia: { title:'Chuculatología', questions: [
+        {id:'JRPwosOSS2qb3aWpY2II',label:'¿Cómo calificarías tu experiencia en general?',type:'single',options:['Excelente','Muy buena','Buena','Regular','Mala']},
+        {id:'I9mUDaEH8mrGsxls75ys',label:'Frente a tus expectativas, la experiencia:',type:'single',options:['Superó las expectativas','Cumplió las expectativas','Cumplió parcialmente las expectativas','No cumplió las expectativas','No había expectativas previas']},
+        {id:'9B4GwlZ1jMFKDH2RkhYF',label:'¿Qué fue lo que más disfrutaste de la CHUCULATOLOGÍA?',type:'multi',options:['La personalización de la bebida','Los sabores y combinaciones','La calidad del chocolate','La presentación','El ambiente del lugar','La atención del equipo','Toda la experiencia','Otras']},
+        {id:'Diat1g5q6OLj9NIQfvPz',label:'¿Cómo calificarías las opciones de personalización?',type:'single',options:['Excelentes','Muy buenas','Buenas','Regulares','Insuficientes']},
+        {id:'4jXb4pPqHYYgGXiBZYP1',label:'¿Recomendarías CHUCULATOLOGÍA a alguien más?',type:'single',options:['Sin duda','Probablemente sí','No está seguro','Probablemente no','No']},
+        {id:'heKvmjtc0yap8OSinkRh',label:'¿Cuáles?',type:'text'},
+        {id:'SXK3mzzvl6tyOrWiBpGJ',label:'Si pudieras mejorar algo de la experiencia, ¿qué sería?',type:'text'}
+    ]}
+};
+const SURVEY_BAR_COLORS=['var(--verde)','var(--azul)','var(--naranja)','var(--cereza)','var(--chocolate-light)','#9C27B0','#607D8B','#795548'];
+
+async function loadSurveys() {
+    try {
+        let data=null;
+        for(let attempt=1;attempt<=4;attempt++){
+            try{ const res=await fetch(SURVEYS_URL); const text=await res.text(); if(res.ok&&text.trim()){data=JSON.parse(text);break;} } catch(e){}
+            await new Promise(r=>setTimeout(r,1200*attempt));
+        }
+        if(!data) throw new Error('Sin respuesta');
+        if(Array.isArray(data)) data=data[0]||{};
+        const exp=(data.experiencias||[]).filter(s=>!BLOCKED_CONTACT_IDS.has(String(s.contactId||'')));
+        const chu=(data.chuculatologia||[]).filter(s=>!BLOCKED_CONTACT_IDS.has(String(s.contactId||'')));
+        document.getElementById('loadingSurveys').style.display='none';
+        document.getElementById('surveyGrid').style.display='grid';
+        const total=exp.length+chu.length;
+        document.getElementById('surveyTotalBadge').textContent=total;
+        document.getElementById('navBadgeEncuestas').textContent=total;
+        renderSurveyCard('experiencias',exp,'bodyExperiencias','countExperiencias','respExperiencias');
+        renderSurveyCard('chuculatologia',chu,'bodyChuculatologia','countChuculatologia','respChuculatologia');
+    } catch(e) { document.getElementById('loadingSurveys').innerHTML='<p style="color:var(--gris);padding:20px;text-align:center">Sin datos de encuestas aún.</p>'; }
+}
+function renderSurveyCard(key,subs,bodyId,countId,respId) {
+    const def=SURVEY_DEFS[key]; const body=document.getElementById(bodyId);
+    document.getElementById(countId).textContent=subs.length+(subs.length===1?' respuesta':' respuestas');
+    if(!subs.length){ body.innerHTML='<div class="survey-empty">📝 Aún no hay respuestas para esta encuesta</div>'; document.getElementById(respId).innerHTML=''; return; }
+    let html='';
+    for(const q of def.questions){
+        const values=[];
+        for(const s of subs){ const v=(s.answers||{})[q.id]; if(v===undefined||v===null||v==='') continue; if(Array.isArray(v)) values.push(...v.map(x=>String(x).trim())); else values.push(String(v).trim()); }
+        if(!values.length) continue;
+        if(q.type==='text'){ html+=`<div class="survey-question"><div class="survey-q-label">${esc(q.label)}</div><div class="survey-text-answers">`+subs.filter(s=>(s.answers||{})[q.id]).map(s=>`<div class="survey-text-answer">"${esc(s.answers[q.id])}"<span class="sta-meta">${esc(s.name||'Anónimo')} · ${fmtDate(s.date)}</span></div>`).join('')+`</div></div>`; }
+        else {
+            const counts={}; for(const v of values) counts[v]=(counts[v]||0)+1;
+            const ordered=[...(q.options||[])]; for(const v of Object.keys(counts)) if(!ordered.includes(v)) ordered.push(v);
+            const maxC=Math.max(...ordered.map(o=>counts[o]||0),1), totalR=q.type==='multi'?subs.length:values.length;
+            html+=`<div class="survey-q-label" style="margin-bottom:10px">${esc(q.label)}</div><div class="survey-question">`+ordered.map((opt,i)=>{ const c=counts[opt]||0,pct=totalR>0?Math.round(c/totalR*100):0,w=Math.round(c/maxC*100),col=SURVEY_BAR_COLORS[i%SURVEY_BAR_COLORS.length];
+                return `<div class="survey-bar-row"><div class="survey-bar-label">${esc(opt)}</div><div class="survey-bar-track"><div class="survey-bar-fill" style="width:${w}%;background:${col}"></div></div><div class="survey-bar-count">${c} · ${pct}%</div></div>`; }).join('')+`</div>`;
+        }
+    }
+    body.innerHTML=html||'<div class="survey-empty">Sin respuestas procesables</div>';
+    document.getElementById(respId).innerHTML=`<details><summary>👤 Ver quién respondió (${subs.length})</summary><ul>`+subs.map(s=>`<li>${esc(s.name||'Anónimo')} <span>· ${esc(s.email||'')} · ${fmtDate(s.date)}</span></li>`).join('')+`</ul></details>`;
+}
+
+// ── VENTAS (B2B / Export) ────────────────────────────────────────────────
+let ventasData = null;
+let b2bClientesSort = { col:'totalCompras', dir:'desc' };
+let chartInstances = {};
+
+(function initB2BDates(){
+    const now = new Date();
+    document.getElementById('b2bDateFrom').value = now.getFullYear() + '-01-01';
+    document.getElementById('b2bDateTo').value   = now.toISOString().split('T')[0];
+})();
+
+function applyB2BFilter(){ loadB2B(); }
+function clearB2BFilter(){
+    const now=new Date();
+    document.getElementById('b2bDateFrom').value=now.getFullYear()+'-01-01';
+    document.getElementById('b2bDateTo').value=now.toISOString().split('T')[0];
+    loadB2B();
+}
+
+async function loadB2B() {
+    document.getElementById('loadingB2B').style.display='block';
+    document.getElementById('b2bContent').style.display='none';
+    const from=document.getElementById('b2bDateFrom').value;
+    const to  =document.getElementById('b2bDateTo').value;
+    const url = VENTAS_URL + (from||to ? '?date_start='+(from||'')+( to ? '&date_end='+to : '') : '');
+    try {
+        const res  = await fetch(url);
+        const data = await res.json();
+        if (!data.meta) throw new Error('Respuesta inválida');
+        ventasData = data;
+        document.getElementById('loadingB2B').style.display='none';
+        document.getElementById('b2bContent').style.display='block';
+        document.getElementById('b2bPeriodLabel').textContent = fmtDate(data.meta.dateStart) + ' → ' + fmtDate(data.meta.dateEnd);
+        renderB2BAll();
+    } catch(e) {
+        document.getElementById('loadingB2B').innerHTML='<p style="color:#D32F2F;padding:30px;">❌ Error cargando datos de ventas. Intenta de nuevo.</p>';
+        console.error(e);
+    }
+}
+
+function renderB2BAll() {
+    if (!ventasData) return;
+    renderB2BKPIs();
+    renderMeta();
+    renderB2BCanal();
+    renderB2BCategorias();
+    renderB2BMensual();
+    renderB2BTop10();
+    renderExport();
+    initPivotMonths();
+    renderPivot();
+    renderB2BClientes();
+    renderCartera();
+}
+
+// ── META MENSUAL CON REDISTRIBUCIÓN ──────────────────────────────────────
+const META_ANUAL_VAL = 1600000000;
+// % participación mensual (COMP VENTAS · suma 100%)
+const META_PCT = { 1:0.06301662, 2:0.06407228, 3:0.07549632, 4:0.06368978, 5:0.12625007, 6:0.06139210, 7:0.05928163, 8:0.06409069, 9:0.08949743, 10:0.10845739, 11:0.11861540, 12:0.10614030 };
+const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+function renderMeta() {
+    // Año del período consultado
+    const year = (ventasData.meta.dateStart || '').slice(0,4) || String(new Date().getFullYear());
+    // Real por mes (subtotal) desde meses[]
+    const realMes = {};
+    for (const m of (ventasData.meses || [])) {
+        const [y, mo] = m.mes.split('-');
+        if (y === year) realMes[parseInt(mo,10)] = m.total;
+    }
+    // Mes actual (si el año consultado es el año en curso; si es pasado, todos cerrados)
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth() + 1;
+    const isCurYear = parseInt(year,10) === curYear;
+    const closed = m => isCurYear ? m < curMonth : true;   // meses cerrados
+
+    // Faltante = meta anual − real acumulado de meses cerrados
+    let realClosed = 0;
+    for (let m=1;m<=12;m++) if (closed(m)) realClosed += (realMes[m]||0);
+    const remaining = Math.max(META_ANUAL_VAL - realClosed, 0);
+    // % de los meses abiertos
+    let openPct = 0;
+    for (let m=1;m<=12;m++) if (!closed(m)) openPct += META_PCT[m];
+
+    let realTotal = 0;
+    const rows = [];
+    for (let m=1;m<=12;m++) {
+        const base = META_PCT[m] * META_ANUAL_VAL;
+        const adj  = closed(m) ? base : (openPct>0 ? remaining * (META_PCT[m]/openPct) : 0);
+        const real = realMes[m] || 0;
+        realTotal += real;
+        const target = adj;
+        const pct = target>0 ? Math.round(real/target*100) : (real>0?100:0);
+        rows.push({ m, base, adj, real, pct, closed: closed(m), isCur: isCurYear && m===curMonth });
+    }
+
+    // KPIs
+    document.getElementById('metaAnualPct').textContent = Math.round(realTotal/META_ANUAL_VAL*100) + '%';
+    document.getElementById('metaAnualSub').textContent = fmtCOP(realTotal) + ' de ' + fmtCOP(META_ANUAL_VAL);
+    const curRow = rows.find(r=>r.isCur) || rows.find(r=>!r.closed);
+    if (curRow) {
+        document.getElementById('metaMesActual').textContent = fmtCOP(Math.round(curRow.adj));
+        document.getElementById('metaMesActualSub').textContent = MESES[curRow.m-1] + ' · real ' + fmtCOP(curRow.real) + ' (' + curRow.pct + '%)';
+    }
+    const faltante = rows.filter(r=>!r.closed).reduce((s,r)=>s+(r.adj - r.base),0);
+    document.getElementById('metaFaltante').textContent = (faltante>=0?'+':'') + fmtCOP(Math.round(faltante));
+    document.getElementById('metaYearLabel').textContent = 'Año ' + year;
+
+    // Tabla
+    const tbody = document.getElementById('bodyMeta');
+    tbody.innerHTML = rows.map(r=>{
+        let estado, color;
+        if (!r.closed && r.real===0) { estado='Pendiente'; color='var(--gris)'; }
+        else if (r.pct>=100) { estado='✅ Cumplida'; color='var(--verde)'; }
+        else if (r.pct>=70)  { estado='🟡 En camino'; color='#f9a825'; }
+        else                 { estado='🔴 Bajo meta'; color='var(--cereza)'; }
+        const barW = Math.min(r.pct,100);
+        const redistrib = (!r.closed && Math.abs(r.adj-r.base)>1) ? ` <small style="color:var(--naranja)">${r.adj>r.base?'▲':'▼'}</small>` : '';
+        return `<tr style="${r.isCur?'background:rgba(0,171,225,.05)':''}">
+            <td class="td-name">${MESES[r.m-1]}${r.isCur?' <small style="color:var(--azul)">· actual</small>':''}</td>
+            <td>${(META_PCT[r.m]*100).toFixed(1)}%</td>
+            <td style="color:var(--gris)">${fmtCOP(Math.round(r.base))}</td>
+            <td class="td-pts azul">${fmtCOP(Math.round(r.adj))}${redistrib}</td>
+            <td class="td-pts verde">${r.real?fmtCOP(r.real):'—'}</td>
+            <td style="min-width:130px">
+                <div style="display:flex;align-items:center;gap:8px">
+                    <div style="flex:1;background:var(--beige);border-radius:50px;height:14px;overflow:hidden">
+                        <div style="height:100%;width:${barW}%;background:${color};border-radius:50px"></div>
+                    </div>
+                    <span style="font-weight:700;font-size:12px;color:${color}">${r.pct}%</span>
+                </div>
+            </td>
+            <td><span style="font-size:12px;font-weight:600;color:${color}">${estado}</span></td>
+        </tr>`;
+    }).join('');
+}
+
+// ── TABLAS DINÁMICAS (PIVOT) ─────────────────────────────────────────────
+let pivotSelectedMonths = null;
+function initPivotMonths() {
+    const meses = (ventasData.pivot && ventasData.pivot.meses) || [];
+    pivotSelectedMonths = new Set(meses);
+    const cont = document.getElementById('pivotMonths');
+    cont.innerHTML = meses.map(mk=>{
+        const [y,mo]=mk.split('-');
+        return `<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--chocolate);cursor:pointer;background:var(--crema);border:1px solid var(--beige);border-radius:50px;padding:3px 10px">
+            <input type="checkbox" checked data-month="${mk}" onchange="togglePivotMonth(this)" style="cursor:pointer"> ${MESES_CORTO[parseInt(mo,10)-1]} ${y.slice(2)}
+        </label>`;
+    }).join('');
+}
+function togglePivotMonth(cb){ const mk=cb.dataset.month; if(cb.checked) pivotSelectedMonths.add(mk); else pivotSelectedMonths.delete(mk); renderPivot(); }
+
+function renderPivot() {
+    if (!ventasData || !ventasData.pivot) return;
+    const dim = document.getElementById('pivotDim').value;
+    const measure = document.getElementById('pivotMeasure').value;
+    const q = document.getElementById('pivotSearch').value.toLowerCase().trim();
+    const lim = parseInt(document.getElementById('pivotLimit').value);
+    const allMonths = ventasData.pivot.meses || [];
+    const months = allMonths.filter(m=>pivotSelectedMonths.has(m));
+    const isMoney = measure==='subtotal';
+    const fmtVal = v => isMoney ? fmtCOP(v) : fmt(v);
+
+    document.getElementById('pivotTitle').textContent =
+        (dim==='categorias'?'Categoría':dim==='productos'?'Producto':'Centro de costo') + ' × Mes';
+
+    // Construir filas normalizadas: {label, extra, meses:{mk:val}, total}
+    let rows = [];
+    if (dim==='centros') {
+        // centro de costo: solo subtotal disponible
+        const map = { b2c:{label:'B2C · Consumidor'}, b2b:{label:'B2B · Empresas'}, export:{label:'🌍 Exportación'} };
+        for (const key of ['b2c','b2b','export']) {
+            const meses={}; let total=0;
+            for (const c of (ventasData.pivot.centros||[])) { if(!pivotSelectedMonths.has(c.mes)) continue; const v=c[key]||0; meses[c.mes]=v; total+=v; }
+            rows.push({ label: map[key].label, extra:'', meses, total });
+        }
+        if (!isMoney) document.getElementById('pivotMeasure').value='subtotal'; // cantidad no aplica a centros
+    } else {
+        const src = ventasData.pivot[dim] || [];
+        rows = src.map(item=>{
+            const meses={}; let total=0;
+            for (const mk of months) { const cell=item.meses[mk]; const v = cell?(isMoney?cell.subtotal:cell.qty):0; meses[mk]=v; total+=v; }
+            return { label: dim==='productos'?item.name:item.categoria, extra: dim==='productos'?item.categoria:'', code:item.code||'', meses, total };
+        });
+    }
+    if (q) rows = rows.filter(r=>(r.label+' '+(r.extra||'')+' '+(r.code||'')).toLowerCase().includes(q));
+    rows.sort((a,b)=>b.total-a.total);
+    if (lim>0) rows = rows.slice(0,lim);
+
+    // Totales por columna
+    const colTot = {}; months.forEach(mk=>colTot[mk]=0); let grand=0;
+    rows.forEach(r=>{ months.forEach(mk=>colTot[mk]+=(r.meses[mk]||0)); grand+=r.total; });
+
+    document.getElementById('pivotCount').textContent = rows.length + ' filas';
+    // Head
+    const head = `<tr><th style="position:sticky;left:0;background:var(--crema);z-index:2">${dim==='productos'?'Producto':dim==='centros'?'Centro':'Categoría'}</th>`
+        + months.map(mk=>{const[y,mo]=mk.split('-');return `<th style="text-align:right">${MESES_CORTO[parseInt(mo,10)-1]} ${y.slice(2)}</th>`}).join('')
+        + `<th style="text-align:right">Total</th></tr>`;
+    document.getElementById('pivotHead').innerHTML = head;
+    // Body
+    const maxTot = Math.max(...rows.map(r=>r.total),1);
+    let body = rows.map(r=>{
+        return `<tr>
+            <td class="td-name" style="position:sticky;left:0;background:var(--blanco);z-index:1">${esc(r.label)}${r.extra?` <small style="color:var(--gris)">${esc(r.extra)}</small>`:''}</td>`
+            + months.map(mk=>`<td style="text-align:right;color:${r.meses[mk]?'var(--chocolate)':'var(--beige)'}">${r.meses[mk]?fmtVal(r.meses[mk]):'·'}</td>`).join('')
+            + `<td style="text-align:right;font-weight:800;color:var(--azul)">${fmtVal(r.total)}</td>
+        </tr>`;
+    }).join('');
+    // Fila total
+    body += `<tr style="border-top:2px solid var(--beige);font-weight:800;background:var(--crema)">
+        <td style="position:sticky;left:0;background:var(--crema)">TOTAL</td>`
+        + months.map(mk=>`<td style="text-align:right">${fmtVal(colTot[mk])}</td>`).join('')
+        + `<td style="text-align:right;color:var(--azul)">${fmtVal(grand)}</td></tr>`;
+    document.getElementById('pivotBody').innerHTML = body || '<tr class="empty-row"><td colspan="99">Sin datos</td></tr>';
+}
+
+function renderB2BKPIs() {
+    const r = ventasData.resumen;
+    const tot = r.totalGeneral || 1;
+    document.getElementById('b2bKpiTotal').textContent   = fmtCOP(r.totalGeneral);
+    document.getElementById('b2bKpiB2C').textContent     = fmtCOP(r.totalB2C);
+    document.getElementById('b2bKpiB2B').textContent     = fmtCOP(r.totalB2B);
+    document.getElementById('b2bKpiExport').textContent  = fmtCOP(r.totalExport || 0);
+    document.getElementById('b2bKpiTotalSub').textContent= ventasData.meta.totalFacturas + ' facturas · subtotal sin IVA';
+    document.getElementById('b2bKpiB2CSub').textContent  = Math.round(r.totalB2C/tot*100)+'% del total';
+    document.getElementById('b2bKpiB2BSub').textContent  = Math.round(r.totalB2B/tot*100)+'% del total';
+    document.getElementById('b2bKpiExportSub').textContent = Math.round((r.totalExport||0)/tot*100)+'% del total';
+    const pct = Math.min(r.cumplimientoPct, 100);
+    document.getElementById('metaBarFill').style.width  = pct + '%';
+    document.getElementById('metaBarPct').textContent   = r.cumplimientoPct + '%';
+    document.getElementById('metaBarInfo').textContent  = fmtCOP(r.totalGeneral) + ' de ' + fmtCOP(r.metaAnual);
+}
+
+function renderB2BCanal() {
+    const r = ventasData.resumen;
+    const total = r.totalGeneral || 1;
+    document.getElementById('canalB2CVal').textContent     = fmtCOP(r.totalB2C);
+    document.getElementById('canalB2CPct').textContent     = Math.round(r.totalB2C/total*100) + '% del total';
+    document.getElementById('canalB2BVal').textContent     = fmtCOP(r.totalB2B);
+    document.getElementById('canalB2BPct').textContent     = Math.round(r.totalB2B/total*100) + '% del total';
+    document.getElementById('canalExpVal').textContent     = fmtCOP(r.totalExport || 0);
+    document.getElementById('canalExpPct').textContent     = Math.round((r.totalExport||0)/total*100) + '% del total';
+    document.getElementById('canalFacturas').textContent   = ventasData.meta.totalFacturas;
+    document.getElementById('canalFacturasSub').textContent= ventasData.totalClientesB2B + ' empresas · ' + ventasData.totalClientesB2C + ' consumidores';
+    document.getElementById('navBadgeB2B').textContent     = ventasData.totalClientesB2B;
+}
+
+function destroyChart(id) { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
+
+function renderB2BCategorias() {
+    const cats = ventasData.categorias || [];
+    const top8 = cats.slice(0,8);
+    const labels = top8.map(c=>c.categoria);
+    const vals   = top8.map(c=>c.subtotal);
+    destroyChart('donut'); destroyChart('barCat');
+    chartInstances['donut'] = new Chart(document.getElementById('chartDonut'), {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: top8.map(c=>c.pct), backgroundColor: CHART_COLORS, borderWidth: 2, borderColor: '#fff' }] },
+        options: { responsive:true, maintainAspectRatio:false, plugins: { legend:{position:'right',labels:{font:{family:'Montserrat',size:11},boxWidth:14}}, tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.parsed}%`}} } }
+    });
+    chartInstances['barCat'] = new Chart(document.getElementById('chartBarCat'), {
+        type: 'bar',
+        data: { labels, datasets: [{ label:'Subtotal COP', data:vals, backgroundColor:CHART_COLORS, borderRadius:6, borderSkipped:false }] },
+        options: { responsive:true, maintainAspectRatio:false, indexAxis:'y', plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'$'+Number(ctx.parsed.x).toLocaleString('es-CO')}}}, scales:{x:{ticks:{callback:v=>'$'+Number(v).toLocaleString('es-CO')},grid:{color:'rgba(0,0,0,.05)'}},y:{grid:{display:false}}} }
+    });
+}
+
+function renderB2BMensual() {
+    const meses = ventasData.meses || [];
+    const labels = meses.map(m=>{ const [y,mo]=m.mes.split('-'); return MESES[parseInt(mo,10)-1]+' '+y.slice(2); });
+    destroyChart('line');
+    chartInstances['line'] = new Chart(document.getElementById('chartLine'), {
+        type: 'line',
+        data: { labels, datasets: [
+            { label:'Total', data:meses.map(m=>m.total), borderColor:CHART_COLORS[1], backgroundColor:'rgba(0,171,225,.06)', fill:true, tension:.35, pointBackgroundColor:CHART_COLORS[1], pointRadius:4, pointHoverRadius:7, borderWidth:2 },
+            { label:'B2B',   data:meses.map(m=>m.b2b||0), borderColor:CHART_COLORS[3], backgroundColor:'transparent', fill:false, tension:.35, pointBackgroundColor:CHART_COLORS[3], pointRadius:3, pointHoverRadius:7, borderWidth:2, borderDash:[5,3] },
+            { label:'B2C',   data:meses.map(m=>m.b2c||0), borderColor:CHART_COLORS[0], backgroundColor:'transparent', fill:false, tension:.35, pointBackgroundColor:CHART_COLORS[0], pointRadius:3, pointHoverRadius:7, borderWidth:2, borderDash:[5,3] },
+            { label:'Export',data:meses.map(m=>m.export||0), borderColor:CHART_COLORS[5], backgroundColor:'transparent', fill:false, tension:.35, pointBackgroundColor:CHART_COLORS[5], pointRadius:3, pointHoverRadius:7, borderWidth:2, borderDash:[2,2] }
+        ]},
+        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true,position:'top',labels:{font:{family:'Montserrat',size:11},boxWidth:14}},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': $'+Number(ctx.parsed.y).toLocaleString('es-CO')}}}, scales:{x:{grid:{color:'rgba(0,0,0,.04)'}},y:{ticks:{callback:v=>'$'+Number(v).toLocaleString('es-CO')},grid:{color:'rgba(0,0,0,.04)'}}} }
+    });
+}
+
+function renderB2BTop10() {
+    let prods = (ventasData.todosProductos || ventasData.top10Productos || []).slice();
+    const q = (document.getElementById('searchProd')?.value || '').toLowerCase().trim();
+    if (q) prods = prods.filter(p => (p.name+' '+p.code+' '+p.category).toLowerCase().includes(q));
+    const lim = parseInt(document.getElementById('prodLimit')?.value ?? '10');
+    if (lim > 0) prods = prods.slice(0, lim);
+    document.getElementById('top10Count').textContent = prods.length + ' productos';
+    const tbody = document.getElementById('bodyTop10');
+    if(!prods.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="7">Sin datos de productos</td></tr>'; return; }
+    tbody.innerHTML = prods.map((p,i)=>`<tr>
+        <td><strong>#${i+1}</strong></td>
+        <td style="color:var(--gris);font-size:12px">${esc(p.code)}</td>
+        <td class="td-name">${esc(p.name)}</td>
+        <td><span class="badge badge-none">${esc(p.category)}</span></td>
+        <td class="td-pts azul">${fmtCOP(p.subtotal)}</td>
+        <td class="td-pts verde" style="text-align:right">${fmt(p.qty)}</td>
+        <td style="text-align:center">${p.facturas}</td>
+    </tr>`).join('');
+}
+
+// ── EXPORTACIÓN ──────────────────────────────────────────────────────────
+function renderExport() {
+    const e = ventasData.exportacion || { total:0, facturas:0, meses:[], productos:[], clientes:[], totalClientes:0 };
+    const totalVentas = ventasData.resumen.totalGeneral || 1;
+    document.getElementById('exportBadge').textContent   = e.facturas || 0;
+    document.getElementById('navBadgeExport').textContent= e.facturas || 0;
+    document.getElementById('expKpiTotal').textContent   = fmtCOP(e.total);
+    document.getElementById('expKpiTotalSub').textContent= 'subtotal sin IVA';
+    document.getElementById('expKpiFacturas').textContent= e.facturas || 0;
+    document.getElementById('expKpiClientes').textContent= e.totalClientes || 0;
+    document.getElementById('expKpiPct').textContent     = Math.round((e.total||0)/totalVentas*100) + '%';
+
+    // Chart mensual export
+    const meses = e.meses || [];
+    const labels = meses.map(m=>{ const [y,mo]=m.mes.split('-'); return MESES[parseInt(mo,10)-1]+' '+y.slice(2); });
+    destroyChart('expLine');
+    chartInstances['expLine'] = new Chart(document.getElementById('chartExpLine'), {
+        type: 'bar',
+        data: { labels, datasets: [{ label:'Exportación', data:meses.map(m=>m.total), backgroundColor:CHART_COLORS[5], borderRadius:6, borderSkipped:false }] },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'$'+Number(ctx.parsed.y).toLocaleString('es-CO')}}}, scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>'$'+Number(v).toLocaleString('es-CO')},grid:{color:'rgba(0,0,0,.04)'}}} }
+    });
+
+    // Productos exportados (ordenados por dinero)
+    const prods = e.productos || [];
+    document.getElementById('expProdCount').textContent = prods.length + ' productos';
+    const pb = document.getElementById('bodyExpProd');
+    pb.innerHTML = prods.length ? prods.map((p,i)=>`<tr>
+        <td><strong>#${i+1}</strong></td>
+        <td class="td-name">${esc(p.name)}</td>
+        <td><span class="badge badge-none">${esc(p.category)}</span></td>
+        <td class="td-pts morado">${fmtCOP(p.subtotal)}</td>
+        <td class="td-pts verde" style="text-align:right">${fmt(p.qty)}</td>
+        <td style="text-align:center">${p.facturas}</td>
+    </tr>`).join('') : '<tr class="empty-row"><td colspan="6">Sin exportaciones en el período</td></tr>';
+
+    // Clientes export
+    const clis = e.clientes || [];
+    document.getElementById('expCliCount').textContent = clis.length + ' clientes';
+    const cb = document.getElementById('bodyExpCli');
+    cb.innerHTML = clis.length ? clis.map(c=>`<tr>
+        <td class="td-name">${esc(c.name)}</td>
+        <td style="color:var(--gris);font-size:12px">${esc(c.identification)}</td>
+        <td class="td-pts morado">${fmtCOP(c.totalCompras)}</td>
+        <td style="text-align:center">${c.facturas}</td>
+        <td>${fmtDate(c.ultimaCompra)}</td>
+        <td>${fmtDate(c.primeraCompra)}</td>
+    </tr>`).join('') : '<tr class="empty-row"><td colspan="6">Sin clientes de exportación en el período</td></tr>';
+}
+
+let b2bClientesData = [];
+function renderB2BClientes() {
+    b2bClientesData = ventasData.clientesB2B || [];
+    _renderB2BClientesTable();
+}
+function _renderB2BClientesTable() {
+    const q = document.getElementById('searchB2BClientes').value.toLowerCase().trim();
+    let rows = b2bClientesData.filter(c=>!q||(c.name+' '+c.identification).toLowerCase().includes(q));
+    rows.sort((a,b)=>{ const av=a[b2bClientesSort.col]??'',bv=b[b2bClientesSort.col]??'';
+        return typeof av==='number'?(b2bClientesSort.dir==='asc'?av-bv:bv-av):(b2bClientesSort.dir==='asc'?String(av).localeCompare(String(bv),'es'):String(bv).localeCompare(String(av),'es')); });
+    document.getElementById('countB2BClientes').textContent = rows.length + ' empresas';
+    const tbody = document.getElementById('bodyB2BClientes');
+    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="6">Sin clientes B2B en el período</td></tr>'; return; }
+    tbody.innerHTML = rows.map(c=>`<tr>
+        <td class="td-name">${esc(c.name)}</td>
+        <td style="color:var(--gris);font-size:12px">${esc(c.identification)}</td>
+        <td class="td-pts azul">${fmtCOP(c.totalCompras)}</td>
+        <td style="text-align:center">${c.facturas}</td>
+        <td>${fmtDate(c.ultimaCompra)}</td>
+        <td>${fmtDate(c.primeraCompra)}</td>
+    </tr>`).join('');
+}
+function sortB2BClientes(col){ b2bClientesSort.dir=b2bClientesSort.col===col?(b2bClientesSort.dir==='asc'?'desc':'asc'):'desc'; b2bClientesSort.col=col; _renderB2BClientesTable(); }
+
+let carteraData = [];
+function renderCartera() {
+    carteraData = ventasData.carteraPorCliente || [];
+    document.getElementById('navBadgeCartera').textContent = carteraData.length;
+    const cr = ventasData.carteraResumen || {};
+    const total = cr.totalDeuda || 0;
+    const pct = v => total > 0 ? Math.round(v / total * 100) + '% del total' : '—';
+    document.getElementById('agingTotal').textContent = fmtCOP(total);
+    document.getElementById('aging180').textContent   = fmtCOP(cr.masde180 || 0);
+    document.getElementById('aging180Pct').textContent= pct(cr.masde180 || 0);
+    document.getElementById('aging90').textContent    = fmtCOP(cr.masde90 || 0);
+    document.getElementById('aging90Pct').textContent = pct(cr.masde90 || 0);
+    document.getElementById('aging31').textContent    = fmtCOP(cr.masde31 || 0);
+    document.getElementById('aging31Pct').textContent = pct(cr.masde31 || 0);
+    document.getElementById('agingPV').textContent    = fmtCOP(cr.porVencer || 0);
+    document.getElementById('agingPVPct').textContent = pct(cr.porVencer || 0);
+    _renderCarteraTable();
+}
+function _renderCarteraTable() {
+    const q = document.getElementById('searchCartera').value.toLowerCase().trim();
+    const rows = carteraData.filter(c=>!q||(c.cliente+' '+c.nit).toLowerCase().includes(q));
+    document.getElementById('countCartera').textContent = rows.length + ' clientes';
+    const tbody = document.getElementById('bodyCartera');
+    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="8">✅ Sin cartera pendiente en el período</td></tr>'; return; }
+    tbody.innerHTML = rows.map(c=>`<tr>
+        <td class="td-name">${esc(c.cliente)}</td>
+        <td style="font-size:12px;color:var(--gris)">${esc(c.nit)}</td>
+        <td class="td-pts azul">${fmtCOP(c.deudaTotal)}</td>
+        <td class="td-pts" style="color:#b71c1c">${c.masde180 > 0 ? fmtCOP(c.masde180) : '<span style="color:var(--gris)">—</span>'}</td>
+        <td class="td-pts" style="color:var(--naranja)">${c.masde90 > 0 ? fmtCOP(c.masde90) : '<span style="color:var(--gris)">—</span>'}</td>
+        <td class="td-pts" style="color:#f9a825">${c.masde31 > 0 ? fmtCOP(c.masde31) : '<span style="color:var(--gris)">—</span>'}</td>
+        <td class="td-pts verde">${c.porVencer > 0 ? fmtCOP(c.porVencer) : '<span style="color:var(--gris)">—</span>'}</td>
+        <td style="text-align:center">${c.facturas}</td>
+    </tr>`).join('');
+}
+
+// ── ARRANQUE ──────────────────────────────────────────────────────────────
+loadData();
+loadLogs();
+loadSurveys();
+</script>
+</body>
+</html>

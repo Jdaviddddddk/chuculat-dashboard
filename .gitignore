@@ -1,0 +1,16 @@
+# Secretos — NUNCA subir
+.env
+*.secret
+*credentials*
+*token*
+
+# Datos crudos/grandes locales (el snapshot oficial va en /data)
+*.xlsx
+scratch/
+tmp/
+
+# SO / editores
+Thumbs.db
+.DS_Store
+.vscode/
+node_modules/

@@ -1,0 +1,130 @@
+{
+  "name": "CHUCULAT | Get Logs",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "get-logs",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "gl-n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        304
+      ],
+      "webhookId": "chuculat-get-logs-001"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/root/.n8n-files/chuculat_activity_log.json",
+        "options": {}
+      },
+      "id": "gl-n2",
+      "name": "Leer Log",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        464,
+        304
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "fromJson",
+        "options": {}
+      },
+      "id": "gl-n3",
+      "name": "Extraer JSON",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        688,
+        304
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "let logs = [];\ntry {\n  const ex = $input.first().json;\n  if (Array.isArray(ex)) logs = ex;\n  else if (ex && ex.data && Array.isArray(ex.data)) logs = ex.data;\n} catch(e) { logs = []; }\n\n// Agrupar por fecha para el timeline\nconst byDate = {};\nfor (const e of logs) {\n  if (!byDate[e.date]) byDate[e.date] = { date: e.date, suma: 0, redencion: 0, eventos: 0 };\n  byDate[e.date].eventos++;\n  if (e.type === 'suma_puntos') byDate[e.date].suma      += (e.points || 0);\n  if (e.type === 'redencion')   byDate[e.date].redencion += (e.points || 0);\n}\nconst timeline = Object.values(byDate).sort((a,b) => a.date.localeCompare(b.date));\n\nreturn [{ json: { logs, timeline, total: logs.length } }];"
+      },
+      "id": "gl-n4",
+      "name": "Procesar Logs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "gl-n5",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Leer Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Log": {
+      "main": [
+        [
+          {
+            "node": "Extraer JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer JSON": {
+      "main": [
+        [
+          {
+            "node": "Procesar Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar Logs": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

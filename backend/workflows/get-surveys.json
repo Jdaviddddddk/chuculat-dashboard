@@ -1,0 +1,153 @@
+{
+  "name": "CHUCULAT | Get Surveys",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "get-surveys",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "sv-n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "chuculat-get-surveys-01"
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/surveys/submissions?locationId=jzrg6bPH71ccLohGddsN&surveyId=jY4H1StWyXGY4ZrM7zSZ&limit=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer <GHL_PRIVATE_TOKEN>"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "sv-n2",
+      "name": "Exp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://services.leadconnectorhq.com/surveys/submissions?locationId=jzrg6bPH71ccLohGddsN&surveyId=sQLVoaIiuumckfA2nuxE&limit=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer <GHL_PRIVATE_TOKEN>"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "sv-n3",
+      "name": "Chu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const exp = $('Exp').first().json;\nconst chu = $('Chu').first().json;\n\n// Campos meta que no son respuestas\nconst META = new Set(['phone','full_name','first_name','last_name','email','formId','location_id',\n  'eventData','sessionFingerprint','Timezone','fieldsOriSequance','funneEventData']);\n\nfunction clean(subs) {\n  return (subs || []).map(s => {\n    const answers = {};\n    for (const [k, v] of Object.entries(s.others || {})) {\n      if (!META.has(k)) answers[k] = v;\n    }\n    let date = '';\n    const ts = s.createdAt || (s.others && s.others.eventData && s.others.eventData.timestamp);\n    if (ts) { try { date = new Date(ts).toISOString().split('T')[0]; } catch(e) {} }\n    return {\n      id: s.id,\n      contactId: s.contactId || '',\n      name: s.name || '',\n      email: s.email || '',\n      date,\n      answers\n    };\n  });\n}\n\nreturn [{ json: {\n  experiencias:   clean(exp.submissions),\n  chuculatologia: clean(chu.submissions),\n  totalExperiencias:   (exp.meta && exp.meta.total) || (exp.submissions||[]).length,\n  totalChuculatologia: (chu.meta && chu.meta.total) || (chu.submissions||[]).length\n} }];"
+      },
+      "id": "sv-n4",
+      "name": "Combinar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "sv-n5",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Exp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exp": {
+      "main": [
+        [
+          {
+            "node": "Chu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chu": {
+      "main": [
+        [
+          {
+            "node": "Combinar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combinar": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

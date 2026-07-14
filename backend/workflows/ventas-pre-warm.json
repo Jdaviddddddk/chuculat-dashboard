@@ -1,0 +1,86 @@
+{
+  "name": "CHUCULAT | Ventas Pre-warm",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 20
+            }
+          ]
+        }
+      },
+      "id": "w0",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const today = new Date().toISOString().slice(0,10);\nconst year = today.slice(0,4);\nconst url = 'https://app.rioagencymarketing.com/webhook/get-ventas?date_start=' + year + '-01-01&date_end=' + today;\nreturn [{ json: { url } }];"
+      },
+      "id": "w1",
+      "name": "Build URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "w2",
+      "name": "Warm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Build URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build URL": {
+      "main": [
+        [
+          {
+            "node": "Warm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

@@ -1,0 +1,7 @@
+Ya8z4KTp9nTu4oOW	dashboard-ventas-siigo	CHUCULAT | Dashboard Ventas Siigo
+W7ELd8Y2IGy8SAst	ventas-cierre-mensual	CHUCULAT | Ventas Cierre Mensual
+zxuXGsnxkJWQYzFn	ventas-pre-warm	CHUCULAT | Ventas Pre-warm
+b3NqLczq5MzJ3dmb	siigo-ghl-facturas-puntos	CHUCULAT | SIIGO - GHL FACTURAS
+GKelHhGiTUYu1QzD	get-logs	CHUCULAT | Get Logs
+iIGA54Txfw5BfKjN	test-log-activity	CHUCULAT | TEST Log Activity
+Vt1nWvjlQeaiX4eB	get-surveys	CHUCULAT | Get Surveys
