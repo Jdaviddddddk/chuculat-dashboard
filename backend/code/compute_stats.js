@@ -28,6 +28,7 @@ let invoices = Object.values(byId);
 
 // ── Filtro por rango solicitado (fecha de factura) ────────────────
 const ds = setup.dateStart, de = setup.dateEnd;
+const invoicesFull = invoices.slice(); // set completo (sin filtro de rango) para "primera compra"
 invoices = invoices.filter(inv => { const d = String(inv.date || '').slice(0,10); return d >= ds && d <= de; });
 
 const META_ANUAL = 1600000000;
@@ -213,6 +214,91 @@ for (const nc of ncsInRange) {
   }
 }
 
+// ── Compras Destacadas (solo B2C, insumo para campañas) ──────────
+const GEN_IDS = new Set(['222222222222', '7777777777777']);
+const esModDest = nm => /^(sel\s|no aplica)/i.test(nm);
+const b2cInvs = invoices.filter(inv => channelOf(inv) === 'b2c');
+
+const dProdMes = {}, dProdCli = {}, dPares = {}, dCust = {};
+for (const inv of b2cInvs) {
+  const fx  = fxOf(inv);
+  const mes = String(inv.date || '').slice(0, 7);
+  const dia = String(inv.date || '').slice(0, 10);
+  const cedRaw = String((inv.customer && inv.customer.identification) || '').replace(/[^0-9]/g, '');
+  const ced = (cedRaw && !GEN_IDS.has(cedRaw)) ? cedRaw : null;
+  const ceD = ced ? customerMap[ced] : null;
+  const cliName = (ceD && ceD.name) || ced || '';
+  const nombresFactura = new Set();
+  for (const it of (inv.items || [])) {
+    const s = itemSubtotal(it) * fx;
+    if (s <= 0) continue;
+    const prodD = productMap[String(it.code || '')] || { name: it.description || it.code };
+    if (esModDest(prodD.name)) continue;
+    const q = Number(it.quantity || 1);
+    const codeK = String(it.code || prodD.name);
+    if (!dProdMes[codeK]) dProdMes[codeK] = { code: codeK, name: prodD.name, total: 0, meses: {} };
+    dProdMes[codeK].total += s;
+    if (!dProdMes[codeK].meses[mes]) dProdMes[codeK].meses[mes] = { qty: 0, subtotal: 0 };
+    dProdMes[codeK].meses[mes].qty += q; dProdMes[codeK].meses[mes].subtotal += s;
+    if (ced) {
+      if (!dProdCli[codeK]) dProdCli[codeK] = {};
+      if (!dProdCli[codeK][ced]) dProdCli[codeK][ced] = { ced, name: cliName, qty: 0, subtotal: 0 };
+      dProdCli[codeK][ced].qty += q; dProdCli[codeK][ced].subtotal += s;
+    }
+    nombresFactura.add(prodD.name);
+  }
+  const arrN = [...nombresFactura].sort();
+  for (let i = 0; i < arrN.length; i++)
+    for (let j = i + 1; j < arrN.length; j++) {
+      const k = arrN[i] + '|||' + arrN[j];
+      dPares[k] = (dPares[k] || 0) + 1;
+    }
+  if (ced) {
+    if (!dCust[ced]) dCust[ced] = { ced, name: cliName, total: 0, compras: 0, ultima: '' };
+    dCust[ced].total += invSubtotal(inv); dCust[ced].compras += 1;
+    if (dia > dCust[ced].ultima) dCust[ced].ultima = dia;
+  }
+}
+const dTop = Object.values(dProdMes).sort((a, b) => b.total - a.total);
+const dst_productosPorMes = dTop.slice(0, 8).map(p => ({
+  code: p.code, name: p.name, total: Math.round(p.total),
+  series: Object.entries(p.meses).sort((a, b) => a[0].localeCompare(b[0]))
+    .map(e => ({ mes: e[0], qty: Math.round(e[1].qty * 100) / 100, subtotal: Math.round(e[1].subtotal) }))
+}));
+const dst_clientesPorProducto = dTop.slice(0, 30).map(p => ({
+  code: p.code, name: p.name, total: Math.round(p.total),
+  clientes: Object.values(dProdCli[p.code] || {}).sort((a, b) => b.subtotal - a.subtotal).slice(0, 10)
+    .map(c => ({ name: c.name, ced: c.ced, qty: Math.round(c.qty * 100) / 100, subtotal: Math.round(c.subtotal) }))
+}));
+const dst_parejas = Object.entries(dPares).sort((a, b) => b[1] - a[1]).slice(0, 15)
+  .map(e => { const p = e[0].split('|||'); return { a: p[0], b: p[1], veces: e[1] }; });
+const dst_reactivar = Object.values(dCust)
+  .filter(c => c.ultima && (TODAY - new Date(c.ultima)) / 86400000 > 60)
+  .sort((a, b) => b.total - a.total).slice(0, 30)
+  .map(c => ({ name: c.name, ced: c.ced, total: Math.round(c.total), compras: c.compras,
+    ultima: c.ultima, diasSin: Math.floor((TODAY - new Date(c.ultima)) / 86400000) }));
+const dPrimera = {};
+for (const inv of invoicesFull) {
+  const cf = String((inv.customer && inv.customer.identification) || '').replace(/[^0-9]/g, '');
+  if (!cf || GEN_IDS.has(cf)) continue;
+  const df = String(inv.date || '').slice(0, 10);
+  if (!dPrimera[cf] || df < dPrimera[cf]) dPrimera[cf] = df;
+}
+const dNR = {}, dVistos = {};
+for (const inv of b2cInvs) {
+  const cf = String((inv.customer && inv.customer.identification) || '').replace(/[^0-9]/g, '');
+  if (!cf || GEN_IDS.has(cf)) continue;
+  const mesNR = String(inv.date || '').slice(0, 7);
+  if (!dVistos[mesNR]) dVistos[mesNR] = {};
+  if (dVistos[mesNR][cf]) continue;
+  dVistos[mesNR][cf] = true;
+  if (!dNR[mesNR]) dNR[mesNR] = { nuevos: 0, recurrentes: 0 };
+  if (String(dPrimera[cf] || '').slice(0, 7) === mesNR) dNR[mesNR].nuevos++;
+  else dNR[mesNR].recurrentes++;
+}
+const dst_nuevosRecurrentes = Object.entries(dNR).sort((a, b) => a[0].localeCompare(b[0]))
+  .map(e => ({ mes: e[0], nuevos: e[1].nuevos, recurrentes: e[1].recurrentes }));
+
 const totalGeneral = totalB2C + totalB2B + totalExport;
 
 const categorias = Object.entries(byCategory).map(([cat,v]) => ({ categoria:cat, subtotal:Math.round(v.subtotal), qty:v.qty, facturas:v.facturas })).sort((a,b)=>b.subtotal-a.subtotal);
@@ -263,6 +349,13 @@ const __payload = {
     total: Math.round(totalExport), facturas: invoices.filter(i=>channelOf(i)==='export').length,
     meses: expMeses, productos: expProductos, top10Productos: expProductos.slice(0,10),
     clientes: expClientes, totalClientes: expClientes.length
+  },
+  destacadas: {
+    productosPorMes: dst_productosPorMes,
+    clientesPorProducto: dst_clientesPorProducto,
+    parejas: dst_parejas,
+    reactivar: dst_reactivar,
+    nuevosRecurrentes: dst_nuevosRecurrentes
   },
   pivot: {
     meses: Object.keys(monthsSet).sort(),

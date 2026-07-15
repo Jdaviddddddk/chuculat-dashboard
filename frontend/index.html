@@ -329,6 +329,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         <button class="seg-btn active" id="segB2C" onclick="setSegment('b2c')">🍫 B2C</button>
         <button class="seg-btn"        id="segB2B" onclick="setSegment('b2b')">🏢 Ventas</button>
         <button class="seg-btn"        id="segTab" onclick="setSegment('tablas')">🧮 Tablas</button>
+        <button class="seg-btn"        id="segDest" onclick="setSegment('destacadas')">⭐ Destacadas</button>
     </div>
     <nav class="topbar-nav nav-b2c show" id="navB2C">
         <a class="nav-item active" href="#sec-kpis"      onclick="b2cNav(this)"><span class="nav-icon">📊</span> KPIs</a>
@@ -786,6 +787,75 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
     </div>
 </div><!-- /panelTablas -->
 
+<div class="panel" id="panelDestacadas">
+    <!-- Filtro de fechas propio -->
+    <div class="date-filter-bar" style="margin-bottom:24px">
+        <label>Desde</label><input type="date" id="destDateFrom">
+        <label>Hasta</label><input type="date" id="destDateTo">
+        <button class="btn-filter" onclick="applyDestFilter()">Aplicar</button>
+        <button class="btn-filter secondary" onclick="clearDestFilter()">Año actual</button>
+        <span class="kpi-filter-period" id="destPeriodLabel">Cargando...</span>
+    </div>
+    <div class="dash-loading" id="loadingDest"><div class="loading-spinner"></div><p>Cargando datos de compras...</p></div>
+    <div id="destContent" style="display:none">
+
+        <section class="dash-section">
+            <div class="section-title">⭐ Compras Destacadas <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· solo B2C (consumidores) · insumo para campañas</small></div>
+            <p class="section-note">Análisis de comportamiento de compra de personas naturales para segmentar campañas en GoHighLevel. Montos = subtotal neto sin IVA.</p>
+        </section>
+
+        <!-- 1. Productos top por mes -->
+        <section class="dash-section">
+            <div class="chart-card full">
+                <h3 style="color:var(--chocolate);margin-bottom:4px">📈 Productos más comprados por mes</h3>
+                <p class="section-note">Top 8 productos B2C y su evolución mensual (cantidad de unidades). Detecta tendencias y estacionalidad.</p>
+                <div style="height:340px"><canvas id="destChartProdMes"></canvas></div>
+            </div>
+        </section>
+
+        <!-- 2. Top clientes por producto -->
+        <section class="dash-section">
+            <div class="chart-card full">
+                <h3 style="color:var(--chocolate);margin-bottom:10px">🎯 Clientes que más compran un producto</h3>
+                <div class="kpi-filter-bar" style="gap:12px;margin-bottom:14px">
+                    <div style="flex:1;min-width:240px">
+                        <label style="display:block;margin-bottom:4px">Elige un producto</label>
+                        <select class="filter-select" id="destProdSelect" onchange="renderDestClientes()" style="width:100%"></select>
+                    </div>
+                </div>
+                <p class="section-note">Audiencia exacta para una campaña de ese producto: los 10 que más han gastado en él.</p>
+                <div class="table-wrap"><table id="destClientesTable"><thead><tr><th>#</th><th>Cliente</th><th>Cédula</th><th>Unidades</th><th>Gastado</th></tr></thead><tbody id="destClientesBody"></tbody></table></div>
+            </div>
+        </section>
+
+        <!-- 3. Comprados juntos + 5. Nuevos vs recurrentes -->
+        <section class="dash-section">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px" id="destGrid2">
+            <div class="chart-card">
+                <h3 style="color:var(--chocolate);margin-bottom:4px">🛒 Comprados juntos (cross-sell)</h3>
+                <p class="section-note">Parejas de productos que más aparecen en la misma factura. Ideas de combos y recomendaciones.</p>
+                <div class="table-wrap"><table id="destParejasTable"><thead><tr><th>Producto A</th><th>Producto B</th><th>Veces</th></tr></thead><tbody id="destParejasBody"></tbody></table></div>
+            </div>
+            <div class="chart-card">
+                <h3 style="color:var(--chocolate);margin-bottom:4px">👥 Clientes nuevos vs recurrentes</h3>
+                <p class="section-note">Por mes: cuántos compran por primera vez vs repetidores. Mide fidelización.</p>
+                <div style="height:300px"><canvas id="destChartNR"></canvas></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. Clientes para reactivar -->
+        <section class="dash-section">
+            <div class="chart-card full">
+                <h3 style="color:var(--chocolate);margin-bottom:4px">💤 Clientes para reactivar</h3>
+                <p class="section-note">Los que más gastaban y llevan <strong>+60 días sin comprar</strong> (calculado contra hoy). Lista lista para campaña "te extrañamos".</p>
+                <div class="table-wrap"><table id="destReactivarTable"><thead><tr><th>#</th><th>Cliente</th><th>Cédula</th><th>Total gastado</th><th>Compras</th><th>Última compra</th><th>Días sin comprar</th></tr></thead><tbody id="destReactivarBody"></tbody></table></div>
+            </div>
+        </section>
+
+    </div>
+</div><!-- /panelDestacadas -->
+
 </main>
 </div><!-- /app -->
 
@@ -851,14 +921,17 @@ function setSegment(seg) {
     document.getElementById('segB2C').classList.toggle('active', seg==='b2c');
     document.getElementById('segB2B').classList.toggle('active', seg==='b2b');
     document.getElementById('segTab').classList.toggle('active', seg==='tablas');
+    document.getElementById('segDest').classList.toggle('active', seg==='destacadas');
     document.getElementById('navB2C').classList.toggle('show', seg==='b2c');
     document.getElementById('navB2B').classList.toggle('show', seg==='b2b');
     document.getElementById('panelB2C').classList.toggle('show', seg==='b2c');
     document.getElementById('panelB2B').classList.toggle('show', seg==='b2b');
     document.getElementById('panelTablas').classList.toggle('show', seg==='tablas');
-    // Ventas y Tablas comparten los datos de get-ventas
-    if ((seg==='b2b' || seg==='tablas') && !b2bLoaded) { b2bLoaded=true; loadB2B(); }
+    document.getElementById('panelDestacadas').classList.toggle('show', seg==='destacadas');
+    // Ventas, Tablas y Destacadas comparten los datos de get-ventas
+    if ((seg==='b2b' || seg==='tablas' || seg==='destacadas') && !b2bLoaded) { b2bLoaded=true; loadB2B(); }
     if (seg==='tablas' && ventasData) { document.getElementById('loadingTablas').style.display='none'; document.getElementById('tablasContent').style.display='block'; renderTablas(); }
+    if (seg==='destacadas' && ventasData) { document.getElementById('loadingDest').style.display='none'; document.getElementById('destContent').style.display='block'; renderDestacadas(); }
 }
 
 // ── NAV ──────────────────────────────────────────────────────────────────
@@ -1155,6 +1228,21 @@ function clearB2BFilter(){
     loadB2B();
 }
 
+// Filtro propio de Destacadas: reutiliza el mismo get-ventas (sincroniza el rango B2B)
+function applyDestFilter(){
+    document.getElementById('b2bDateFrom').value=document.getElementById('destDateFrom').value;
+    document.getElementById('b2bDateTo').value  =document.getElementById('destDateTo').value;
+    document.getElementById('loadingDest').style.display='block';
+    document.getElementById('destContent').style.display='none';
+    loadB2B();
+}
+function clearDestFilter(){
+    const now=new Date();
+    document.getElementById('destDateFrom').value=now.getFullYear()+'-01-01';
+    document.getElementById('destDateTo').value=now.toISOString().split('T')[0];
+    applyDestFilter();
+}
+
 async function loadB2B() {
     document.getElementById('loadingB2B').style.display='block';
     document.getElementById('b2bContent').style.display='none';
@@ -1173,9 +1261,17 @@ async function loadB2B() {
         // Revelar panel de tablas si es el segmento activo
         document.getElementById('loadingTablas').style.display='none';
         document.getElementById('tablasContent').style.display='block';
+        // Revelar panel de destacadas
+        document.getElementById('loadingDest').style.display='none';
+        document.getElementById('destContent').style.display='block';
+        if (!document.getElementById('destDateFrom').value) document.getElementById('destDateFrom').value = data.meta.dateStart || '';
+        if (!document.getElementById('destDateTo').value)   document.getElementById('destDateTo').value   = data.meta.dateEnd || '';
+        document.getElementById('destPeriodLabel').textContent = fmtDate(data.meta.dateStart) + ' → ' + fmtDate(data.meta.dateEnd);
+        renderDestacadas();
     } catch(e) {
         document.getElementById('loadingB2B').innerHTML='<p style="color:#D32F2F;padding:30px;">❌ Error cargando datos de ventas. Intenta de nuevo.</p>';
         document.getElementById('loadingTablas').innerHTML='<p style="color:#D32F2F;padding:30px;">❌ Error cargando datos. Intenta de nuevo.</p>';
+        document.getElementById('loadingDest').innerHTML='<p style="color:#D32F2F;padding:30px;">❌ Error cargando datos. Intenta de nuevo.</p>';
         console.error(e);
     }
 }
@@ -1192,6 +1288,91 @@ function renderB2BAll() {
     renderTablas();
     renderB2BClientes();
     renderCartera();
+}
+
+// ── COMPRAS DESTACADAS ───────────────────────────────────────────────────
+let destChartProdMes=null, destChartNR=null;
+
+function renderDestacadas(){
+    const d = ventasData && ventasData.destacadas;
+    if (!d) return;
+    document.getElementById('destPeriodLabel').textContent = fmtDate(ventasData.meta.dateStart) + ' → ' + fmtDate(ventasData.meta.dateEnd);
+    renderDestProdMes(d);
+    renderDestProdSelect(d);
+    renderDestClientes();
+    renderDestParejas(d);
+    renderDestReactivar(d);
+    renderDestNR(d);
+}
+
+function mesCorto(m){ // "2026-05" → "May 26"
+    const [y,mm]=String(m).split('-'); return (MESES_CORTO[parseInt(mm,10)-1]||m)+' '+String(y).slice(2);
+}
+
+function renderDestProdMes(d){
+    const prods = d.productosPorMes || [];
+    // eje X = unión de todos los meses presentes
+    const mesesSet = new Set();
+    prods.forEach(p=>(p.series||[]).forEach(s=>mesesSet.add(s.mes)));
+    const meses = [...mesesSet].sort();
+    const datasets = prods.map((p,i)=>{
+        const byMes = {}; (p.series||[]).forEach(s=>byMes[s.mes]=s.qty);
+        const col = CHART_COLORS[i%CHART_COLORS.length];
+        return { label:p.name, data:meses.map(m=>byMes[m]||0), borderColor:col, backgroundColor:col,
+                 tension:.3, borderWidth:2, pointRadius:3, fill:false };
+    });
+    if (destChartProdMes) destChartProdMes.destroy();
+    destChartProdMes = new Chart(document.getElementById('destChartProdMes'), {
+        type:'line',
+        data:{ labels:meses.map(mesCorto), datasets },
+        options:{ responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, font:{size:11} } },
+                      tooltip:{ callbacks:{ label:c=>c.dataset.label+': '+fmt(c.parsed.y)+' und' } } },
+            scales:{ y:{ beginAtZero:true, title:{display:true,text:'Unidades'} } } }
+    });
+}
+
+function renderDestProdSelect(d){
+    const sel = document.getElementById('destProdSelect');
+    const list = d.clientesPorProducto || [];
+    sel.innerHTML = list.map((p,i)=>`<option value="${i}">${esc(p.name)} — ${fmtCOP(p.total)}</option>`).join('');
+}
+
+function renderDestClientes(){
+    const d = ventasData && ventasData.destacadas; if(!d) return;
+    const list = d.clientesPorProducto || [];
+    const idx = parseInt(document.getElementById('destProdSelect').value||'0',10);
+    const p = list[idx]; const tb=document.getElementById('destClientesBody');
+    if (!p || !(p.clientes||[]).length){ tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--gris);padding:20px">Sin clientes registrados para este producto.</td></tr>'; return; }
+    tb.innerHTML = p.clientes.map((c,i)=>`<tr><td>${i+1}</td><td><strong>${esc(c.name||'—')}</strong></td><td>${esc(c.ced||'')}</td><td>${fmt(c.qty)}</td><td style="font-weight:700;color:var(--verde)">${fmtCOP(c.subtotal)}</td></tr>`).join('');
+}
+
+function renderDestParejas(d){
+    const tb=document.getElementById('destParejasBody'); const list=d.parejas||[];
+    if(!list.length){ tb.innerHTML='<tr><td colspan="3" style="text-align:center;color:var(--gris);padding:20px">Sin datos suficientes.</td></tr>'; return; }
+    tb.innerHTML = list.map(p=>`<tr><td>${esc(p.a)}</td><td>${esc(p.b)}</td><td style="font-weight:700;color:var(--cereza)">${p.veces}×</td></tr>`).join('');
+}
+
+function renderDestReactivar(d){
+    const tb=document.getElementById('destReactivarBody'); const list=d.reactivar||[];
+    if(!list.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--gris);padding:20px">Ningún cliente con +60 días sin comprar en este período. 🎉</td></tr>'; return; }
+    tb.innerHTML = list.map((c,i)=>`<tr><td>${i+1}</td><td><strong>${esc(c.name||'—')}</strong></td><td>${esc(c.ced||'')}</td><td style="font-weight:700;color:var(--verde)">${fmtCOP(c.total)}</td><td>${c.compras}</td><td>${fmtDate(c.ultima)}</td><td style="font-weight:700;color:var(--naranja)">${c.diasSin} días</td></tr>`).join('');
+}
+
+function renderDestNR(d){
+    const list = d.nuevosRecurrentes || [];
+    const meses = list.map(x=>mesCorto(x.mes));
+    if (destChartNR) destChartNR.destroy();
+    destChartNR = new Chart(document.getElementById('destChartNR'), {
+        type:'bar',
+        data:{ labels:meses, datasets:[
+            { label:'Nuevos', data:list.map(x=>x.nuevos), backgroundColor:'#62B22A' },
+            { label:'Recurrentes', data:list.map(x=>x.recurrentes), backgroundColor:'#00ABE1' }
+        ]},
+        options:{ responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, font:{size:11} } } },
+            scales:{ x:{ stacked:true }, y:{ stacked:true, beginAtZero:true, title:{display:true,text:'Clientes'} } } }
+    });
 }
 
 // ── META MENSUAL CON REDISTRIBUCIÓN ──────────────────────────────────────
