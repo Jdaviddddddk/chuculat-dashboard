@@ -1,9 +1,15 @@
 const productMap = $('Build Customer Map').first().json.productMap || {};
 const setup      = $('Build Customer Map').first().json;
 
+// ── Separar input: páginas de facturas vs resumen de notas crédito ─
+const __allInput = $input.all();
+const __ncItem   = __allInput.find(p => p.json._type === 'nc_summary');
+const allNCs     = __ncItem ? (__ncItem.json.ncs || []) : [];
+
 // ── Facturas del mes activo (en vivo) ─────────────────────────────
 const liveInvoices = [];
-for (const p of $input.all()) {
+for (const p of __allInput) {
+  if (p.json._type === 'nc_summary') continue;
   for (const inv of (p.json.results || [])) liveInvoices.push(inv);
 }
 
@@ -57,9 +63,15 @@ function channelOf(inv) {
   return null; // 170 planta / 172 admin / otros: no son venta
 }
 
-// Subtotal (sin impuestos) por ítem y por factura
-function itemSubtotal(it) { return Number(it.price || 0) * Number(it.quantity || 1); }
-function invSubtotal(inv) { return (inv.items || []).reduce((s, it) => s + itemSubtotal(it), 0); }
+// Subtotal (sin impuestos) por ítem y por factura: precio × cantidad − descuento
+function itemSubtotal(it) {
+  const base = Number(it.price || 0) * Number(it.quantity || 1);
+  const disc = (it.discount && it.discount.value) ? Number(it.discount.value) : 0;
+  return base - disc;
+}
+// Facturas en moneda extranjera (exportación EUR/USD): convertir a COP con la tasa del documento
+function fxOf(doc) { return (doc.currency && doc.currency.exchange_rate) ? Number(doc.currency.exchange_rate) : 1; }
+function invSubtotal(inv) { return (inv.items || []).reduce((s, it) => s + itemSubtotal(it), 0) * fxOf(inv); }
 
 function daysSince(d) { if (!d) return 0; return Math.floor((TODAY - new Date(d)) / 86400000); }
 function agingBucket(x) { if (x>180) return '>180'; if (x>120) return '>120'; if (x>90) return '>90'; if (x>31) return '>31'; return 'por_vencer'; }
@@ -88,7 +100,8 @@ for (const inv of invoices) {
   else totalB2C += sub;
 
   // Impuestos (informativo)
-  for (const it of (inv.items || [])) totalImpuestos += (it.taxes || []).reduce((s,t)=>s+Number(t.value||0),0);
+  const __fx = fxOf(inv);
+  for (const it of (inv.items || [])) totalImpuestos += (it.taxes || []).reduce((s,t)=>s+Number(t.value||0),0) * __fx;
 
   // Cartera (proporcional al subtotal): pendiente_sub = balance * sub/total
   const balance = Number(inv.balance || 0);
@@ -118,7 +131,7 @@ for (const inv of invoices) {
   for (const it of (inv.items || [])) {
     const code = String(it.code || '');
     const prod = productMap[code] || { name: it.description || code, category: 'Sin categoria' };
-    const s = itemSubtotal(it), q = Number(it.quantity || 1);
+    const s = itemSubtotal(it) * __fx, q = Number(it.quantity || 1);
 
     if (!byCategory[prod.category]) byCategory[prod.category] = { subtotal:0, qty:0, facturas:0 };
     byCategory[prod.category].subtotal += s; byCategory[prod.category].qty += q; byCategory[prod.category].facturas += 1;
@@ -150,6 +163,53 @@ for (const inv of invoices) {
     expByCustomer[custId].totalCompras += sub; expByCustomer[custId].facturas += 1;
     if (!expByCustomer[custId].ultimaCompra  || date > expByCustomer[custId].ultimaCompra)  expByCustomer[custId].ultimaCompra  = date;
     if (!expByCustomer[custId].primeraCompra || date < expByCustomer[custId].primeraCompra) expByCustomer[custId].primeraCompra = date;
+  }
+}
+
+// ── Netear Notas Crédito del período (totales, meses, productos, pivots) ──
+const ncsInRange = allNCs.filter(nc => {
+  const d = String(nc.date || '').slice(0,10);
+  return d >= ds && d <= de;
+});
+for (const nc of ncsInRange) {
+  const ch = channelOf(nc);
+  if (!ch) continue;
+  const ncFx  = fxOf(nc);
+  const ncSub = (nc.items || []).reduce((s, it) => s + itemSubtotal(it), 0) * ncFx;
+  if (ch === 'export') totalExport -= ncSub;
+  else if (ch === 'b2b') totalB2B -= ncSub;
+  else totalB2C -= ncSub;
+
+  const month = String(nc.date || '').slice(0, 7);
+  if (byMonth[month]) {
+    byMonth[month].total -= ncSub;
+    if (ch === 'export') byMonth[month].export -= ncSub;
+    else if (ch === 'b2b') byMonth[month].b2b -= ncSub;
+    else byMonth[month].b2c -= ncSub;
+  }
+
+  // Restar por producto / categoría / pivots (igual que el reporte de Siigo)
+  for (const it of (nc.items || [])) {
+    const code = String(it.code || '');
+    const prod = productMap[code] || { name: it.description || code, category: 'Sin categoria' };
+    const s = itemSubtotal(it) * ncFx, q = Number(it.quantity || 1);
+    if (byCategory[prod.category]) { byCategory[prod.category].subtotal -= s; byCategory[prod.category].qty -= q; }
+    if (byProduct[code]) { byProduct[code].subtotal -= s; byProduct[code].qty -= q; }
+    if (month && catMonth[prod.category] && catMonth[prod.category][month]) {
+      catMonth[prod.category][month].subtotal -= s; catMonth[prod.category][month].qty -= q;
+    }
+    if (month && prodMonth[code] && prodMonth[code].m[month]) {
+      prodMonth[code].m[month].subtotal -= s; prodMonth[code].m[month].qty -= q;
+    }
+    if (ch === 'export' && expByProduct[code]) { expByProduct[code].subtotal -= s; expByProduct[code].qty -= q; }
+  }
+
+  // Restar del cliente y de exportación mensual
+  const ncCed = String((nc.customer && nc.customer.identification) || '');
+  if (ncCed && byCustomer[ncCed]) byCustomer[ncCed].totalCompras -= ncSub;
+  if (ch === 'export') {
+    if (expByMonth[month]) expByMonth[month].total -= ncSub;
+    if (ncCed && expByCustomer[ncCed]) expByCustomer[ncCed].totalCompras -= ncSub;
   }
 }
 
@@ -188,7 +248,7 @@ const expProductos = Object.values(expByProduct).sort((a,b)=>b.subtotal-a.subtot
 const expClientes = Object.values(expByCustomer).sort((a,b)=>b.totalCompras-a.totalCompras).map(c=>({ ...c, totalCompras:Math.round(c.totalCompras) }));
 
 const __payload = {
-  meta: { dateStart:setup.dateStart, dateEnd:setup.dateEnd, totalFacturas:invoices.filter(i=>channelOf(i)).length, generadoEn:new Date().toISOString(), base:'subtotal' },
+  meta: { dateStart:setup.dateStart, dateEnd:setup.dateEnd, totalFacturas:invoices.filter(i=>channelOf(i)).length, totalNCs:ncsInRange.length, generadoEn:new Date().toISOString(), base:'subtotal_neto' },
   resumen: {
     totalGeneral:Math.round(totalGeneral), totalB2C:Math.round(totalB2C), totalB2B:Math.round(totalB2B), totalExport:Math.round(totalExport),
     totalSubtotal:Math.round(totalGeneral), totalImpuestos:Math.round(totalImpuestos),
