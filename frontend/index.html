@@ -749,12 +749,6 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                         <option value="centros">Centro de costo</option>
                     </select>
                 </div>
-                <div><label style="display:block;margin-bottom:4px">Medida</label>
-                    <select class="filter-select" id="pivotMeasure" onchange="renderPivot()">
-                        <option value="subtotal">💵 Subtotal ($)</option>
-                        <option value="qty">📦 Cantidad (und)</option>
-                    </select>
-                </div>
                 <div style="flex:1;min-width:220px"><label style="display:block;margin-bottom:4px">Meses</label>
                     <div id="pivotMonths" style="display:flex;flex-wrap:wrap;gap:6px"></div>
                 </div>
@@ -1530,8 +1524,7 @@ function updateTablasSummary(){
     const allM = (ventasData.pivot.meses||[]).length;
     const selM = pivotSelectedMonths ? pivotSelectedMonths.size : allM;
     const mesTxt = selM===allM ? 'todos los meses' : (selM+' meses');
-    const meas = document.getElementById('pivotMeasure').value==='subtotal'?'$':'und';
-    document.getElementById('tablasFilterSummary').textContent = `${dimLbl} · ${rowsTxt} · ${mesTxt} · ${meas}`;
+    document.getElementById('tablasFilterSummary').textContent = `${dimLbl} · ${rowsTxt} · ${mesTxt} · valor + cantidad`;
 }
 
 function onPivotDimChange() {
@@ -1567,42 +1560,47 @@ function rowSelAll(on){
 function renderPivot() {
     if (!ventasData || !ventasData.pivot) return;
     const dim = document.getElementById('pivotDim').value;
-    let measure = document.getElementById('pivotMeasure').value;
     const q = document.getElementById('pivotSearch').value.toLowerCase().trim();
     const allMonths = ventasData.pivot.meses || [];
     const months = allMonths.filter(m=>pivotSelectedMonths.has(m));
-    if (dim==='centros' && measure==='qty') { measure='subtotal'; document.getElementById('pivotMeasure').value='subtotal'; }
-    const isMoney = measure==='subtotal';
-    const fmtVal = v => isMoney ? fmtCOP(v) : fmt(v);
+    const hasQty = dim!=='centros';   // centro de costo no tiene cantidad
 
     document.getElementById('pivotTitle').textContent =
         (dim==='categorias'?'Categoría':dim==='productos'?'Producto':'Centro de costo') + ' × Mes';
 
-    // Filas normalizadas con clave para el selector
+    // Filas: cada celda guarda {sub, qty}
     let rows = [];
     if (dim==='centros') {
         const defs = [['B2C · Consumidor','b2c'],['B2B · Empresas','b2b'],['🌍 Exportación','export']];
         for (const [label,key] of defs) {
-            const meses={}; let total=0;
-            for (const c of (ventasData.pivot.centros||[])) { if(!pivotSelectedMonths.has(c.mes)) continue; const v=c[key]||0; meses[c.mes]=v; total+=v; }
-            rows.push({ key:label, label, extra:'', meses, total });
+            const meses={}; let tSub=0;
+            for (const c of (ventasData.pivot.centros||[])) { if(!pivotSelectedMonths.has(c.mes)) continue; const v=c[key]||0; meses[c.mes]={sub:v,qty:null}; tSub+=v; }
+            rows.push({ key:label, label, extra:'', meses, totSub:tSub, totQty:null });
         }
     } else {
         const src = ventasData.pivot[dim] || [];
         rows = src.map(item=>{
-            const meses={}; let total=0;
-            for (const mk of months) { const cell=item.meses[mk]; const v = cell?(isMoney?cell.subtotal:cell.qty):0; meses[mk]=v; total+=v; }
-            return { key: dim==='productos'?item.code:item.categoria, label: dim==='productos'?item.name:item.categoria, extra: dim==='productos'?item.categoria:'', meses, total };
+            const meses={}; let tSub=0, tQty=0;
+            for (const mk of months) { const c=item.meses[mk]; const s=c?c.subtotal:0, qy=c?c.qty:0; meses[mk]={sub:s,qty:qy}; tSub+=s; tQty+=qy; }
+            return { key: dim==='productos'?item.code:item.categoria, label: dim==='productos'?item.name:item.categoria, extra: dim==='productos'?item.categoria:'', meses, totSub:tSub, totQty:tQty };
         });
     }
-    // Filtrar por selección de filas + búsqueda de tabla
     rows = rows.filter(r=>pivotRowSel.has(r.key));
     if (q) rows = rows.filter(r=>(r.label+' '+(r.extra||'')+' '+r.key).toLowerCase().includes(q));
-    rows.sort((a,b)=>b.total-a.total);
+    rows.sort((a,b)=>b.totSub-a.totSub);
 
-    const colTot = {}; months.forEach(mk=>colTot[mk]=0); let grand=0;
-    rows.forEach(r=>{ months.forEach(mk=>colTot[mk]+=(r.meses[mk]||0)); grand+=r.total; });
+    const colSub={}, colQty={}; months.forEach(mk=>{colSub[mk]=0;colQty[mk]=0;});
+    let gSub=0, gQty=0;
+    rows.forEach(r=>{ months.forEach(mk=>{ colSub[mk]+=(r.meses[mk]?r.meses[mk].sub:0)||0; colQty[mk]+=(r.meses[mk]&&r.meses[mk].qty)||0; }); gSub+=r.totSub; gQty+=(r.totQty||0); });
     document.getElementById('pivotCount').textContent = rows.length + ' filas';
+
+    // Celda: valor arriba + cantidad abajo (siempre juntos)
+    const cell = (o) => {
+        if (!o || (!o.sub && !o.qty)) return `<div style="color:var(--beige)">·</div>`;
+        const money = `<div style="font-weight:700">${fmtCOP(o.sub)}</div>`;
+        const units = (o.qty===null||o.qty===undefined) ? '' : `<div style="font-size:11px;color:var(--gris)">${fmt(o.qty)} und</div>`;
+        return money+units;
+    };
 
     const head = `<tr><th style="position:sticky;left:0;background:var(--crema);z-index:2">${dim==='productos'?'Producto':dim==='centros'?'Centro':'Categoría'}</th>`
         + months.map(mk=>{const[y,mo]=mk.split('-');return `<th style="text-align:right">${MESES_CORTO[parseInt(mo,10)-1]} ${y.slice(2)}</th>`}).join('')
@@ -1611,12 +1609,12 @@ function renderPivot() {
 
     let body = rows.map(r=>`<tr>
         <td class="td-name" style="position:sticky;left:0;background:var(--blanco);z-index:1">${esc(r.label)}${r.extra?` <small style="color:var(--gris)">${esc(r.extra)}</small>`:''}</td>`
-        + months.map(mk=>`<td style="text-align:right;color:${r.meses[mk]?'var(--chocolate)':'var(--beige)'}">${r.meses[mk]?fmtVal(r.meses[mk]):'·'}</td>`).join('')
-        + `<td style="text-align:right;font-weight:800;color:var(--azul)">${fmtVal(r.total)}</td></tr>`).join('');
+        + months.map(mk=>`<td style="text-align:right">${cell(r.meses[mk])}</td>`).join('')
+        + `<td style="text-align:right"><div style="font-weight:800;color:var(--azul)">${fmtCOP(r.totSub)}</div>${r.totQty!==null?`<div style="font-size:11px;color:var(--verde);font-weight:700">${fmt(r.totQty)} und</div>`:''}</td></tr>`).join('');
     body += `<tr style="border-top:2px solid var(--beige);font-weight:800;background:var(--crema)">
         <td style="position:sticky;left:0;background:var(--crema)">TOTAL</td>`
-        + months.map(mk=>`<td style="text-align:right">${fmtVal(colTot[mk])}</td>`).join('')
-        + `<td style="text-align:right;color:var(--azul)">${fmtVal(grand)}</td></tr>`;
+        + months.map(mk=>`<td style="text-align:right"><div>${fmtCOP(colSub[mk])}</div>${hasQty?`<div style="font-size:11px;color:var(--gris)">${fmt(colQty[mk])} und</div>`:''}</td>`).join('')
+        + `<td style="text-align:right;color:var(--azul)"><div>${fmtCOP(gSub)}</div>${hasQty?`<div style="font-size:11px;color:var(--verde)">${fmt(gQty)} und</div>`:''}</td></tr>`;
     document.getElementById('pivotBody').innerHTML = rows.length ? body : '<tr class="empty-row"><td colspan="99">Selecciona al menos una fila</td></tr>';
     updateTablasSummary();
 }
