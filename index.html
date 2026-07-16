@@ -1205,6 +1205,10 @@ function renderSurveyCard(key,subs,bodyId,countId,respId) {
 
 // ── VENTAS (B2B / Export) ────────────────────────────────────────────────
 let ventasData = null;
+// Datos del rango por defecto (año en curso). Meta, Exportación y Cartera SIEMPRE
+// se renderizan con estos y NO se re-renderizan al cambiar el filtro de fechas.
+let ventasFull = null;
+let fullRendered = false;
 let b2bClientesSort = { col:'totalCompras', dir:'desc' };
 let chartInstances = {};
 
@@ -1248,6 +1252,8 @@ async function loadB2B() {
         const data = await res.json();
         if (!data.meta) throw new Error('Respuesta inválida');
         ventasData = data;
+        // La primera carga usa el rango por defecto (1-ene → hoy) = base sin filtro
+        if (!ventasFull) ventasFull = data;
         document.getElementById('loadingB2B').style.display='none';
         document.getElementById('b2bContent').style.display='block';
         document.getElementById('b2bPeriodLabel').textContent = fmtDate(data.meta.dateStart) + ' → ' + fmtDate(data.meta.dateEnd);
@@ -1272,16 +1278,23 @@ async function loadB2B() {
 
 function renderB2BAll() {
     if (!ventasData) return;
+    // Secciones que SÍ responden al filtro de fechas
     renderB2BKPIs();
-    renderMeta();
     renderB2BCanal();
     renderB2BCategorias();
     renderB2BMensual();
     renderB2BTop10();
-    renderExport();
     renderTablas();
     renderB2BClientes();
-    renderCartera();
+    // Secciones sin filtro (meta, avance anual, exportación, cartera): una sola vez.
+    // Evita re-render (y re-crear sus charts) en cada cambio de fechas.
+    if (!fullRendered) {
+        fullRendered = true;
+        renderMetaBar();
+        renderMeta();
+        renderExport();
+        renderCartera();
+    }
 }
 
 // ── COMPRAS DESTACADAS ───────────────────────────────────────────────────
@@ -1376,11 +1389,12 @@ const META_PCT = { 1:0.06301662, 2:0.06407228, 3:0.07549632, 4:0.06368978, 5:0.1
 const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
 function renderMeta() {
-    // Año del período consultado
-    const year = (ventasData.meta.dateStart || '').slice(0,4) || String(new Date().getFullYear());
+    // Meta NO se filtra por fechas: siempre sobre el rango por defecto (año en curso)
+    const VD = ventasFull || ventasData;
+    const year = (VD.meta.dateStart || '').slice(0,4) || String(new Date().getFullYear());
     // Real por mes (subtotal) desde meses[]
     const realMes = {};
-    for (const m of (ventasData.meses || [])) {
+    for (const m of (VD.meses || [])) {
         const [y, mo] = m.mes.split('-');
         if (y === year) realMes[parseInt(mo,10)] = m.total;
     }
@@ -1451,9 +1465,9 @@ function renderMeta() {
         </tr>`;
     }).join('');
 
-    // Meta por centro de costo (split fijo B2C 40 / B2B 30 / Export 30)
-    const CC_SPLIT = { 'B2C · Consumidor':0.40, 'B2B · Empresas':0.30, '🌍 Exportación':0.30 };
-    const r = ventasData.resumen;
+    // Meta por centro de costo (split fijo B2C 60 / B2B 20 / Export 20)
+    const CC_SPLIT = { 'B2C · Consumidor':0.60, 'B2B · Empresas':0.20, '🌍 Exportación':0.20 };
+    const r = VD.resumen;
     const realCC = { 'B2C · Consumidor': r.totalB2C||0, 'B2B · Empresas': r.totalB2B||0, '🌍 Exportación': r.totalExport||0 };
     const ccColors = { 'B2C · Consumidor':'var(--cereza)', 'B2B · Empresas':'var(--naranja)', '🌍 Exportación':'var(--morado)' };
     document.getElementById('bodyMetaCanal').innerHTML = Object.keys(CC_SPLIT).map(k=>{
@@ -1630,6 +1644,11 @@ function renderB2BKPIs() {
     document.getElementById('b2bKpiB2CSub').textContent  = Math.round(r.totalB2C/tot*100)+'% del total';
     document.getElementById('b2bKpiB2BSub').textContent  = Math.round(r.totalB2B/tot*100)+'% del total';
     document.getElementById('b2bKpiExportSub').textContent = Math.round((r.totalExport||0)/tot*100)+'% del total';
+}
+
+// Barra de avance anual: NO depende del filtro de fechas (usa el rango por defecto)
+function renderMetaBar() {
+    const r = (ventasFull || ventasData).resumen;
     const pct = Math.min(r.cumplimientoPct, 100);
     document.getElementById('metaBarFill').style.width  = pct + '%';
     document.getElementById('metaBarPct').textContent   = r.cumplimientoPct + '%';
@@ -1708,8 +1727,10 @@ function renderB2BTop10() {
 
 // ── EXPORTACIÓN ──────────────────────────────────────────────────────────
 function renderExport() {
-    const e = ventasData.exportacion || { total:0, facturas:0, meses:[], productos:[], clientes:[], totalClientes:0 };
-    const totalVentas = ventasData.resumen.totalGeneral || 1;
+    // Exportación NO se filtra por fechas: siempre sobre el rango por defecto
+    const VD = ventasFull || ventasData;
+    const e = VD.exportacion || { total:0, facturas:0, meses:[], productos:[], clientes:[], totalClientes:0 };
+    const totalVentas = VD.resumen.totalGeneral || 1;
     document.getElementById('exportBadge').textContent   = e.facturas || 0;
     document.getElementById('navBadgeExport').textContent= e.facturas || 0;
     document.getElementById('expKpiTotal').textContent   = fmtCOP(e.total);
@@ -1781,9 +1802,11 @@ function sortB2BClientes(col){ b2bClientesSort.dir=b2bClientesSort.col===col?(b2
 
 let carteraData = [];
 function renderCartera() {
-    carteraData = ventasData.carteraPorCliente || [];
+    // Cartera NO se filtra por fechas: siempre sobre el rango por defecto
+    const VD = ventasFull || ventasData;
+    carteraData = VD.carteraPorCliente || [];
     document.getElementById('navBadgeCartera').textContent = carteraData.length;
-    const cr = ventasData.carteraResumen || {};
+    const cr = VD.carteraResumen || {};
     const total = cr.totalDeuda || 0;
     const pct = v => total > 0 ? Math.round(v / total * 100) + '% del total' : '—';
     document.getElementById('agingTotal').textContent = fmtCOP(total);
