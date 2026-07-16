@@ -11,3 +11,4 @@ O1NgZF4VXxdRjSeo	siigo-ghl-enriquecimiento	CHUCULAT | Siigo → GHL Enriquecimie
 VQKbig1zk65gk3G5	confirmar-cita	CHUCULAT | Confirmar cita
 KebzbxEJltA9a86w	stats	CHUCULAT | Stats
 T5vFnAkNZKPmuzv9	woocommerce-siigo	CHUCULAT | Woocommerce - Siigo
+GriVDvrNIY6RGDx1	get-premios	CHUCULAT | Get Premios

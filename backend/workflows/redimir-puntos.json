@@ -178,7 +178,7 @@
     12
    ],
    "parameters": {
-    "jsCode": "const body=$('Webhook').first().json.body||{};\nconst contact=$('Leer Contacto').first().json.contact||{};\nconst now=new Date();\nreturn [{ json: { ext_id: Date.now().toString(36)+Math.random().toString(36).slice(2), timestamp: now.toISOString(), fecha: now.toISOString().split('T')[0], tipo:'redencion', contact_id: body.contactId||'', contact_name: ((contact.firstName||'')+' '+(contact.lastName||'')).trim(), phone: contact.phone||'', points: Number(body.pointsToRedeem)||0, source:'redencion', invoice_id:null, siigo_id:null } }];"
+    "jsCode": "const body=$('Webhook').first().json.body||{};\nconst contact=$('Leer Contacto').first().json.contact||{};\nconst now=new Date();\nreturn [{ json: { ext_id: Date.now().toString(36)+Math.random().toString(36).slice(2), timestamp: now.toISOString(), fecha: now.toISOString().split('T')[0], tipo:'redencion', contact_id: body.contactId||'', contact_name: ((contact.firstName||'')+' '+(contact.lastName||'')).trim(), phone: contact.phone||'', points: Number(body.pointsToRedeem)||0, source:'redencion', invoice_id:null, siigo_id:null,\n    // Detalle de lo redimido: [{sku,nombre,puntos,precio_cop,qty}] (lo manda el sitio de redencion)\n    items: Array.isArray(body.items) ? body.items.map(i => ({\n      sku: String(i.sku||''), nombre: String(i.nombre||''),\n      puntos: Number(i.puntos)||0, precio_cop: Number(i.precio_cop)||0,\n      qty: Number(i.qty)||1\n    })) : null } }];"
    }
   },
   {

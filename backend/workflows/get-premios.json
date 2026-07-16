@@ -1,0 +1,90 @@
+{
+ "name": "CHUCULAT | Get Premios",
+ "nodes": [
+  {
+   "parameters": {
+    "httpMethod": "GET",
+    "path": "get-premios",
+    "responseMode": "responseNode",
+    "options": {
+     "allowedOrigins": "*"
+    }
+   },
+   "id": "a1",
+   "name": "Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    240,
+    300
+   ],
+   "webhookId": "get-premios-01"
+  },
+  {
+   "parameters": {
+    "jsCode": "// Catalogo de premios desde Supabase (tabla premios_puntos).\n// Lo consumen el sitio de redencion y el de premios; asi no hay llaves en el frontend.\nconst SB='https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY='<SUPABASE_SERVICE_ROLE>';\nconst res = await this.helpers.httpRequest({ method:'GET',\n  url: SB+'/rest/v1/premios_puntos?select=sku,nombre,precio_cop,puntos,imagen,orden&activo=is.true&order=puntos.asc',\n  headers:{ apikey:KEY, Authorization:'Bearer '+KEY }, json:true });\nreturn [{ json: { premios: Array.isArray(res)?res:[], total: (res||[]).length } }];"
+   },
+   "id": "a2",
+   "name": "Leer Premios",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    460,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ JSON.stringify($json) }}",
+    "options": {
+     "responseHeaders": {
+      "entries": [
+       {
+        "name": "Access-Control-Allow-Origin",
+        "value": "*"
+       }
+      ]
+     }
+    }
+   },
+   "id": "a3",
+   "name": "Resp",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1,
+   "position": [
+    680,
+    300
+   ]
+  }
+ ],
+ "connections": {
+  "Webhook": {
+   "main": [
+    [
+     {
+      "node": "Leer Premios",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Leer Premios": {
+   "main": [
+    [
+     {
+      "node": "Resp",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "callerPolicy": "workflowsFromSameOwner",
+  "availableInMCP": false
+ }
+}

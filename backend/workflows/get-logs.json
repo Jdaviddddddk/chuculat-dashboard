@@ -49,7 +49,7 @@
   },
   {
    "parameters": {
-    "jsCode": "const items=$input.all();\nlet rows=[];\nif(items.length>1){rows=items.map(i=>i.json);}else if(items.length===1){const j=items[0].json;rows=Array.isArray(j)?j:(Array.isArray(j.data)?j.data:[j]);}\nconst logs=rows.filter(r=>r&&r.tipo).map(r=>({id:r.ext_id||r.id,timestamp:r.timestamp,date:r.fecha,type:r.tipo,contactId:r.contact_id,contactName:r.contact_name,phone:r.phone,points:r.points,source:r.source,invoiceId:r.invoice_id,siigoId:r.siigo_id}));\nreturn [{ json: { logs } }];"
+    "jsCode": "const items=$input.all();\nlet rows=[];\nif(items.length>1){rows=items.map(i=>i.json);}else if(items.length===1){const j=items[0].json;rows=Array.isArray(j)?j:(Array.isArray(j.data)?j.data:[j]);}\nconst logs=rows.filter(r=>r&&r.tipo).map(r=>({id:r.ext_id||r.id,timestamp:r.timestamp,date:r.fecha,type:r.tipo,contactId:r.contact_id,contactName:r.contact_name,phone:r.phone,points:r.points,source:r.source,invoiceId:r.invoice_id,siigoId:r.siigo_id,items:r.items||null}));\nreturn [{ json: { logs } }];"
    },
    "id": "sb-map",
    "name": "Mapear",
