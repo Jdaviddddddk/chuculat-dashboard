@@ -74,7 +74,10 @@
         1168
       ],
       "id": "f7bd6c69-0147-4f05-af34-92052ea7be23",
-      "name": "Factura"
+      "name": "Factura",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
     },
     {
       "parameters": {
@@ -237,7 +240,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const contact = $input.first().json.contacts[0];\nconst cf = contact.customFields || [];\n\n// Puntos actuales y nuevo total\nconst puntosActuales = $('Buscar contacto').first().json.contacts[0].customFields[1].value;\nconst puntosNuevos   = $('Code in JavaScript1').first().json.puntosGanados;\nconst totalPuntos    = puntosActuales + puntosNuevos;\nconst puntosHistory  = $('Buscar contacto').first().json.contacts[0].customFields[3].value + totalPuntos;\n\n// Historial de recompras: leer campo actual y agregar fecha de hoy\nconst allCf = $('Buscar contacto').first().json.contacts[0].customFields || [];\nconst historicField    = allCf.find(f => f.id === 'wdfNkPf305JjwPdTUBwS');\nconst currentHistorial = historicField?.value || '';\nconst today            = new Date().toISOString().split('T')[0]; // YYYY-MM-DD\nconst newHistorial     = currentHistorial ? currentHistorial + ',' + today : today;\n\n// DESPUÉS\nconst fechaUltimaRecompra = new Date().toISOString().split('T')[0]; // \"2026-06-03\"\n\nreturn [{\n  json: {\n    contactId:           contact.id,\n    puntosActuales,\n    puntosNuevos,\n    totalPuntos,\n    puntosHistory,\n    newHistorial,\n    fechaUltimaRecompra\n  }\n}];"
+        "jsCode": "const contact = $('Buscar contacto').first().json.contacts[0];\nconst cf = contact.customFields || [];\n\n// Leer por ID de campo (NO por posicion) con coercion numerica segura\nconst num = (id) => { const f = cf.find(x => x.id === id); const v = f ? Number(f.value) : 0; return isNaN(v) ? 0 : v; };\n\nconst PUNTOS_ID    = 'UfFc9GjS1K9az8nactO5'; // saldo de puntos\nconst HIST_ID      = 'ciYvzjlWfz9RcmIlqRkO'; // puntos historicos (total otorgado)\nconst HISTORIAL_ID = 'wdfNkPf305JjwPdTUBwS'; // fechas de recompra\n\nconst puntosActuales = num(PUNTOS_ID);\nconst puntosNuevos   = Number($('Code in JavaScript1').first().json.puntosGanados) || 0;\nconst totalPuntos    = puntosActuales + puntosNuevos;\nconst puntosHistory  = num(HIST_ID) + puntosNuevos;\n\nconst histField        = cf.find(f => f.id === HISTORIAL_ID);\nconst currentHistorial = histField?.value || '';\nconst today            = new Date().toISOString().split('T')[0];\nconst newHistorial     = currentHistorial ? currentHistorial + ',' + today : today;\nconst fechaUltimaRecompra = today;\n\nreturn [{\n  json: { contactId: contact.id, puntosActuales, puntosNuevos, totalPuntos, puntosHistory, newHistorial, fechaUltimaRecompra }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -509,37 +512,7 @@
     },
     {
       "parameters": {
-        "fileSelector": "/root/.n8n-files/chuculat_activity_log.json",
-        "options": {}
-      },
-      "id": "mq0p3alj67kin4",
-      "name": "Log: Leer Log",
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1,
-      "position": [
-        2800,
-        1232
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "operation": "fromJson",
-        "options": {}
-      },
-      "id": "mq0p3aljtabwbp",
-      "name": "Log: Extraer JSON",
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1,
-      "position": [
-        3024,
-        1232
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "const BLOCKED_IDS = new Set(['7777777777777', '222222222222']);\n\nlet logs = [];\ntry {\n  const ex = $input.first().json;\n  if (Array.isArray(ex)) logs = ex;\n  else if (ex && ex.data && Array.isArray(ex.data)) logs = ex.data;\n} catch(e) { logs = []; }\n\nconst bc      = $('Buscar contacto').first().json.contacts[0] || {};\nconst invoice = $('Code in JavaScript1').first().json;\nconst puntos  = invoice.puntosGanados || 0;\n\nconst siigoId = String(invoice.identification || '').trim();\n\nif (BLOCKED_IDS.has(siigoId)) {\n  return [{ json: { logsStr: JSON.stringify(logs, null, 2), skipped: true, siigoId, total: logs.length } }];\n}\n\nconst entry = {\n  id:          Date.now().toString(36) + Math.random().toString(36).slice(2),\n  timestamp:   new Date().toISOString(),\n  date:        new Date().toISOString().split('T')[0],\n  type:        'suma_puntos',\n  contactId:   bc.id || '',\n  contactName: ((bc.firstName || '') + ' ' + (bc.lastName || '')).trim(),\n  phone:       bc.phone || '',\n  points:      puntos,\n  source:      'siigo',\n  invoiceId:   invoice.name || null,\n  siigoId:     siigoId || null\n};\nlogs.push(entry);\nreturn [{ json: { logsStr: JSON.stringify(logs, null, 2), entry, total: logs.length } }];"
+        "jsCode": "const BLOCKED_IDS=new Set(['7777777777777','222222222222']);\nconst bc=$('Buscar contacto').first().json.contacts[0]||{};\nconst invoice=$('Code in JavaScript1').first().json;\nlet fv='', fdate='';\ntry{ const f=$('Factura').first().json.results[0]; fv=f.name||''; fdate=String(f.date||'').slice(0,10); }catch(e){}\nconst puntos=Number(invoice.puntosGanados)||0;\nconst siigoId=String(invoice.identification||'').trim();\nif(BLOCKED_IDS.has(siigoId))return [];\nconst now=new Date();\nreturn [{ json: { ext_id: Date.now().toString(36)+Math.random().toString(36).slice(2), timestamp: (fdate?fdate+'T12:00:00Z':now.toISOString()), fecha: (fdate||now.toISOString().split('T')[0]), tipo:'suma_puntos', contact_id: bc.id||'', contact_name: ((bc.firstName||'')+' '+(bc.lastName||'')).trim(), phone: bc.phone||'', points: puntos, source:'siigo', invoice_id: fv||null, siigo_id: siigoId||null } }];"
       },
       "id": "mq0p3aljjh4ky7",
       "name": "Log: Preparar Entrada",
@@ -552,34 +525,90 @@
     },
     {
       "parameters": {
-        "operation": "toText",
-        "sourceProperty": "logsStr",
-        "options": {
-          "fileName": "chuculat_activity_log.json"
-        }
+        "method": "POST",
+        "url": "https://wavqyesyqqmawjfaztvb.supabase.co/rest/v1/puntos_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "<SUPABASE_SERVICE_ROLE>"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer <SUPABASE_SERVICE_ROLE>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
       },
-      "id": "mq0p3alj9xwx72",
-      "name": "Log: Convertir a Archivo",
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1,
+      "id": "sb-ins-pts",
+      "name": "Insertar Supabase Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
-        3472,
-        1232
+        1600,
+        600
+      ],
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "const cli=$('Cliente').first().json||{};\nconst ident=String(cli.identification||'').trim();\nconst idtype=String((cli.id_type&&cli.id_type.code)||'');\nconst ptype=String(cli.person_type||'');\nlet cname=cli.name; cname=Array.isArray(cname)?cname.join(' '):String(cname||'');\nlet invDate=''; try{invDate=String($('Factura').first().json.results[0].date||'').slice(0,10);}catch(e){}\nconst BLOCKED=new Set(['222222222222','7777777777777']);\nconst LAURA=/laura\\s+catalina\\s+le[oó]n/i;\nconst KW=/\\b(s\\.?a\\.?s\\.?|ltda\\.?|factura|corp|inc|empresa|group|grupo|distribu|comercial|industria|hospitality|retail|inversiones)\\b/i;\nconst CUTOFF='2026-05-11';\nconst esNatural = !BLOCKED.has(ident) && ptype!=='Company' && idtype!=='31' && !LAURA.test(cname) && !KW.test(cname) && !(invDate && invDate<CUTOFF);\nreturn [{ json: { ...$json, esNatural } }];"
+      },
+      "id": "flt-nat",
+      "name": "Filtro Natural",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        900
       ]
     },
     {
       "parameters": {
-        "operation": "write",
-        "fileName": "/root/.n8n-files/chuculat_activity_log.json",
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "nat1",
+              "leftValue": "={{ $json.esNatural }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
         "options": {}
       },
-      "id": "mq0p3aljpm2epg",
-      "name": "Log: Guardar Log",
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1,
+      "id": "flt-if",
+      "name": "Es Natural?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
       "position": [
-        3680,
-        1232
+        1020,
+        900
       ]
     }
   ],
@@ -610,7 +639,7 @@
       "main": [
         [
           {
-            "node": "Code in JavaScript",
+            "node": "Filtro Natural",
             "type": "main",
             "index": 0
           }
@@ -764,7 +793,7 @@
             "index": 0
           },
           {
-            "node": "Log: Leer Log",
+            "node": "Log: Preparar Entrada",
             "type": "main",
             "index": 0
           }
@@ -843,44 +872,40 @@
         []
       ]
     },
-    "Log: Leer Log": {
-      "main": [
-        [
-          {
-            "node": "Log: Extraer JSON",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Log: Extraer JSON": {
-      "main": [
-        [
-          {
-            "node": "Log: Preparar Entrada",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Log: Preparar Entrada": {
       "main": [
         [
           {
-            "node": "Log: Convertir a Archivo",
+            "node": "Insertar Supabase Log",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Log: Convertir a Archivo": {
+    "Filtro Natural": {
       "main": [
         [
           {
-            "node": "Log: Guardar Log",
+            "node": "Es Natural?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es Natural?": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
             "type": "main",
             "index": 0
           }
@@ -889,9 +914,6 @@
     }
   },
   "settings": {
-    "executionOrder": "v1",
-    "binaryMode": "separate",
-    "availableInMCP": false,
-    "callerPolicy": "workflowsFromSameOwner"
+    "executionOrder": "v1"
   }
 }

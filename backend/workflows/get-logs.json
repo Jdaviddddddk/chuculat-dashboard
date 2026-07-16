@@ -19,60 +19,60 @@
     },
     {
       "parameters": {
-        "fileSelector": "/root/.n8n-files/chuculat_activity_log.json",
+        "url": "https://wavqyesyqqmawjfaztvb.supabase.co/rest/v1/puntos_log?select=*&order=timestamp.asc&limit=100000",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "<SUPABASE_SERVICE_ROLE>"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer <SUPABASE_SERVICE_ROLE>"
+            }
+          ]
+        },
         "options": {}
       },
-      "id": "gl-n2",
-      "name": "Leer Log",
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1,
+      "id": "sb-get",
+      "name": "Get Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
-        464,
-        304
+        460,
+        300
       ],
-      "onError": "continueRegularOutput"
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
     },
     {
       "parameters": {
-        "operation": "fromJson",
-        "options": {}
+        "jsCode": "const items=$input.all();\nlet rows=[];\nif(items.length>1){rows=items.map(i=>i.json);}else if(items.length===1){const j=items[0].json;rows=Array.isArray(j)?j:(Array.isArray(j.data)?j.data:[j]);}\nconst logs=rows.filter(r=>r&&r.tipo).map(r=>({id:r.ext_id||r.id,timestamp:r.timestamp,date:r.fecha,type:r.tipo,contactId:r.contact_id,contactName:r.contact_name,phone:r.phone,points:r.points,source:r.source,invoiceId:r.invoice_id,siigoId:r.siigo_id}));\nreturn [{ json: { logs } }];"
       },
-      "id": "gl-n3",
-      "name": "Extraer JSON",
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1,
-      "position": [
-        688,
-        304
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "let logs = [];\ntry {\n  const ex = $input.first().json;\n  if (Array.isArray(ex)) logs = ex;\n  else if (ex && ex.data && Array.isArray(ex.data)) logs = ex.data;\n} catch(e) { logs = []; }\n\n// Agrupar por fecha para el timeline\nconst byDate = {};\nfor (const e of logs) {\n  if (!byDate[e.date]) byDate[e.date] = { date: e.date, suma: 0, redencion: 0, eventos: 0 };\n  byDate[e.date].eventos++;\n  if (e.type === 'suma_puntos') byDate[e.date].suma      += (e.points || 0);\n  if (e.type === 'redencion')   byDate[e.date].redencion += (e.points || 0);\n}\nconst timeline = Object.values(byDate).sort((a,b) => a.date.localeCompare(b.date));\n\nreturn [{ json: { logs, timeline, total: logs.length } }];"
-      },
-      "id": "gl-n4",
-      "name": "Procesar Logs",
+      "id": "sb-map",
+      "name": "Mapear",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        912,
-        304
+        680,
+        300
       ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ $json }}",
+        "responseBody": "={{ JSON.stringify($json) }}",
         "options": {}
       },
-      "id": "gl-n5",
+      "id": "sb-resp",
       "name": "Responder",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        1120,
-        304
+        900,
+        300
       ]
     }
   ],
@@ -81,36 +81,25 @@
       "main": [
         [
           {
-            "node": "Leer Log",
+            "node": "Get Supabase",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Leer Log": {
+    "Get Supabase": {
       "main": [
         [
           {
-            "node": "Extraer JSON",
+            "node": "Mapear",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extraer JSON": {
-      "main": [
-        [
-          {
-            "node": "Procesar Logs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Procesar Logs": {
+    "Mapear": {
       "main": [
         [
           {
@@ -123,8 +112,6 @@
     }
   },
   "settings": {
-    "executionOrder": "v1",
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
+    "executionOrder": "v1"
   }
 }
