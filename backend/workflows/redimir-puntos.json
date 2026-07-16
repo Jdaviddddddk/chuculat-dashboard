@@ -74,7 +74,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"customFields\": [\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": \"{{ $json.newPoints }}\"\n    },\n    {\n      \"id\": \"jyDAuEv0t1ugBAop1HAQ\",\n      \"value\": \"{{ $json.newUsedPoints }}\"\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": \"{{ $json.puntosHistory }}\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"customFields\": [\n    { \"id\": \"UfFc9GjS1K9az8nactO5\", \"value\": \"{{ $json.newPoints }}\" },\n    { \"id\": \"jyDAuEv0t1ugBAop1HAQ\", \"value\": \"{{ $json.newUsedPoints }}\" },\n    { \"id\": \"ciYvzjlWfz9RcmIlqRkO\", \"value\": \"{{ $json.puntosHistory }}\" },\n    { \"id\": \"KK5lI6yJVEB9WhGwdFpa\", \"value\": \"{{ $json.fechaRedencion }}\" },\n    { \"id\": \"xmOqbRfTg5xaE2WCKfzS\", \"value\": \"{{ $json.detalleRedencion }}\" }\n  ]\n}",
         "options": {
           "redirect": {
             "redirect": {}
@@ -107,7 +107,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Lee saldo y redimidos por ID de campo (no por índice: GHL omite campos vacíos)\nconst cf = (($('Leer Contacto').first().json.contact) || {}).customFields || [];\nconst val = id => { const f = cf.find(x => x.id === id); return f ? (Number(f.value) || 0) : 0; };\nconst SALDO='UfFc9GjS1K9az8nactO5', REDIMIDOS='jyDAuEv0t1ugBAop1HAQ';\n\nconst currentPoints  = Number($('Webhook').first().json.body.currentPoints || 0);\nconst pointsToRedeem = Number($('Webhook').first().json.body.pointsToRedeem || 0);\nconst usedPoints     = val(REDIMIDOS);\n\nconst newPoints     = currentPoints - pointsToRedeem;   // saldo restante\nconst newUsedPoints = usedPoints + pointsToRedeem;      // redimidos acumulado\nconst puntosHistory = newPoints + newUsedPoints;        // histórico (ganado) = saldo + redimidos\n\nreturn [{ json: { newPoints, newUsedPoints, puntosHistory } }];"
+        "jsCode": "// Lee saldo y redimidos por ID de campo (no por índice: GHL omite campos vacíos)\nconst cf = (($('Leer Contacto').first().json.contact) || {}).customFields || [];\nconst val = id => { const f = cf.find(x => x.id === id); return f ? (Number(f.value) || 0) : 0; };\nconst SALDO='UfFc9GjS1K9az8nactO5', REDIMIDOS='jyDAuEv0t1ugBAop1HAQ';\n\nconst currentPoints  = Number($('Webhook').first().json.body.currentPoints || 0);\nconst pointsToRedeem = Number($('Webhook').first().json.body.pointsToRedeem || 0);\nconst usedPoints     = val(REDIMIDOS);\n\nconst newPoints     = currentPoints - pointsToRedeem;   // saldo restante\nconst newUsedPoints = usedPoints + pointsToRedeem;      // redimidos acumulado\nconst puntosHistory = newPoints + newUsedPoints;        // histórico (ganado) = saldo + redimidos\n\n// Fecha y detalle de esta redención\nconst hoy = new Date();\nconst fechaRedencion = hoy.toISOString().split('T')[0]; // YYYY-MM-DD (campo DATE)\nconst dd = String(hoy.getDate()).padStart(2,'0');\nconst mm = String(hoy.getMonth()+1).padStart(2,'0');\nconst detalleRedencion = dd+'/'+mm+'/'+hoy.getFullYear()+' · '+pointsToRedeem+' pts';\n\nreturn [{ json: { newPoints, newUsedPoints, puntosHistory, fechaRedencion, detalleRedencion } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
