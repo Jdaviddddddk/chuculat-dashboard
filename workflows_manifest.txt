@@ -5,3 +5,9 @@ b3NqLczq5MzJ3dmb	siigo-ghl-facturas-puntos	CHUCULAT | SIIGO - GHL FACTURAS
 GKelHhGiTUYu1QzD	get-logs	CHUCULAT | Get Logs
 iIGA54Txfw5BfKjN	test-log-activity	CHUCULAT | TEST Log Activity
 Vt1nWvjlQeaiX4eB	get-surveys	CHUCULAT | Get Surveys
+5fkAFHxQJXal55hQ	redimir-puntos	CHUCULAT | Redimir Puntos
+iVi686P2BTWp2nFg	error-handler	CHUCULAT | Error Handler
+O1NgZF4VXxdRjSeo	siigo-ghl-enriquecimiento	CHUCULAT | Siigo → GHL Enriquecimiento
+VQKbig1zk65gk3G5	confirmar-cita	CHUCULAT | Confirmar cita
+KebzbxEJltA9a86w	stats	CHUCULAT | Stats
+T5vFnAkNZKPmuzv9	woocommerce-siigo	CHUCULAT | Woocommerce - Siigo

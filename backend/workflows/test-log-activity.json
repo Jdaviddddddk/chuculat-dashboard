@@ -1,185 +1,132 @@
 {
-  "name": "CHUCULAT | TEST Log Activity",
-  "nodes": [
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "test-log-activity",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "n1",
-      "name": "Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        240,
-        304
-      ],
-      "webhookId": "test-log-chuculat-001"
-    },
-    {
-      "parameters": {
-        "fileSelector": "/root/.n8n-files/chuculat_activity_log.json",
-        "options": {}
-      },
-      "id": "n2",
-      "name": "Leer Log",
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1,
-      "position": [
-        464,
-        304
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "operation": "fromJson",
-        "options": {}
-      },
-      "id": "n2b",
-      "name": "Extraer JSON",
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1,
-      "position": [
-        672,
-        304
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "let logs = [];\ntry {\n  const extracted = $input.first().json;\n  if (Array.isArray(extracted)) { logs = extracted; }\n  else if (extracted && extracted.data && Array.isArray(extracted.data)) { logs = extracted.data; }\n} catch(e) { logs = []; }\nconst body = $('Webhook').first().json.body || {};\n\nif (body.deleteSource) {\n  logs = logs.filter(l => l.source !== body.deleteSource);\n  return [{ json: { logsStr: JSON.stringify(logs, null, 2), total: logs.length, deleted: true } }];\n}\n\nif (body.deleteContactId) {\n  logs = logs.filter(l => l.contactId !== body.deleteContactId);\n  return [{ json: { logsStr: JSON.stringify(logs, null, 2), total: logs.length, deleted: true } }];\n}\n\nconst entryDate = body.date || new Date().toISOString().split('T')[0];\nconst entryTs   = body.timestamp || (entryDate + 'T12:00:00.000Z');\n\nconst entry = {\n  id:          Date.now().toString(36) + Math.random().toString(36).slice(2),\n  timestamp:   entryTs,\n  date:        entryDate,\n  type:        body.type        || 'test',\n  contactId:   body.contactId   || 'test-id',\n  contactName: body.contactName || 'Test User',\n  phone:       body.phone       || '0000',\n  points:      Number(body.points) || 0,\n  source:      body.source      || 'test',\n  invoiceId:   body.invoiceId   || null,\n  siigoId:     body.siigoId     || null\n};\nlogs.push(entry);\nreturn [{ json: { logsStr: JSON.stringify(logs, null, 2), entry, total: logs.length } }];"
-      },
-      "id": "n3",
-      "name": "Preparar Entrada",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        880,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "toText",
-        "sourceProperty": "logsStr",
-        "options": {
-          "fileName": "chuculat_activity_log.json"
-        }
-      },
-      "id": "n4b",
-      "name": "Convertir a Archivo",
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1,
-      "position": [
-        1088,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "write",
-        "fileName": "/root/.n8n-files/chuculat_activity_log.json",
-        "options": {}
-      },
-      "id": "n4",
-      "name": "Guardar Log",
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1,
-      "position": [
-        1280,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { ok: true, entry: $('Preparar Entrada').first().json.entry, total: $('Preparar Entrada').first().json.total } }}",
-        "options": {}
-      },
-      "id": "n5",
-      "name": "Responder",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [
-        1488,
-        304
-      ]
-    }
-  ],
-  "connections": {
-    "Webhook": {
-      "main": [
-        [
-          {
-            "node": "Leer Log",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Leer Log": {
-      "main": [
-        [
-          {
-            "node": "Extraer JSON",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extraer JSON": {
-      "main": [
-        [
-          {
-            "node": "Preparar Entrada",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Preparar Entrada": {
-      "main": [
-        [
-          {
-            "node": "Convertir a Archivo",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Convertir a Archivo": {
-      "main": [
-        [
-          {
-            "node": "Guardar Log",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Guardar Log": {
-      "main": [
-        [
-          {
-            "node": "Responder",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+ "name": "CHUCULAT | TEST Log Activity",
+ "nodes": [
+  {
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "test-log-activity",
+    "responseMode": "responseNode",
+    "options": {}
+   },
+   "id": "n1",
+   "name": "Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    240,
+    304
+   ],
+   "webhookId": "test-log-chuculat-001"
   },
-  "settings": {
-    "executionOrder": "v1",
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
+  {
+   "parameters": {
+    "jsCode": "const body=$('Webhook').first().json.body||{};\nconst date=body.date||new Date().toISOString().split('T')[0];\nconst ts=body.timestamp||(date+'T12:00:00.000Z');\nreturn [{ json: { ext_id: Date.now().toString(36)+Math.random().toString(36).slice(2), timestamp: ts, fecha: date, tipo: body.type||'suma_puntos', contact_id: body.contactId||'', contact_name: body.contactName||'', phone: body.phone||'', points: Number(body.points)||0, source: body.source||'manual', invoice_id: body.invoiceId||null, siigo_id: body.siigoId||null } }];"
+   },
+   "id": "tl-prep",
+   "name": "Preparar Entrada",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    460,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://wavqyesyqqmawjfaztvb.supabase.co/rest/v1/puntos_log",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "apikey",
+       "value": "<SUPABASE_SERVICE_ROLE>"
+      },
+      {
+       "name": "Authorization",
+       "value": "Bearer <SUPABASE_SERVICE_ROLE>"
+      },
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Prefer",
+       "value": "return=minimal"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json) }}",
+    "options": {}
+   },
+   "id": "tl-ins",
+   "name": "Insertar Supabase",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    680,
+    300
+   ],
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 2000
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={ \"ok\": true }",
+    "options": {}
+   },
+   "id": "tl-resp",
+   "name": "Responder",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1,
+   "position": [
+    900,
+    300
+   ]
   }
+ ],
+ "connections": {
+  "Webhook": {
+   "main": [
+    [
+     {
+      "node": "Preparar Entrada",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Preparar Entrada": {
+   "main": [
+    [
+     {
+      "node": "Insertar Supabase",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Insertar Supabase": {
+   "main": [
+    [
+     {
+      "node": "Responder",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "callerPolicy": "workflowsFromSameOwner",
+  "availableInMCP": false
+ }
 }

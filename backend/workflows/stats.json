@@ -1,0 +1,160 @@
+{
+ "name": "CHUCULAT | Stats",
+ "nodes": [
+  {
+   "parameters": {
+    "path": "get-stats",
+    "responseMode": "responseNode",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2.1,
+   "position": [
+    288,
+    0
+   ],
+   "id": "18ad9c5a-0cc7-4b26-84a3-38a644ecf21f",
+   "name": "Webhook",
+   "webhookId": "a1b2c3d4-0001-0001-0001-000000000002"
+  },
+  {
+   "parameters": {
+    "jsCode": "const pages = [];\n\nfor (let i = 1; i <= 50; i++) {\n  pages.push({ json: { page: i } });\n}\n\nreturn pages;"
+   },
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    512,
+    0
+   ],
+   "id": "b1819a94-0e2a-4fe7-84f9-9bd2f7f02e89",
+   "name": "Generate Pages"
+  },
+  {
+   "parameters": {
+    "url": "https://services.leadconnectorhq.com/contacts/",
+    "sendQuery": true,
+    "queryParameters": {
+     "parameters": [
+      {
+       "name": "locationId",
+       "value": "jzrg6bPH71ccLohGddsN"
+      },
+      {
+       "name": "limit",
+       "value": "100"
+      },
+      {
+       "name": "page",
+       "value": "={{$json.page}}"
+      }
+     ]
+    },
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "Bearer <GHL_PRIVATE_TOKEN>"
+      },
+      {
+       "name": "Version",
+       "value": "2021-07-28"
+      }
+     ]
+    },
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    736,
+    0
+   ],
+   "id": "d84b346f-7cd2-449f-9c0f-f037404bd2a9",
+   "name": "HTTP Request",
+   "onError": "continueRegularOutput",
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 2000
+  },
+  {
+   "parameters": {
+    "jsCode": "const contacts = [];\n\n// Fecha límite: hace 30 días\nconst now      = new Date();\nconst limit30  = new Date(now);\nlimit30.setDate(limit30.getDate() - 30);\nconst limit30Str = limit30.toISOString().split('T')[0]; // YYYY-MM-DD\n\nfor (const item of items) {\n  const data = item.json.contacts || [];\n\n  for (const contact of data) {\n    const cf   = contact.customFields || [];\n    const find = id => cf.find(f => f.id === id)?.value || 0;\n    const findStr = id => cf.find(f => f.id === id)?.value || '';\n\n    // Historial de recompras: string con fechas separadas por coma\n    const historialRaw   = findStr('wdfNkPf305JjwPdTUBwS');\n    const todasFechas    = historialRaw\n      ? historialRaw.split(',').map(d => d.trim()).filter(Boolean)\n      : [];\n\n    // Contar cuántas están en los últimos 30 días\n    const recompras30 = todasFechas.filter(d => d >= limit30Str).length;\n\n    // Última fecha de recompra (campo que se sobreescribe)\n    const ultimaRecompra = findStr('4SxhRfKQzstus8dzHsxS');\n\n    contacts.push({\n      id:             contact.id,\n      fullName:       (contact.firstName + ' ' + (contact.lastName || '')).trim(),\n      phone:          contact.phone || '',\n      historicPoints: parseInt(find('ciYvzjlWfz9RcmIlqRkO')) || 0,\n      redeemedPoints: parseInt(find('jyDAuEv0t1ugBAop1HAQ')) || 0,\n      recompras30,\n      ultimaRecompra\n    });\n  }\n}\n\nconst totalOtorgados  = contacts.reduce((s, c) => s + c.historicPoints, 0);\nconst totalRedimidos  = contacts.reduce((s, c) => s + c.redeemedPoints, 0);\nconst tasa = totalOtorgados > 0\n  ? parseFloat(((totalRedimidos / totalOtorgados) * 100).toFixed(1))\n  : 0;\nconst totalRecompras30 = contacts.reduce((s, c) => s + c.recompras30, 0);\n\nreturn [{\n  json: {\n    totalOtorgados,\n    totalRedimidos,\n    tasa,\n    totalRecompras30,\n    contacts\n  }\n}];"
+   },
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    944,
+    0
+   ],
+   "id": "5e63a128-b9d5-4308-b6cf-54785e8f4d5c",
+   "name": "Compute Stats"
+  },
+  {
+   "parameters": {
+    "options": {}
+   },
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.5,
+   "position": [
+    1152,
+    0
+   ],
+   "id": "7c75e6b1-03c3-4090-9d27-b58dfa925de0",
+   "name": "Respond to Webhook"
+  }
+ ],
+ "connections": {
+  "Webhook": {
+   "main": [
+    [
+     {
+      "node": "Generate Pages",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Generate Pages": {
+   "main": [
+    [
+     {
+      "node": "HTTP Request",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HTTP Request": {
+   "main": [
+    [
+     {
+      "node": "Compute Stats",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Compute Stats": {
+   "main": [
+    [
+     {
+      "node": "Respond to Webhook",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "binaryMode": "separate",
+  "availableInMCP": false,
+  "callerPolicy": "workflowsFromSameOwner"
+ }
+}

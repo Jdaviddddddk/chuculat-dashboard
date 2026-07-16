@@ -1,0 +1,965 @@
+{
+ "name": "CHUCULAT | Confirmar cita",
+ "nodes": [
+  {
+   "parameters": {
+    "assignments": {
+     "assignments": [
+      {
+       "id": "4877c70c-3979-4646-87fe-f20017cbdb88",
+       "name": "refPayco",
+       "value": "={{ $json.query.x_ref_payco }}",
+       "type": "string"
+      },
+      {
+       "id": "51b8ca82-2b3d-491f-8504-3bf6e8a7d872",
+       "name": "status",
+       "value": "={{ $json.query.x_response }}",
+       "type": "string"
+      },
+      {
+       "id": "f1c91ec8-b54c-4820-bf58-3382f3f600c6",
+       "name": "amount",
+       "value": "={{ $json.query.x_amount }}",
+       "type": "string"
+      },
+      {
+       "id": "3131c129-b6c9-4d96-9db8-711f744496ee",
+       "name": "customerEmail",
+       "value": "={{ $json.query.x_customer_email }}",
+       "type": "string"
+      },
+      {
+       "id": "1b12fbd4-a247-4a09-a84f-466f9547d226",
+       "name": "=customerName",
+       "value": "={{ $json.query.x_customer_name }}",
+       "type": "string"
+      },
+      {
+       "id": "13793fdc-5114-41f1-acbe-f4c6c47285d0",
+       "name": "=customerLastName",
+       "value": "={{ $json.query.x_customer_lastname }}",
+       "type": "string"
+      },
+      {
+       "id": "e24f4f59-d816-444e-a9f2-535f5a8c4c3e",
+       "name": "=customerPhone",
+       "value": "={{ $json.query.x_customer_phone }}",
+       "type": "string"
+      },
+      {
+       "id": "edc3cb21-dc13-415e-b1d5-dd12405621ca",
+       "name": "=date",
+       "value": "={{ $json.body?.x_extra1 || $json.query?.x_extra1 }}",
+       "type": "string"
+      },
+      {
+       "id": "c75a2454-b2ae-4beb-9c6c-0b1ac17ce282",
+       "name": "=slot",
+       "value": "={{ $json.body?.x_extra2 || $json.query?.x_extra2 }}",
+       "type": "string"
+      },
+      {
+       "id": "4a503da2-2d79-4b87-b738-5cc902658054",
+       "name": "customerId",
+       "value": "={{ $json.query.x_customer_document }}",
+       "type": "number"
+      }
+     ]
+    },
+    "options": {}
+   },
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    304,
+    -128
+   ],
+   "id": "e56cfe4c-a717-4803-842f-251da07c601c",
+   "name": "Edit Fields"
+  },
+  {
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "payment-confirmation",
+    "responseMode": "responseNode",
+    "options": {
+     "responseHeaders": {
+      "entries": [
+       {
+        "name": "Access-Control-Allow-Origin",
+        "value": "*"
+       },
+       {
+        "name": "Access-Control-Allow-Methods",
+        "value": "GET, POST, OPTIONS"
+       },
+       {
+        "name": "Access-Control-Allow-Headers",
+        "value": "Content-Type, Authorization"
+       }
+      ]
+     }
+    }
+   },
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2.1,
+   "position": [
+    96,
+    -128
+   ],
+   "id": "8f6d6c66-1a9c-4566-9cf0-2583329b5824",
+   "name": "Webhook",
+   "webhookId": "c9c6d00d-ac32-434e-8f5c-4b57ff6cf37a"
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={\n  \"success\": true,\n  \"status\": \"Aceptada\",\n  \"message\": \"Pago aprobado\"\n}",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.5,
+   "position": [
+    768,
+    -224
+   ],
+   "id": "526151c1-69ad-4cb5-884d-d42442daae18",
+   "name": "Respond to Webhook"
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "strict",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "db8a6ca3-42af-4d83-a9de-cefdd10c5866",
+       "leftValue": "={{ $json.status }}",
+       "rightValue": "Aceptada",
+       "operator": {
+        "type": "string",
+        "operation": "equals",
+        "name": "filter.operator.equals"
+       }
+      },
+      {
+       "id": "5f31b9de-67f3-4a87-87b7-a2f9ce64011c",
+       "leftValue": "",
+       "rightValue": "",
+       "operator": {
+        "type": "string",
+        "operation": "equals",
+        "name": "filter.operator.equals"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    512,
+    -128
+   ],
+   "id": "34750091-6576-4d99-afb4-f1ddc491e20a",
+   "name": "If"
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={\n  \"success\": false,\n  \"status\": \"Rechazada\",\n  \"message\": \"Pago rechazado\"\n}",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.5,
+   "position": [
+    768,
+    -16
+   ],
+   "id": "e1e3ea92-1664-4e07-b34a-37614c310177",
+   "name": "Respond to Webhook1"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://services.leadconnectorhq.com/calendars/events/appointments",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Accept",
+       "value": "application/json"
+      },
+      {
+       "name": "Version",
+       "value": "2023-02-21"
+      },
+      {
+       "name": "Authorization",
+       "value": "Bearer <GHL_PRIVATE_TOKEN>"
+      }
+     ]
+    },
+    "sendBody": true,
+    "bodyParameters": {
+     "parameters": [
+      {
+       "name": "title",
+       "value": "={{ $('Webhook').item.json.query.x_description }}"
+      },
+      {
+       "name": "meetingLocationType",
+       "value": "custom"
+      },
+      {
+       "name": "meetingLocationId",
+       "value": "custom_0"
+      },
+      {
+       "name": "appointmentStatus",
+       "value": "confirmed"
+      },
+      {
+       "name": "description",
+       "value": "={{ $('Webhook').item.json.query.x_extra3 }} Personas Asistir?n a esta experiencia"
+      },
+      {
+       "name": "ignoreDateRange",
+       "value": "false"
+      },
+      {
+       "name": "toNotify",
+       "value": "false"
+      },
+      {
+       "name": "calendarId",
+       "value": "w3rGqK15TJ1SBZwJO5gR"
+      },
+      {
+       "name": "locationId",
+       "value": "jzrg6bPH71ccLohGddsN"
+      },
+      {
+       "name": "contactId",
+       "value": "={{ $json.contacts[0].id }}"
+      },
+      {
+       "name": "startTime",
+       "value": "={{ new Date($('Edit Fields').item.json.slot).toISOString() }}"
+      },
+      {
+       "name": "assignedUserId",
+       "value": "SFECUioMYaUE1Aw0N4Ke"
+      }
+     ]
+    },
+    "options": {
+     "redirect": {
+      "redirect": {}
+     }
+    }
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    1968,
+    -384
+   ],
+   "id": "f8604f7f-13bd-47ca-aa70-29bc8be50d63",
+   "name": "HTTP Request"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://services.leadconnectorhq.com/contacts/search",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Version",
+       "value": "2023-02-21"
+      },
+      {
+       "name": "Authorization",
+       "value": "Bearer <GHL_PRIVATE_TOKEN>"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"locationId\": \"jzrg6bPH71ccLohGddsN\",\n  \"pageLimit\": 10,\n  \"page\": 1,\n  \"filters\": [\n    {\n      \"field\": \"customFields.4C6TxwNRElYAB1HFkJb4\",\n      \"operator\": \"eq\",\n      \"value\": \"{{ $json.customerId }}\"\n    }\n  ]\n}",
+    "options": {
+     "redirect": {
+      "redirect": {}
+     }
+    }
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    1440,
+    -224
+   ],
+   "id": "f1ec6cf8-c24d-42d8-9915-33424fa21cfa",
+   "name": "Buscar contacto"
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "strict",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "e2fced20-299c-423c-b8be-aec85e6a8b90",
+       "leftValue": "={{ $json.total }}",
+       "rightValue": 0,
+       "operator": {
+        "type": "number",
+        "operation": "gt"
+       }
+      },
+      {
+       "id": "a76bb94f-939c-4315-bb3f-4b5ea74f1668",
+       "leftValue": "={{ $json.total }}",
+       "rightValue": 2,
+       "operator": {
+        "type": "number",
+        "operation": "lt"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    1712,
+    -224
+   ],
+   "id": "c3d98aca-7bdd-4c15-85c4-c0f92e4ecbc2",
+   "name": "If1"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://services.leadconnectorhq.com/contacts/",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Accept",
+       "value": "application/json"
+      },
+      {
+       "name": "Version",
+       "value": "2023-02-21"
+      },
+      {
+       "name": "Authorization",
+       "value": "Bearer <GHL_PRIVATE_TOKEN>"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"locationId\": \"jzrg6bPH71ccLohGddsN\",\n  \"city\": \"\",\n  \"country\": \"CO\",\n  \"name\": \"{{ $('Edit Fields').item.json.customerName }} {{ $('Edit Fields').item.json.customerLastName }}\",\n  \"phone\": \"{{ $('Edit Fields').item.json.customerPhone }}\",\n  \"email\": \"{{ $('Edit Fields').item.json.customerEmail }}\",\n  \"customFields\": [\n    {\n      \"id\": \"4C6TxwNRElYAB1HFkJb4\",\n      \"value\": \"{{ $('Edit Fields').item.json.customerId }}\"\n    }\n  ]\n}",
+    "options": {
+     "redirect": {
+      "redirect": {}
+     }
+    }
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    1984,
+    -96
+   ],
+   "id": "718d19c9-87bc-4012-ac5d-27107f4e1bbe",
+   "name": "HTTP Request1"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://services.leadconnectorhq.com/calendars/events/appointments",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Accept",
+       "value": "application/json"
+      },
+      {
+       "name": "Version",
+       "value": "2023-02-21"
+      },
+      {
+       "name": "Authorization",
+       "value": "Bearer <GHL_PRIVATE_TOKEN>"
+      }
+     ]
+    },
+    "sendBody": true,
+    "bodyParameters": {
+     "parameters": [
+      {
+       "name": "title",
+       "value": "={{ $('Webhook').item.json.query.x_description }}"
+      },
+      {
+       "name": "meetingLocationType",
+       "value": "custom"
+      },
+      {
+       "name": "meetingLocationId",
+       "value": "custom_0"
+      },
+      {
+       "name": "appointmentStatus",
+       "value": "confirmed"
+      },
+      {
+       "name": "description",
+       "value": "={{ $('Webhook').item.json.query.x_extra3 }} Personas Asistir?n a esta experiencia"
+      },
+      {
+       "name": "ignoreDateRange",
+       "value": "false"
+      },
+      {
+       "name": "toNotify",
+       "value": "false"
+      },
+      {
+       "name": "calendarId",
+       "value": "w3rGqK15TJ1SBZwJO5gR"
+      },
+      {
+       "name": "locationId",
+       "value": "jzrg6bPH71ccLohGddsN"
+      },
+      {
+       "name": "contactId",
+       "value": "={{ $json.contact.id }}"
+      },
+      {
+       "name": "startTime",
+       "value": "={{ new Date($('Edit Fields').item.json.slot).toISOString() }}"
+      },
+      {
+       "name": "assignedUserId",
+       "value": "SFECUioMYaUE1Aw0N4Ke"
+      }
+     ]
+    },
+    "options": {
+     "redirect": {
+      "redirect": {}
+     }
+    }
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    2224,
+    -32
+   ],
+   "id": "7902e96b-ee35-480e-8e65-17590d6ccfe5",
+   "name": "HTTP Request2"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/v1/invoices",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
+      },
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n\n  \"customer\": {\n    \"identification\": \"{{ $('Webhook').item.json.query.x_customer_document }}\"\n  },\n\n  \"seller\": 10857,\n\n  \"cost_center\": 168,\n\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $json.siigoPayload.payments[0].value }}\n    }\n  ],\n\n  \"items\": {{ JSON.stringify($json.siigoPayload.items) }},\n\n  \"global_charges\": {{ JSON.stringify($json.siigoPayload.global_charges || []) }}\n}",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    2880,
+    -320
+   ],
+   "id": "8fed46a8-350f-43ad-b48c-a313ee8e8f05",
+   "name": "Crear Factura"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/auth",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "{\n  \"username\": \"<SIIGO_USERNAME>\",\n  \"access_key\": \"<SIIGO_ACCESS_KEY>\"\n}",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    2288,
+    -320
+   ],
+   "id": "ac1f2af3-a437-4f21-b446-ea345621aa58",
+   "name": "Get Siigo Token"
+  },
+  {
+   "parameters": {
+    "jsCode": "// ========== CONFIGURACI?N ==========\nconst skuMap = {\n  \"Cacao Maestro\": \"664\",\n  \"Camino del chocolate\": \"663\",\n  \"Wonka por un D?a\": \"661\",\n  \"Un D?a como Oompa Loompa\": \"662\"\n};\n\nconst PROPINA_ID = 30;\nconst PROPINA_POR_PERSONA = 15000;\nconst SKU_SIN_PROPINA = \"663\";  // ? Camino del chocolate NO cobra propina\n\n// ========== DATOS DEL WEBHOOK ==========\nconst query = $('Webhook').item.json.query;\nconst description = query.x_description;\nconst numPersonas = Number(query.x_extra3 || 1);\nconst totalOriginal = Number(query.x_amount || 0);\n\n// ========== VALIDACI?N ==========\nconst skuExperiencia = skuMap[description];\nif (!skuExperiencia) {\n  throw new Error(`No se encontr? SKU para: \"${description}\"`);\n}\n\n// ========== L?GICA DE PROPINA ==========\nconst sinPropina = skuExperiencia === SKU_SIN_PROPINA;\n\nlet valorExperiencia;\nlet propinaTotal;\n\nif (sinPropina) {\n  valorExperiencia = totalOriginal;\n  propinaTotal = 0;\n} else {\n  propinaTotal = numPersonas * PROPINA_POR_PERSONA;\n  valorExperiencia = totalOriginal - propinaTotal;\n}\n\nif (valorExperiencia < 0) {\n  throw new Error(`Propina (${propinaTotal}) > Total (${totalOriginal})`);\n}\n\n// ========== CONSTRUIR PAYLOAD ==========\nconst siigoPayload = {\n  document: { id: 30537 },\n  date: new Date().toISOString().split('T')[0],\n  customer: {\n    identification: query.x_customer_document\n  },\n  seller: 10857,\n  cost_center: 168,\n  payments: [\n    {\n      id: 13848,\n      value: totalOriginal\n    }\n  ],\n  items: [\n    {\n      code: skuExperiencia,\n      description: description,\n      quantity: numPersonas,\n      price: Math.round(valorExperiencia / numPersonas),\n      warehouse: 30\n    }\n  ]\n};\n\nif (propinaTotal > 0) {\n  siigoPayload.global_charges = [\n    {\n      id: PROPINA_ID,\n      value: propinaTotal\n    }\n  ];\n}\n\n// ========== RESULTADO ==========\nreturn [{\n  json: {\n    siigoPayload: siigoPayload,\n    resumen: {\n      experiencia: description,\n      sku: skuExperiencia,\n      personas: numPersonas,\n      valorExperiencia: valorExperiencia,\n      propina: propinaTotal,\n      total: totalOriginal,\n      sinPropina: sinPropina\n    }\n  }\n}];"
+   },
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    2592,
+    -320
+   ],
+   "id": "15c2ce5a-e02f-4c9d-a65a-937e061a5909",
+   "name": "Code in JavaScript"
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "version": 3,
+      "typeValidation": "strict",
+      "leftValue": "",
+      "caseSensitive": true
+     },
+     "conditions": [
+      {
+       "operator": {
+        "operation": "notEmpty",
+        "singleValue": true,
+        "type": "string"
+       },
+       "rightValue": "",
+       "id": "b1c2d3e4-f5a6-7890-bcde-fa1234567890",
+       "leftValue": "={{ $json.slot }}"
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+   "name": "Tiene Slot?",
+   "type": "n8n-nodes-base.if",
+   "position": [
+    1024,
+    -224
+   ],
+   "typeVersion": 2.3
+  },
+  {
+   "parameters": {
+    "jsCode": "// ========== CONFIGURACI?N ==========\nconst skuMap = {\n  \"Cacao Maestro\": \"664\",\n  \"Camino del chocolate\": \"663\",\n  \"Wonka por un D?a\": \"661\",\n  \"Un D?a como Oompa Loompa\": \"662\"\n};\n\nconst PROPINA_ID = 30;\nconst PROPINA_POR_PERSONA = 15000;\nconst SKU_SIN_PROPINA = \"663\";  // ? Camino del chocolate NO cobra propina\n\n// ========== DATOS DEL WEBHOOK ==========\nconst query = $('Webhook').item.json.query;\nconst description = query.x_description;\nconst numPersonas = Number(query.x_extra3 || 1);\nconst totalOriginal = Number(query.x_amount || 0);\n\n// ========== VALIDACI?N ==========\nconst skuExperiencia = skuMap[description];\nif (!skuExperiencia) {\n  throw new Error(`No se encontr? SKU para: \"${description}\"`);\n}\n\n// ========== L?GICA DE PROPINA ==========\nconst sinPropina = skuExperiencia === SKU_SIN_PROPINA;\n\nlet valorExperiencia;\nlet propinaTotal;\n\nif (sinPropina) {\n  valorExperiencia = totalOriginal;\n  propinaTotal = 0;\n} else {\n  propinaTotal = numPersonas * PROPINA_POR_PERSONA;\n  valorExperiencia = totalOriginal - propinaTotal;\n}\n\nif (valorExperiencia < 0) {\n  throw new Error(`Propina (${propinaTotal}) > Total (${totalOriginal})`);\n}\n\n// ========== CONSTRUIR PAYLOAD ==========\nconst siigoPayload = {\n  document: { id: 30537 },\n  date: new Date().toISOString().split('T')[0],\n  customer: {\n    identification: query.x_customer_document\n  },\n  seller: 10857,\n  cost_center: 168,\n  payments: [\n    {\n      id: 13848,\n      value: totalOriginal\n    }\n  ],\n  items: [\n    {\n      code: skuExperiencia,\n      description: description,\n      quantity: numPersonas,\n      price: Math.round(valorExperiencia / numPersonas),\n      warehouse: 30\n    }\n  ]\n};\n\nif (propinaTotal > 0) {\n  siigoPayload.global_charges = [\n    {\n      id: PROPINA_ID,\n      value: propinaTotal\n    }\n  ];\n}\n\n// ========== RESULTADO ==========\nreturn [{\n  json: {\n    siigoPayload: siigoPayload,\n    resumen: {\n      experiencia: description,\n      sku: skuExperiencia,\n      personas: numPersonas,\n      valorExperiencia: valorExperiencia,\n      propina: propinaTotal,\n      total: totalOriginal,\n      sinPropina: sinPropina\n    }\n  }\n}];"
+   },
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    2656,
+    -96
+   ],
+   "id": "06149737-dc24-4d7a-a34c-3ff637b3bf25",
+   "name": "Code in JavaScript1"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/v1/invoices",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{$node[\"Get Siigo Token1\"].json[\"access_token\"]}}"
+      },
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n\n  \"customer\": {\n    \"identification\": \"{{ $('Webhook').item.json.query.x_customer_document }}\"\n  },\n\n  \"seller\": 10857,\n\n  \"cost_center\": 168,\n\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $json.siigoPayload.payments[0].value }}\n    }\n  ],\n\n  \"items\": {{ JSON.stringify($json.siigoPayload.items) }},\n\n  \"global_charges\": {{ JSON.stringify($json.siigoPayload.global_charges || []) }}\n}",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    2960,
+    -96
+   ],
+   "id": "0a0801a7-ee80-4345-8af2-f253df117158",
+   "name": "Crear Factura1"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/auth",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "{\n  \"username\": \"<SIIGO_USERNAME>\",\n  \"access_key\": \"<SIIGO_ACCESS_KEY>\"\n}",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    2448,
+    -80
+   ],
+   "id": "cd32eb82-f050-492a-9bad-1984fe58d0ad",
+   "name": "Get Siigo Token1"
+  },
+  {
+   "parameters": {
+    "errorMessage": "=Pago SIN slot/fecha — no se agendo ni facturo. refPayco={{ $json.refPayco }} | cliente={{ $json.customerName }} {{ $json.customerLastName }} | doc={{ $json.customerId }} | monto={{ $json.amount }} | descripcion={{ $('Webhook').item.json.query.x_description }}"
+   },
+   "id": "stop-sin-slot-01",
+   "name": "Sin Slot - Alertar",
+   "type": "n8n-nodes-base.stopAndError",
+   "typeVersion": 1,
+   "position": [
+    1224,
+    -24
+   ]
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/v1/customers",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
+      },
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"type\": \"Customer\",\n  \"person_type\": \"Person\",\n  \"id_type\": \"13\",\n  \"identification\": \"{{ $('Webhook').item.json.query.x_customer_document || $('Webhook').item.json.body.x_customer_document }}\",\n  \"name\": [\"{{ $('Webhook').item.json.query.x_customer_name || $('Webhook').item.json.body.x_customer_name }}\", \"{{ $('Webhook').item.json.query.x_customer_lastname || $('Webhook').item.json.body.x_customer_lastname }}\"],\n  \"branch_office\": 0,\n  \"active\": true,\n  \"vat_responsible\": false,\n  \"fiscal_responsibilities\": [{ \"code\": \"R-99-PN\" }],\n  \"address\": {\n    \"address\": \"{{ $('Webhook').item.json.query.x_customer_address || $('Webhook').item.json.body.x_customer_address || 'Bogota' }}\",\n    \"city\": { \"country_code\": \"Co\", \"state_code\": \"11\", \"city_code\": \"11001\" }\n  },\n  \"phones\": [{ \"number\": \"{{ $('Webhook').item.json.query.x_customer_phone || $('Webhook').item.json.body.x_customer_phone }}\" }],\n  \"contacts\": [{\n    \"first_name\": \"{{ $('Webhook').item.json.query.x_customer_name || $('Webhook').item.json.body.x_customer_name }}\",\n    \"last_name\": \"{{ $('Webhook').item.json.query.x_customer_lastname || $('Webhook').item.json.body.x_customer_lastname }}\",\n    \"email\": \"{{ $('Webhook').item.json.query.x_customer_email || $('Webhook').item.json.body.x_customer_email }}\"\n  }]\n}",
+    "options": {}
+   },
+   "id": "crear-cli-0",
+   "name": "Crear Cliente Siigo",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    2552,
+    -150
+   ],
+   "onError": "continueRegularOutput",
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 3000
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/v1/customers",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{$node[\"Get Siigo Token1\"].json[\"access_token\"]}}"
+      },
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"type\": \"Customer\",\n  \"person_type\": \"Person\",\n  \"id_type\": \"13\",\n  \"identification\": \"{{ $('Webhook').item.json.query.x_customer_document || $('Webhook').item.json.body.x_customer_document }}\",\n  \"name\": [\"{{ $('Webhook').item.json.query.x_customer_name || $('Webhook').item.json.body.x_customer_name }}\", \"{{ $('Webhook').item.json.query.x_customer_lastname || $('Webhook').item.json.body.x_customer_lastname }}\"],\n  \"branch_office\": 0,\n  \"active\": true,\n  \"vat_responsible\": false,\n  \"fiscal_responsibilities\": [{ \"code\": \"R-99-PN\" }],\n  \"address\": {\n    \"address\": \"{{ $('Webhook').item.json.query.x_customer_address || $('Webhook').item.json.body.x_customer_address || 'Bogota' }}\",\n    \"city\": { \"country_code\": \"Co\", \"state_code\": \"11\", \"city_code\": \"11001\" }\n  },\n  \"phones\": [{ \"number\": \"{{ $('Webhook').item.json.query.x_customer_phone || $('Webhook').item.json.body.x_customer_phone }}\" }],\n  \"contacts\": [{\n    \"first_name\": \"{{ $('Webhook').item.json.query.x_customer_name || $('Webhook').item.json.body.x_customer_name }}\",\n    \"last_name\": \"{{ $('Webhook').item.json.query.x_customer_lastname || $('Webhook').item.json.body.x_customer_lastname }}\",\n    \"email\": \"{{ $('Webhook').item.json.query.x_customer_email || $('Webhook').item.json.body.x_customer_email }}\"\n  }]\n}",
+    "options": {}
+   },
+   "id": "crear-cli-1",
+   "name": "Crear Cliente Siigo1",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    2616,
+    74
+   ],
+   "onError": "continueRegularOutput",
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 3000
+  }
+ ],
+ "connections": {
+  "Webhook": {
+   "main": [
+    [
+     {
+      "node": "Edit Fields",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Edit Fields": {
+   "main": [
+    [
+     {
+      "node": "If",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "If": {
+   "main": [
+    [
+     {
+      "node": "Respond to Webhook",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Respond to Webhook1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Respond to Webhook": {
+   "main": [
+    [
+     {
+      "node": "Tiene Slot?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Buscar contacto": {
+   "main": [
+    [
+     {
+      "node": "If1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "If1": {
+   "main": [
+    [
+     {
+      "node": "HTTP Request",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "HTTP Request1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HTTP Request1": {
+   "main": [
+    [
+     {
+      "node": "HTTP Request2",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HTTP Request": {
+   "main": [
+    [
+     {
+      "node": "Get Siigo Token",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Get Siigo Token": {
+   "main": [
+    [
+     {
+      "node": "Crear Cliente Siigo",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Code in JavaScript": {
+   "main": [
+    [
+     {
+      "node": "Crear Factura",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Tiene Slot?": {
+   "main": [
+    [
+     {
+      "node": "Buscar contacto",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Sin Slot - Alertar",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HTTP Request2": {
+   "main": [
+    [
+     {
+      "node": "Get Siigo Token1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Code in JavaScript1": {
+   "main": [
+    [
+     {
+      "node": "Crear Factura1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Get Siigo Token1": {
+   "main": [
+    [
+     {
+      "node": "Crear Cliente Siigo1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Crear Cliente Siigo": {
+   "main": [
+    [
+     {
+      "node": "Code in JavaScript",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Crear Cliente Siigo1": {
+   "main": [
+    [
+     {
+      "node": "Code in JavaScript1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "binaryMode": "separate",
+  "availableInMCP": false,
+  "callerPolicy": "workflowsFromSameOwner",
+  "errorWorkflow": "iVi686P2BTWp2nFg"
+ }
+}

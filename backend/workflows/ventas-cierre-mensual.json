@@ -1,279 +1,298 @@
 {
-  "name": "CHUCULAT | Ventas Cierre Mensual",
-  "nodes": [
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "months",
-              "triggerAtDayOfMonth": 1,
-              "triggerAtHour": 3
-            }
-          ]
-        }
-      },
-      "id": "m0",
-      "name": "Schedule",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        120,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.siigo.com/auth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{\"username\": \"<SIIGO_USERNAME>\", \"access_key\": \"<SIIGO_ACCESS_KEY>\"}",
-        "options": {}
-      },
-      "id": "m1",
-      "name": "Auth Siigo",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        320,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const now = new Date();\n// Mes recién cerrado = mes anterior al actual\nconst y = now.getUTCFullYear(), m = now.getUTCMonth(); // m = mes actual 0-based\nconst prev = new Date(Date.UTC(y, m-1, 1));\nconst py = prev.getUTCFullYear(), pm = prev.getUTCMonth();\nconst first = new Date(Date.UTC(py, pm, 1));\nconst last  = new Date(Date.UTC(py, pm+1, 0));\nconst pad = n => String(n).padStart(2,'0');\nconst cs = `${py}-${pad(pm+1)}-01`;\nconst ce = `${py}-${pad(pm+1)}-${pad(last.getUTCDate())}`;\nconst tag = `${py}${pad(pm+1)}`;\nreturn [{ json: { created_start: cs, created_end: ce, tag } }];"
-      },
-      "id": "m2",
-      "name": "Calc Month",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        520,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "url": "=https://api.siigo.com/v1/invoices?page=1&page_size=1&created_start={{ $json.created_start }}T00:00:00&created_end={{ $json.created_end }}T23:59:59",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$node[\"Auth Siigo\"].json[\"access_token\"]}}"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "m3",
-      "name": "Get Count",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        720,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const total = $input.first().json.pagination.total_results || 0;\nconst s = $('Calc Month').first().json;\nconst PS = 100; const np = Math.ceil(total/PS);\nconst pages = [];\nfor (let i=1;i<=Math.max(np,1);i++) pages.push({ json: { page:i, pageSize:PS, created_start:s.created_start, created_end:s.created_end, tag:s.tag } });\nreturn pages;"
-      },
-      "id": "m4",
-      "name": "Gen Pages",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        920,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "url": "=https://api.siigo.com/v1/invoices?page={{ $json.page }}&page_size={{ $json.pageSize }}&created_start={{ $json.created_start }}T00:00:00&created_end={{ $json.created_end }}T23:59:59",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$node[\"Auth Siigo\"].json[\"access_token\"]}}"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "m5",
-      "name": "Get Invoices",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1120,
-        300
-      ],
-      "retryOnFail": true,
-      "maxTries": 4,
-      "waitBetweenTries": 4000
-    },
-    {
-      "parameters": {
-        "jsCode": "const s = $('Calc Month').first().json;\nconst invs = [];\nfor (const p of $input.all()) for (const inv of (p.json.results||[])) invs.push(inv);\nconst red = invs.map(inv => ({\n  id: inv.id, name: inv.name, date: inv.date, total: inv.total, balance: inv.balance,\n  cost_center: inv.cost_center,\n  stamp: inv.stamp ? { status: inv.stamp.status } : null,\n  metadata: { created: (inv.metadata||{}).created || '' },\n  customer: inv.customer ? { identification: inv.customer.identification, name: inv.customer.name } : null,\n  items: (inv.items||[]).map(it => ({ code:it.code, description:it.description, price:it.price, quantity:it.quantity, discount:it.discount, taxes:(it.taxes||[]).map(t=>({value:t.value})) }))\n}));\nreturn [{ json: { tag: s.tag, count: red.length, fileStr: JSON.stringify(red) } }];"
-      },
-      "id": "m6",
-      "name": "Reduce",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1320,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "toText",
-        "sourceProperty": "fileStr",
-        "options": {}
-      },
-      "id": "m7",
-      "name": "ToFile",
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1,
-      "position": [
-        1520,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "write",
-        "fileName": "=/root/.n8n-files/chuculat_ventas_hist_part_{{ $('Reduce').item.json.tag }}.json",
-        "dataPropertyName": "data",
-        "options": {}
-      },
-      "id": "m8",
-      "name": "WriteFile",
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1,
-      "position": [
-        1720,
-        300
-      ]
+ "name": "CHUCULAT | Ventas Cierre Mensual",
+ "nodes": [
+  {
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "months",
+       "triggerAtDayOfMonth": 1,
+       "triggerAtHour": 3
+      }
+     ]
     }
-  ],
-  "connections": {
-    "Schedule": {
-      "main": [
-        [
-          {
-            "node": "Auth Siigo",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Auth Siigo": {
-      "main": [
-        [
-          {
-            "node": "Calc Month",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Calc Month": {
-      "main": [
-        [
-          {
-            "node": "Get Count",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Count": {
-      "main": [
-        [
-          {
-            "node": "Gen Pages",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Gen Pages": {
-      "main": [
-        [
-          {
-            "node": "Get Invoices",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Invoices": {
-      "main": [
-        [
-          {
-            "node": "Reduce",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Reduce": {
-      "main": [
-        [
-          {
-            "node": "ToFile",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "ToFile": {
-      "main": [
-        [
-          {
-            "node": "WriteFile",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+   },
+   "id": "m0",
+   "name": "Schedule",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.2,
+   "position": [
+    120,
+    300
+   ]
   },
-  "settings": {
-    "executionOrder": "v1",
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/auth",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "{\"username\": \"<SIIGO_USERNAME>\", \"access_key\": \"<SIIGO_ACCESS_KEY>\"}",
+    "options": {}
+   },
+   "id": "m1",
+   "name": "Auth Siigo",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    320,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "const now = new Date();\n// Mes recién cerrado = mes anterior al actual\nconst y = now.getUTCFullYear(), m = now.getUTCMonth(); // m = mes actual 0-based\nconst prev = new Date(Date.UTC(y, m-1, 1));\nconst py = prev.getUTCFullYear(), pm = prev.getUTCMonth();\nconst first = new Date(Date.UTC(py, pm, 1));\nconst last  = new Date(Date.UTC(py, pm+1, 0));\nconst pad = n => String(n).padStart(2,'0');\nconst cs = `${py}-${pad(pm+1)}-01`;\nconst ce = `${py}-${pad(pm+1)}-${pad(last.getUTCDate())}`;\nconst tag = `${py}${pad(pm+1)}`;\nreturn [{ json: { created_start: cs, created_end: ce, tag } }];"
+   },
+   "id": "m2",
+   "name": "Calc Month",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    520,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "url": "=https://api.siigo.com/v1/invoices?page=1&page_size=1&created_start={{ $json.created_start }}T00:00:00&created_end={{ $json.created_end }}T23:59:59",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{$node[\"Auth Siigo\"].json[\"access_token\"]}}"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "options": {}
+   },
+   "id": "m3",
+   "name": "Get Count",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    720,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "const total = $input.first().json.pagination.total_results || 0;\nconst s = $('Calc Month').first().json;\nconst PS = 100; const np = Math.ceil(total/PS);\nconst pages = [];\nfor (let i=1;i<=Math.max(np,1);i++) pages.push({ json: { page:i, pageSize:PS, created_start:s.created_start, created_end:s.created_end, tag:s.tag } });\nreturn pages;"
+   },
+   "id": "m4",
+   "name": "Gen Pages",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    920,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "url": "=https://api.siigo.com/v1/invoices?page={{ $json.page }}&page_size={{ $json.pageSize }}&created_start={{ $json.created_start }}T00:00:00&created_end={{ $json.created_end }}T23:59:59",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{$node[\"Auth Siigo\"].json[\"access_token\"]}}"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "options": {}
+   },
+   "id": "m5",
+   "name": "Get Invoices",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1120,
+    300
+   ],
+   "retryOnFail": true,
+   "maxTries": 4,
+   "waitBetweenTries": 4000
+  },
+  {
+   "parameters": {
+    "jsCode": "const s = $('Calc Month').first().json;\nconst invs = [];\nfor (const p of $input.all()) for (const inv of (p.json.results||[])) invs.push(inv);\nconst red = invs.map(inv => ({\n  id: inv.id, name: inv.name, date: inv.date, total: inv.total, balance: inv.balance,\n  cost_center: inv.cost_center,\n  stamp: inv.stamp ? { status: inv.stamp.status } : null,\n  metadata: { created: (inv.metadata||{}).created || '' },\n  customer: inv.customer ? { identification: inv.customer.identification, name: inv.customer.name } : null,\n  items: (inv.items||[]).map(it => ({ code:it.code, description:it.description, price:it.price, quantity:it.quantity, discount:it.discount, taxes:(it.taxes||[]).map(t=>({value:t.value})) }))\n}));\nreturn [{ json: { tag: s.tag, count: red.length, fileStr: JSON.stringify(red), rows: red } }];"
+   },
+   "id": "m6",
+   "name": "Reduce",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1320,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "toText",
+    "sourceProperty": "fileStr",
+    "options": {}
+   },
+   "id": "m7",
+   "name": "ToFile",
+   "type": "n8n-nodes-base.convertToFile",
+   "typeVersion": 1,
+   "position": [
+    1520,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "write",
+    "fileName": "=/root/.n8n-files/chuculat_ventas_hist_part_{{ $('Reduce').item.json.tag }}.json",
+    "dataPropertyName": "data",
+    "options": {}
+   },
+   "id": "m8",
+   "name": "WriteFile",
+   "type": "n8n-nodes-base.readWriteFile",
+   "typeVersion": 1,
+   "position": [
+    1720,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "const rows=($('Reduce').first().json.rows)||[];\nconst SB='https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY='<SUPABASE_SERVICE_ROLE>';\nconst H={ apikey:KEY, Authorization:'Bearer '+KEY, 'Content-Type':'application/json', Prefer:'return=minimal,resolution=merge-duplicates' };\nconst payload=rows.map(r=>({ id:r.id, name:r.name, fecha:r.date||null, created:(r.metadata||{}).created||null, cost_center:r.cost_center, total:r.total, balance:r.balance, stamp_status:(r.stamp||{}).status||null, cust_name:(r.customer||{}).name||null, raw:r }));\nlet ok=0;\nfor(let i=0;i<payload.length;i+=200){\n  const chunk=payload.slice(i,i+200);\n  await this.helpers.httpRequest({ method:'POST', url:SB+'/rest/v1/ventas_invoices?on_conflict=id', headers:H, body:chunk, json:true });\n  ok+=chunk.length;\n}\nreturn [{ json:{ upserted: ok } }];"
+   },
+   "id": "upsert-sb-01",
+   "name": "Upsert Supabase",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1520,
+    480
+   ]
   }
+ ],
+ "connections": {
+  "Schedule": {
+   "main": [
+    [
+     {
+      "node": "Auth Siigo",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Auth Siigo": {
+   "main": [
+    [
+     {
+      "node": "Calc Month",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Calc Month": {
+   "main": [
+    [
+     {
+      "node": "Get Count",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Get Count": {
+   "main": [
+    [
+     {
+      "node": "Gen Pages",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Gen Pages": {
+   "main": [
+    [
+     {
+      "node": "Get Invoices",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Get Invoices": {
+   "main": [
+    [
+     {
+      "node": "Reduce",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Reduce": {
+   "main": [
+    [
+     {
+      "node": "ToFile",
+      "type": "main",
+      "index": 0
+     },
+     {
+      "node": "Upsert Supabase",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "ToFile": {
+   "main": [
+    [
+     {
+      "node": "WriteFile",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "callerPolicy": "workflowsFromSameOwner",
+  "availableInMCP": false,
+  "errorWorkflow": "iVi686P2BTWp2nFg"
+ }
 }
