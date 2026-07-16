@@ -802,7 +802,11 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         <section class="dash-section">
             <div class="chart-card full">
                 <h3 style="color:var(--chocolate);margin-bottom:4px">📈 Productos más comprados por mes</h3>
-                <p class="section-note">Top 8 productos B2C y su evolución mensual (cantidad de unidades). Detecta tendencias y estacionalidad.</p>
+                <p class="section-note">Top 8 productos B2C y su evolución mensual. Detecta tendencias y estacionalidad.</p>
+                <div style="display:flex;gap:8px;margin-bottom:10px">
+                    <button class="btn-filter" id="btnProdQty"   onclick="setDestProdMetric('qty')">Ver por unidades</button>
+                    <button class="btn-filter" id="btnProdMoney" onclick="setDestProdMetric('subtotal')">Ver por precio</button>
+                </div>
                 <div style="height:340px"><canvas id="destChartProdMes"></canvas></div>
             </div>
         </section>
@@ -819,6 +823,21 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                 </div>
                 <p class="section-note">Audiencia exacta para una campaña de ese producto: los 10 que más han gastado en él.</p>
                 <div class="table-wrap"><table id="destClientesTable"><thead><tr><th>#</th><th>Cliente</th><th>Cédula</th><th>Unidades</th><th>Gastado</th></tr></thead><tbody id="destClientesBody"></tbody></table></div>
+            </div>
+        </section>
+
+        <!-- 2b. Buscar por cliente -> que productos ha comprado -->
+        <section class="dash-section">
+            <div class="chart-card full">
+                <h3 style="color:var(--chocolate);margin-bottom:10px">🔎 Qué ha comprado un cliente</h3>
+                <div class="kpi-filter-bar" style="gap:12px;margin-bottom:14px">
+                    <div style="flex:1;min-width:260px">
+                        <label style="display:block;margin-bottom:4px">Busca por cédula o nombre</label>
+                        <div class="search-wrap"><input type="text" id="searchCliProd" placeholder="Ej: 1014183640 o Johnn Peña..." oninput="renderCliProductos()"></div>
+                    </div>
+                </div>
+                <p class="section-note" id="cliProdNota">Escribe una cédula o nombre para ver los productos que ha comprado, con cantidad y valor.</p>
+                <div class="table-wrap"><table id="cliProdTable"><thead><tr><th>#</th><th>Producto</th><th>Código</th><th style="text-align:right">Unidades</th><th style="text-align:right">Valor</th></tr></thead><tbody id="cliProdBody"></tbody></table></div>
             </div>
         </section>
 
@@ -1209,6 +1228,10 @@ let ventasData = null;
 // se renderizan con estos y NO se re-renderizan al cambiar el filtro de fechas.
 let ventasFull = null;
 let fullRendered = false;
+// Histórico completo (desde que existe la operación). Solo lo usa la Tendencia
+// Mensual, que debe mostrar todos los meses siempre, sin importar el filtro.
+const VENTAS_ALLTIME_START = '2024-01-01';
+let ventasAllTime = null;
 let b2bClientesSort = { col:'totalCompras', dir:'desc' };
 let chartInstances = {};
 
@@ -1253,7 +1276,7 @@ async function loadB2B() {
         if (!data.meta) throw new Error('Respuesta inválida');
         ventasData = data;
         // La primera carga usa el rango por defecto (1-ene → hoy) = base sin filtro
-        if (!ventasFull) ventasFull = data;
+        if (!ventasFull) { ventasFull = data; loadVentasAllTime(); }
         document.getElementById('loadingB2B').style.display='none';
         document.getElementById('b2bContent').style.display='block';
         document.getElementById('b2bPeriodLabel').textContent = fmtDate(data.meta.dateStart) + ' → ' + fmtDate(data.meta.dateEnd);
@@ -1276,22 +1299,34 @@ async function loadB2B() {
     }
 }
 
+// Carga en segundo plano el histórico completo (solo para la Tendencia Mensual).
+// No bloquea el panel: cuando llega, redibuja ese único gráfico.
+async function loadVentasAllTime() {
+    if (ventasAllTime) return;
+    try {
+        const hoy = new Date().toISOString().split('T')[0];
+        const res = await fetch(VENTAS_URL + '?date_start=' + VENTAS_ALLTIME_START + '&date_end=' + hoy);
+        const data = await res.json();
+        if (data && data.meta) { ventasAllTime = data; renderB2BMensual(); }
+    } catch(e) { console.warn('histórico completo no disponible, se usa el rango por defecto', e); }
+}
+
 function renderB2BAll() {
     if (!ventasData) return;
     // Secciones que SÍ responden al filtro de fechas
     renderB2BKPIs();
     renderB2BCanal();
     renderB2BCategorias();
-    renderB2BMensual();
     renderB2BTop10();
     renderTablas();
     renderB2BClientes();
-    // Secciones sin filtro (meta, avance anual, exportación, cartera): una sola vez.
-    // Evita re-render (y re-crear sus charts) en cada cambio de fechas.
+    // Secciones sin filtro (meta, avance anual, tendencia mensual, exportación,
+    // cartera): una sola vez. Evita re-render (y re-crear sus charts) al filtrar.
     if (!fullRendered) {
         fullRendered = true;
         renderMetaBar();
         renderMeta();
+        renderB2BMensual();
         renderExport();
         renderCartera();
     }
@@ -1307,6 +1342,7 @@ function renderDestacadas(){
     renderDestProdMes(d);
     renderDestProdSelect(d);
     renderDestClientes();
+    renderCliProductos();
     renderDestParejas(d);
     renderDestReactivar(d);
     renderDestNR(d);
@@ -1316,14 +1352,28 @@ function mesCorto(m){ // "2026-05" → "May 26"
     const [y,mm]=String(m).split('-'); return (MESES_CORTO[parseInt(mm,10)-1]||m)+' '+String(y).slice(2);
 }
 
+// Métrica del gráfico de productos por mes: 'qty' (unidades) o 'subtotal' (precio)
+let destProdMetric = 'qty';
+function setDestProdMetric(m){
+    destProdMetric = m;
+    const d = ventasData && ventasData.destacadas;
+    if (d) renderDestProdMes(d);
+}
 function renderDestProdMes(d){
     const prods = d.productosPorMes || [];
+    const esQty = destProdMetric === 'qty';
+    // Botón activo
+    const bq = document.getElementById('btnProdQty'), bm = document.getElementById('btnProdMoney');
+    if (bq && bm) {
+        bq.style.opacity = esQty ? '1' : '.45';
+        bm.style.opacity = esQty ? '.45' : '1';
+    }
     // eje X = unión de todos los meses presentes
     const mesesSet = new Set();
     prods.forEach(p=>(p.series||[]).forEach(s=>mesesSet.add(s.mes)));
     const meses = [...mesesSet].sort();
     const datasets = prods.map((p,i)=>{
-        const byMes = {}; (p.series||[]).forEach(s=>byMes[s.mes]=s.qty);
+        const byMes = {}; (p.series||[]).forEach(s=>byMes[s.mes]=s[destProdMetric]||0);
         const col = CHART_COLORS[i%CHART_COLORS.length];
         return { label:p.name, data:meses.map(m=>byMes[m]||0), borderColor:col, backgroundColor:col,
                  tension:.3, borderWidth:2, pointRadius:3, fill:false };
@@ -1334,8 +1384,9 @@ function renderDestProdMes(d){
         data:{ labels:meses.map(mesCorto), datasets },
         options:{ responsive:true, maintainAspectRatio:false,
             plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, font:{size:11} } },
-                      tooltip:{ callbacks:{ label:c=>c.dataset.label+': '+fmt(c.parsed.y)+' und' } } },
-            scales:{ y:{ beginAtZero:true, title:{display:true,text:'Unidades'} } } }
+                      tooltip:{ callbacks:{ label:c=>c.dataset.label+': '+(esQty ? fmt(c.parsed.y)+' und' : fmtCOP(c.parsed.y)) } } },
+            scales:{ y:{ beginAtZero:true, title:{display:true,text: esQty ? 'Unidades' : 'Subtotal (COP)'},
+                         ticks:{ callback:v=> esQty ? fmt(v) : '$'+Number(v).toLocaleString('es-CO') } } } }
     });
 }
 
@@ -1352,6 +1403,53 @@ function renderDestClientes(){
     const p = list[idx]; const tb=document.getElementById('destClientesBody');
     if (!p || !(p.clientes||[]).length){ tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--gris);padding:20px">Sin clientes registrados para este producto.</td></tr>'; return; }
     tb.innerHTML = p.clientes.map((c,i)=>`<tr><td>${i+1}</td><td><strong>${esc(c.name||'—')}</strong></td><td>${esc(c.ced||'')}</td><td>${fmt(c.qty)}</td><td style="font-weight:700;color:var(--verde)">${fmtCOP(c.subtotal)}</td></tr>`).join('');
+}
+
+// Invierte clientesPorProducto (producto -> clientes) en cliente -> productos
+function renderCliProductos(){
+    const d  = ventasData && ventasData.destacadas;
+    const tb = document.getElementById('cliProdBody');
+    const nota = document.getElementById('cliProdNota');
+    if (!d || !tb) return;
+    const q = (document.getElementById('searchCliProd').value || '').toLowerCase().trim();
+    if (!q) {
+        tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gris);padding:20px">Escribe una cédula o nombre para buscar.</td></tr>';
+        nota.textContent = 'Escribe una cédula o nombre para ver los productos que ha comprado, con cantidad y valor.';
+        return;
+    }
+    // Busca el cliente en todos los productos
+    const filas = [];
+    const nombres = new Set(); const ceds = new Set();
+    for (const p of (d.clientesPorProducto || [])) {
+        for (const c of (p.clientes || [])) {
+            const nm = String(c.name || '').toLowerCase();
+            const cd = String(c.ced || '').toLowerCase();
+            if (!cd.includes(q) && !nm.includes(q)) continue;
+            filas.push({ producto: p.name, code: p.code, qty: c.qty, subtotal: c.subtotal });
+            if (c.name) nombres.add(c.name);
+            if (c.ced)  ceds.add(c.ced);
+        }
+    }
+    if (!filas.length) {
+        tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gris);padding:20px">Sin resultados para «' + esc(q) + '» en el período.</td></tr>';
+        nota.textContent = 'Sin coincidencias. Ojo: solo aparecen los productos del top de Compras Destacadas.';
+        return;
+    }
+    filas.sort((a,b)=>b.subtotal-a.subtotal);
+    const totQty = filas.reduce((s,f)=>s+f.qty,0);
+    const totSub = filas.reduce((s,f)=>s+f.subtotal,0);
+    nota.textContent = [...nombres].join(', ') + (ceds.size ? ' · ' + [...ceds].join(', ') : '') +
+        ' — ' + filas.length + ' productos · ' + fmt(totQty) + ' und · ' + fmtCOP(totSub);
+    tb.innerHTML = filas.map((f,i)=>`<tr>
+        <td>${i+1}</td>
+        <td class="td-name">${esc(f.producto)}</td>
+        <td style="color:var(--gris);font-size:12px">${esc(f.code)}</td>
+        <td class="td-pts verde" style="text-align:right">${fmt(f.qty)}</td>
+        <td class="td-pts azul" style="text-align:right">${fmtCOP(f.subtotal)}</td>
+    </tr>`).join('') + `<tr style="border-top:2px solid var(--beige);font-weight:700">
+        <td></td><td>TOTAL</td><td></td>
+        <td style="text-align:right">${fmt(totQty)}</td>
+        <td style="text-align:right">${fmtCOP(totSub)}</td></tr>`;
 }
 
 function renderDestParejas(d){
@@ -1690,7 +1788,10 @@ function renderB2BCategorias() {
 }
 
 function renderB2BMensual() {
-    const meses = ventasData.meses || [];
+    // Tendencia Mensual NO se filtra por fechas: muestra todos los meses de la
+    // operación. Usa el histórico completo apenas llega; entretanto, el rango base.
+    const VD = ventasAllTime || ventasFull || ventasData;
+    const meses = VD.meses || [];
     const labels = meses.map(m=>{ const [y,mo]=m.mes.split('-'); return MESES[parseInt(mo,10)-1]+' '+y.slice(2); });
     destroyChart('line');
     chartInstances['line'] = new Chart(document.getElementById('chartLine'), {
