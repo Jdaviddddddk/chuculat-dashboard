@@ -408,6 +408,22 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         </div>
     </section>
 
+    <!-- Compras con puntos (redenciones) -->
+    <section class="dash-section" id="sec-redenciones">
+        <div class="section-title">🎁 Compras con puntos<span id="redBadge">0</span></div>
+        <div class="table-section">
+            <div class="table-header"><h2>🛒 Productos redimidos</h2>
+                <div class="table-controls">
+                    <div class="search-wrap"><input type="text" id="searchRed" placeholder="Cliente, SKU o producto..." oninput="renderRedenciones()"></div>
+                    <span class="count-badge" id="countRed">0 redenciones</span>
+                </div>
+            </div>
+            <div class="table-wrap"><table id="tableRed"><thead><tr>
+                <th>Fecha</th><th>Cliente</th><th>Productos redimidos</th><th style="text-align:right">Puntos</th>
+            </tr></thead><tbody id="bodyRed"></tbody></table></div>
+        </div>
+    </section>
+
     <!-- Todos los clientes -->
     <section class="dash-section" id="sec-clientes">
         <div class="section-title">📋 Todos los Clientes</div>
@@ -1028,6 +1044,47 @@ function applyKpiFilter() {
 }
 function clearKpiFilter(){ document.getElementById('kpiDateFrom').value=''; document.getElementById('kpiDateTo').value=''; renderKPIsFromStats(); }
 
+// ── COMPRAS CON PUNTOS (redenciones) ─────────────────────────────────────
+// Se alimenta de puntos_log (tipo=redencion). El detalle de productos viene en
+// items[], que manda el sitio de redención; las redenciones viejas no lo traen.
+function renderRedenciones(){
+    const tb = document.getElementById('bodyRed');
+    if(!tb) return;
+    const q = (document.getElementById('searchRed')?.value || '').toLowerCase().trim();
+    let reds = (allLogs || []).filter(e => e.type === 'redencion');
+    if(q){
+        reds = reds.filter(e => {
+            const items = Array.isArray(e.items) ? e.items : [];
+            const txt = (e.contactName||'') + ' ' + items.map(i => (i.sku||'') + ' ' + (i.nombre||'')).join(' ');
+            return txt.toLowerCase().includes(q);
+        });
+    }
+    reds.sort((a,b) => String(b.timestamp||'').localeCompare(String(a.timestamp||'')));
+    document.getElementById('redBadge').textContent  = reds.length;
+    document.getElementById('countRed').textContent  = reds.length + (reds.length===1?' redención':' redenciones');
+    if(!reds.length){
+        tb.innerHTML = '<tr class="empty-row"><td colspan="4">Sin compras con puntos en el período.</td></tr>';
+        return;
+    }
+    tb.innerHTML = reds.map(e => {
+        const items = Array.isArray(e.items) ? e.items : [];
+        const prods = items.length
+            ? items.map(i => `<div style="padding:2px 0">
+                    <span style="font-size:11px;color:var(--gris)">${esc(i.sku)}</span>
+                    · ${esc(i.nombre)}
+                    ${Number(i.qty)>1 ? `<strong> ×${i.qty}</strong>` : ''}
+                    <span style="color:var(--gris);font-size:11px"> — ${Number(i.puntos)*Number(i.qty||1)} pts · ${fmtCOP(Number(i.precio_cop)*Number(i.qty||1))}</span>
+                 </div>`).join('')
+            : '<span style="color:var(--gris);font-style:italic">Sin detalle (anterior al carrito)</span>';
+        return `<tr>
+            <td style="white-space:nowrap">${fmtDate(e.date)}</td>
+            <td class="td-name">${esc(e.contactName||'—')}<br><span style="font-size:11px;color:var(--gris)">${esc(e.phone||'')}</span></td>
+            <td>${prods}</td>
+            <td class="td-pts" style="text-align:right;color:var(--cereza)">${e.points}</td>
+        </tr>`;
+    }).join('');
+}
+
 async function loadLogs() {
     try {
         const res=await fetch(LOGS_URL);
@@ -1035,7 +1092,7 @@ async function loadLogs() {
         allLogs=(data.logs||[]).filter(e=>!isLogBlocked(e) && !isB2BLog(e)).slice().reverse();
         ['loadingTimeline','loadingLogs','loadingRepurchase'].forEach(id=>document.getElementById(id).style.display='none');
         ['wrapTimeline','wrapLogs','wrapRepurchase'].forEach(id=>document.getElementById(id).style.display='block');
-        applyDateFilter(); applyRepurchaseFilter();
+        applyDateFilter(); applyRepurchaseFilter(); renderRedenciones();
     } catch(e) {
         const msg='<p style="color:var(--gris);padding:20px;text-align:center">Sin datos de log aún.</p>';
         ['loadingTimeline','loadingLogs','loadingRepurchase'].forEach(id=>document.getElementById(id).innerHTML=msg);

@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chuculat - Acceso</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
+    * { margin:0; padding:0; box-sizing:border-box; }
+    :root{
+        --chocolate:#3F2021; --chocolate-light:#5C3A3B; --chocolate-dark:#2A1516;
+        --cereza:#EC6197; --azul:#00ABE1; --verde:#62B22A;
+        --crema:#F5F0EB; --beige:#E8E0D5; --blanco:#FFFFFF; --gris:#8A7E78;
+    }
+    body{
+        font-family:'Montserrat','Helvetica Neue',Arial,sans-serif;
+        background:var(--crema); min-height:100vh; padding:20px;
+        background-image:
+            radial-gradient(circle at 10% 20%, rgba(236,97,151,.05) 0%, transparent 20%),
+            radial-gradient(circle at 90% 80%, rgba(0,171,225,.05) 0%, transparent 20%),
+            radial-gradient(circle at 50% 50%, rgba(98,178,42,.03) 0%, transparent 30%);
+    }
+    /* ── LOGIN ── */
+    #loginScreen{ display:flex; align-items:center; justify-content:center; min-height:100vh; }
+    .login-container{
+        background:var(--blanco); border-radius:16px; padding:50px 40px; width:100%; max-width:420px;
+        box-shadow:0 4px 20px rgba(63,32,33,.08); border:1px solid var(--beige);
+        text-align:center; position:relative; overflow:hidden;
+    }
+    .login-container::before{
+        content:''; position:absolute; top:0; left:0; right:0; height:5px;
+        background:linear-gradient(90deg,var(--cereza),var(--azul),var(--verde));
+    }
+    .login-container img{ max-width:180px; margin-bottom:10px; }
+    .login-container h2{ color:var(--chocolate); font-size:13px; text-transform:uppercase; letter-spacing:3px; margin-bottom:30px; font-weight:600; }
+    .login-container h1{ color:var(--chocolate); font-size:1.4rem; margin-bottom:25px; font-weight:700; }
+    .input-group{ margin-bottom:18px; text-align:left; }
+    .input-group label{ display:block; color:var(--gris); font-size:11px; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:6px; font-weight:600; }
+    .input-group input{
+        width:100%; padding:14px 18px; border:2px solid var(--beige); border-radius:50px;
+        font-size:15px; font-family:'Montserrat',sans-serif; outline:none; color:var(--chocolate); background:var(--crema);
+    }
+    .input-group input:focus{ border-color:var(--chocolate); background:var(--blanco); }
+    .error-msg{ color:#D32F2F; font-size:13px; margin-bottom:15px; min-height:20px; font-weight:600; }
+    .btn-login{
+        width:100%; background:var(--chocolate); color:var(--blanco); border:none; padding:16px;
+        border-radius:50px; font-size:15px; font-weight:700; cursor:pointer; text-transform:uppercase;
+        letter-spacing:1px; font-family:'Montserrat',sans-serif; transition:.3s;
+    }
+    .btn-login:hover{ background:var(--chocolate-light); }
+    #protectedContent{ display:none; }
+    #protectedContent.active{ display:block; }
+    .btn-logout{
+        position:fixed; top:20px; right:20px; background:var(--chocolate); color:var(--blanco);
+        border:none; padding:10px 20px; border-radius:50px; font-size:12px; font-weight:600;
+        cursor:pointer; z-index:9999; font-family:'Montserrat',sans-serif; text-transform:uppercase; letter-spacing:1px;
+    }
+    /* ── APP ── */
+    .brand-header{ text-align:center; margin-bottom:24px; }
+    .brand-header img{ max-width:180px; }
+    .brand-header h2{ color:var(--chocolate); font-size:13px; text-transform:uppercase; letter-spacing:3px; margin-top:8px; font-weight:600; }
+    .wrap{ max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:20px; }
+    .card{
+        background:var(--blanco); border-radius:14px; border:1px solid var(--beige);
+        box-shadow:0 4px 20px rgba(63,32,33,.08); padding:26px; position:relative; overflow:hidden;
+    }
+    .card::before{ content:''; position:absolute; top:0; left:0; right:0; height:4px;
+        background:linear-gradient(90deg,var(--cereza),var(--azul),var(--verde)); }
+    h1{ color:var(--chocolate); text-align:center; margin-bottom:20px; font-size:1.5rem; font-weight:800; text-transform:uppercase; letter-spacing:1px; }
+    .search-box{ position:relative; }
+    .search-box input{
+        width:100%; padding:16px 22px 16px 52px; border:2px solid var(--beige); border-radius:50px;
+        font-size:16px; font-family:'Montserrat',sans-serif; outline:none; background:var(--crema); color:var(--chocolate);
+    }
+    .search-box input:focus{ border-color:var(--chocolate); background:var(--blanco); }
+    .search-box::before{ content:"🔍"; position:absolute; left:20px; top:50%; transform:translateY(-50%); font-size:17px; opacity:.6; }
+    .status{ text-align:center; color:var(--gris); font-size:13px; margin-top:12px; min-height:18px; font-weight:500; }
+    .loading{ text-align:center; padding:30px; color:var(--gris); display:none; }
+    .loading.active{ display:block; }
+    .loading-spinner{
+        width:44px; height:44px; border:4px solid var(--beige); border-top-color:var(--cereza);
+        border-right-color:var(--azul); border-bottom-color:var(--verde); border-radius:50%;
+        animation:spin 1s linear infinite; margin:0 auto 12px;
+    }
+    @keyframes spin{ to{ transform:rotate(360deg); } }
+    .not-found{ text-align:center; padding:30px; color:var(--gris); display:none; }
+    .not-found.active{ display:block; }
+    /* Cliente */
+    #clienteCard{ display:none; }
+    #clienteCard.active{ display:block; }
+    .client-head{ display:flex; flex-wrap:wrap; align-items:center; gap:16px; justify-content:space-between; }
+    .client-head h2{ color:var(--chocolate); font-size:1.35rem; font-weight:700; }
+    .client-head p{ color:var(--gris); font-size:13px; }
+    .puntos-box{ display:flex; gap:12px; flex-wrap:wrap; }
+    .pbox{ background:var(--crema); border:1px solid var(--beige); border-radius:10px; padding:12px 18px; text-align:center; min-width:110px; }
+    .pbox label{ display:block; color:var(--gris); font-size:10px; text-transform:uppercase; letter-spacing:1.2px; font-weight:600; margin-bottom:4px; }
+    .pbox .v{ font-size:22px; font-weight:800; color:var(--chocolate); }
+    .pbox.disp .v{ color:var(--verde); }
+    .pbox.usa .v{ color:var(--cereza); }
+    /* Layout carrito */
+    .cols{ display:grid; grid-template-columns:1fr 340px; gap:20px; align-items:start; }
+    @media(max-width:900px){ .cols{ grid-template-columns:1fr; } }
+    .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; }
+    .prod{
+        background:var(--blanco); border:1px solid var(--beige); border-radius:12px; overflow:hidden;
+        display:flex; flex-direction:column; transition:.2s;
+    }
+    .prod.no{ opacity:.4; filter:grayscale(.7); }
+    .prod img{ width:100%; height:110px; object-fit:cover; background:var(--beige); }
+    .prod .body{ padding:12px; display:flex; flex-direction:column; gap:8px; flex:1; }
+    .prod .nm{ font-size:12.5px; font-weight:700; color:var(--chocolate); line-height:1.3; flex:1; }
+    .prod .sku{ font-size:10px; color:var(--gris); font-weight:600; }
+    .prod .pts{ font-size:15px; font-weight:800; color:var(--verde); }
+    .prod .cop{ font-size:11px; color:var(--gris); }
+    .btn-add{
+        width:100%; border:none; border-radius:50px; padding:9px; font-family:'Montserrat',sans-serif;
+        font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.5px; cursor:pointer;
+        background:var(--chocolate); color:var(--blanco); transition:.2s;
+    }
+    .btn-add:hover:not(:disabled){ background:var(--chocolate-light); }
+    .btn-add:disabled{ background:var(--beige); color:var(--gris); cursor:not-allowed; }
+    /* Carrito */
+    .cart{ position:sticky; top:16px; }
+    .cart h3{ color:var(--chocolate); font-size:15px; font-weight:800; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }
+    .citem{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--beige); }
+    .citem .n{ flex:1; font-size:12.5px; font-weight:600; color:var(--chocolate); line-height:1.3; }
+    .citem .p{ font-size:12.5px; font-weight:800; color:var(--verde); white-space:nowrap; }
+    .qty{ display:flex; align-items:center; gap:6px; }
+    .qty button{
+        width:24px; height:24px; border-radius:50%; border:1px solid var(--beige); background:var(--crema);
+        color:var(--chocolate); font-weight:800; cursor:pointer; font-size:13px; line-height:1;
+    }
+    .qty button:hover:not(:disabled){ background:var(--beige); }
+    .qty button:disabled{ opacity:.35; cursor:not-allowed; }
+    .qty span{ min-width:16px; text-align:center; font-weight:700; font-size:13px; }
+    .cart-empty{ color:var(--gris); font-size:13px; text-align:center; padding:20px 0; }
+    .cart-total{ display:flex; justify-content:space-between; align-items:center; padding:14px 0 16px; font-weight:800; color:var(--chocolate); }
+    .cart-total .t{ font-size:22px; color:var(--cereza); }
+    .btn-redeem{
+        width:100%; background:var(--verde); color:var(--blanco); border:none; padding:15px; border-radius:50px;
+        font-size:14px; font-weight:700; cursor:pointer; text-transform:uppercase; letter-spacing:1px;
+        font-family:'Montserrat',sans-serif; transition:.2s;
+    }
+    .btn-redeem:hover:not(:disabled){ background:#4A8A1F; }
+    .btn-redeem:disabled{ background:var(--beige); color:var(--gris); cursor:not-allowed; }
+    /* Modal */
+    .modal-overlay{
+        display:none; position:fixed; inset:0; background:rgba(63,32,33,.7); backdrop-filter:blur(6px);
+        z-index:1000; justify-content:center; align-items:center; padding:20px;
+    }
+    .modal-overlay.active{ display:flex; }
+    .modal{ background:var(--blanco); border-radius:16px; padding:32px; width:100%; max-width:420px; position:relative; overflow:hidden; }
+    .modal::before{ content:''; position:absolute; top:0; left:0; right:0; height:5px;
+        background:linear-gradient(90deg,var(--cereza),var(--azul),var(--verde)); }
+    .modal h2{ text-align:center; color:var(--chocolate); margin-bottom:16px; font-size:1.3rem; font-weight:700; text-transform:uppercase; }
+    .modal .res{ background:var(--crema); border:1px solid var(--beige); border-radius:10px; padding:14px; margin-bottom:18px; max-height:220px; overflow-y:auto; }
+    .modal .res .l{ display:flex; justify-content:space-between; gap:10px; font-size:12.5px; padding:4px 0; color:var(--chocolate); }
+    .modal .res .tt{ border-top:2px solid var(--beige); margin-top:8px; padding-top:8px; font-weight:800; }
+    .modal-buttons{ display:flex; gap:10px; }
+    .modal-buttons button{ flex:1; padding:14px; border:none; border-radius:50px; font-size:14px; font-weight:700; cursor:pointer; text-transform:uppercase; font-family:'Montserrat',sans-serif; }
+    .btn-cancel{ background:var(--beige); color:var(--chocolate); }
+    .btn-confirm{ background:var(--verde); color:var(--blanco); }
+    .btn-confirm:disabled{ background:var(--beige); color:var(--gris); cursor:not-allowed; }
+    .brand-footer{ text-align:center; margin-top:10px; padding-top:16px; border-top:1px solid var(--beige); }
+    .brand-footer p{ color:var(--gris); font-size:11px; text-transform:uppercase; letter-spacing:2px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+    <div class="login-container">
+        <img src="https://assets.cdn.filesafe.space/jzrg6bPH71ccLohGddsN/media/69fd5ac4bc1f77cc35de6a72.png" alt="Chuculat">
+        <h2>Programa de Fidelización</h2>
+        <h1>🔐 Acceso Restringido</h1>
+        <div class="input-group">
+            <label for="email">Correo electrónico</label>
+            <input type="email" id="email" placeholder="tu@email.com" autocomplete="email">
+        </div>
+        <div class="input-group">
+            <label for="password">Contraseña</label>
+            <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <div class="error-msg" id="errorMsg"></div>
+        <button class="btn-login" onclick="login()">Ingresar</button>
+    </div>
+</div>
+
+<!-- APP -->
+<div id="protectedContent">
+    <button class="btn-logout" onclick="logout()">Cerrar sesión</button>
+
+    <div class="brand-header">
+        <img src="https://assets.cdn.filesafe.space/jzrg6bPH71ccLohGddsN/media/69fd5ac4bc1f77cc35de6a72.png" alt="Chuculat">
+        <h2>Programa de Fidelización</h2>
+    </div>
+
+    <div class="wrap">
+        <div class="card">
+            <h1>🏆 Buscar Cliente</h1>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Número de identificación o teléfono..." autocomplete="off" inputmode="numeric">
+            </div>
+            <div class="status" id="status">Escribe para buscar...</div>
+            <div class="loading" id="loading"><div class="loading-spinner"></div><p>Buscando...</p></div>
+            <div class="not-found" id="notFound"><div style="font-size:44px">🍫</div><p>No se encontró ningún cliente con ese número</p></div>
+        </div>
+
+        <div class="card" id="clienteCard">
+            <div class="client-head">
+                <div>
+                    <h2 id="clientName">-</h2>
+                    <p><span id="clientPhone">-</span> · ID <span id="clientId">-</span></p>
+                </div>
+                <div class="puntos-box">
+                    <div class="pbox"><label>Puntos</label><div class="v" id="pTotal">0</div></div>
+                    <div class="pbox usa"><label>En carrito</label><div class="v" id="pUsados">0</div></div>
+                    <div class="pbox disp"><label>Disponibles</label><div class="v" id="pDisp">0</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="cols" id="cols" style="display:none">
+            <div class="card">
+                <h3 style="color:var(--chocolate);font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">🎁 Premios disponibles</h3>
+                <p style="color:var(--gris);font-size:12.5px;margin-bottom:14px" id="premiosNota">—</p>
+                <div class="grid" id="grid"></div>
+            </div>
+            <div class="card cart">
+                <h3>🛒 Carrito</h3>
+                <div id="cartBody"><div class="cart-empty">Agrega premios para redimir.</div></div>
+                <div class="cart-total"><span>Total</span><span class="t" id="cartTotal">0 pts</span></div>
+                <button class="btn-redeem" id="btnRedeem" onclick="openConfirm()" disabled>Redimir</button>
+            </div>
+        </div>
+
+        <div class="brand-footer"><p>Producto de Cacao 100% Colombiano y Natural</p></div>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="confirmModal">
+    <div class="modal">
+        <h2>Confirmar redención</h2>
+        <div class="res" id="resumen"></div>
+        <div class="modal-buttons">
+            <button class="btn-cancel" onclick="closeConfirm()">Cancelar</button>
+            <button class="btn-confirm" id="btnConfirm" onclick="doRedeem()">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────────────────────
+const CONTACTS_URL = 'https://app.rioagencymarketing.com/webhook/get-all-contacts';
+const PREMIOS_URL  = 'https://app.rioagencymarketing.com/webhook/get-premios';
+const REDEEM_URL   = 'https://app.rioagencymarketing.com/webhook/redeem-points';
+
+let allContacts = [], premios = [], currentClient = null, cart = [], searchTimeout = null;
+
+const fmtCOP = n => '$' + Number(n||0).toLocaleString('es-CO');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// Puntos ya comprometidos en el carrito
+const puntosUsados = () => cart.reduce((s,i) => s + i.puntos * i.qty, 0);
+// Lo que le queda para seguir agregando (sin haber hecho la transacción)
+const puntosDisponibles = () => Number(currentClient?.totalPoints || 0) - puntosUsados();
+
+// ── INIT ─────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+    const input = document.getElementById('searchInput');
+    if (input) { input.addEventListener('input', handleInput); }
+    await Promise.all([loadContacts(), loadPremios()]);
+});
+
+async function loadContacts(){
+    try{
+        showLoading(); showStatus('📥 Cargando contactos...');
+        const r = await fetch(CONTACTS_URL);
+        if(!r.ok) throw new Error();
+        allContacts = (await r.json()).contacts || [];
+        hideAll(); showStatus(`✅ ${allContacts.length} contactos cargados`);
+    }catch(e){ hideAll(); showStatus('❌ Error cargando contactos'); }
+}
+async function loadPremios(){
+    try{
+        const r = await fetch(PREMIOS_URL);
+        if(!r.ok) throw new Error();
+        premios = (await r.json()).premios || [];
+    }catch(e){ premios = []; console.error('premios', e); }
+}
+
+// ── BUSCAR ───────────────────────────────────────────────────────────
+function handleInput(e){
+    const v = e.target.value.trim();
+    clearTimeout(searchTimeout);
+    if(!v){ resetCliente(); hideAll(); showStatus(`✅ ${allContacts.length} contactos cargados`); return; }
+    if(!/^\d+$/.test(v)){ showStatus('⚠️ Solo números'); return; }
+    searchTimeout = setTimeout(() => searchClient(v), 150);
+}
+function searchClient(q){
+    showLoading();
+    const r = allContacts.find(c =>
+        String(c.identification||'').includes(q) || String(c.phone||'').includes(q));
+    setTimeout(() => {
+        if(!r){ resetCliente(); hideAll(); showNotFound(); showStatus('❌ No encontrado'); return; }
+        currentClient = r; cart = [];
+        hideAll(); showStatus('✅ Cliente encontrado');
+        document.getElementById('clientName').textContent = r.fullName || 'Sin nombre';
+        document.getElementById('clientPhone').textContent = r.phone || '—';
+        document.getElementById('clientId').textContent = r.identification || '—';
+        document.getElementById('clienteCard').classList.add('active');
+        document.getElementById('cols').style.display = 'grid';
+        render();
+    }, 100);
+}
+function resetCliente(){
+    currentClient = null; cart = [];
+    document.getElementById('clienteCard').classList.remove('active');
+    document.getElementById('cols').style.display = 'none';
+}
+
+// ── CARRITO ──────────────────────────────────────────────────────────
+function addItem(sku){
+    const p = premios.find(x => String(x.sku) === String(sku));
+    if(!p) return;
+    if(p.puntos > puntosDisponibles()) return;   // no alcanza: no se agrega
+    const ex = cart.find(i => String(i.sku) === String(sku));
+    if(ex) ex.qty++; else cart.push({ sku:String(p.sku), nombre:p.nombre, puntos:Number(p.puntos), precio_cop:Number(p.precio_cop), qty:1 });
+    render();
+}
+function changeQty(sku, d){
+    const i = cart.findIndex(x => String(x.sku) === String(sku));
+    if(i < 0) return;
+    if(d > 0 && cart[i].puntos > puntosDisponibles()) return;
+    cart[i].qty += d;
+    if(cart[i].qty <= 0) cart.splice(i,1);
+    render();
+}
+
+// ── RENDER ───────────────────────────────────────────────────────────
+function render(){
+    if(!currentClient) return;
+    const total = Number(currentClient.totalPoints || 0);
+    const usados = puntosUsados();
+    const disp = total - usados;
+
+    document.getElementById('pTotal').textContent  = total;
+    document.getElementById('pUsados').textContent = usados;
+    document.getElementById('pDisp').textContent   = disp;
+
+    // Solo se listan los premios que alcanza con lo que le QUEDA
+    const alcanza = premios.filter(p => Number(p.puntos) <= disp);
+    document.getElementById('premiosNota').textContent =
+        alcanza.length ? `${alcanza.length} premios a su alcance con ${disp} puntos` : 'Con los puntos restantes ya no alcanza ningún premio.';
+
+    document.getElementById('grid').innerHTML = premios.map(p => {
+        const ok = Number(p.puntos) <= disp;
+        return `<div class="prod${ok?'':' no'}">
+            <img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" loading="lazy">
+            <div class="body">
+                <div class="sku">SKU ${esc(p.sku)}</div>
+                <div class="nm">${esc(p.nombre)}</div>
+                <div><div class="pts">${p.puntos} pts</div><div class="cop">${fmtCOP(p.precio_cop)}</div></div>
+                <button class="btn-add" ${ok?'':'disabled'} onclick="addItem('${esc(p.sku)}')">${ok?'Agregar':'No alcanza'}</button>
+            </div>
+        </div>`;
+    }).join('');
+
+    const cb = document.getElementById('cartBody');
+    if(!cart.length){
+        cb.innerHTML = '<div class="cart-empty">Agrega premios para redimir.</div>';
+    } else {
+        cb.innerHTML = cart.map(i => `<div class="citem">
+            <div class="qty">
+                <button onclick="changeQty('${esc(i.sku)}',-1)">−</button>
+                <span>${i.qty}</span>
+                <button onclick="changeQty('${esc(i.sku)}',1)" ${i.puntos > disp ? 'disabled' : ''}>+</button>
+            </div>
+            <div class="n">${esc(i.nombre)}<br><span style="color:var(--gris);font-size:10px">SKU ${esc(i.sku)}</span></div>
+            <div class="p">${i.puntos * i.qty}</div>
+        </div>`).join('');
+    }
+    document.getElementById('cartTotal').textContent = usados + ' pts';
+    document.getElementById('btnRedeem').disabled = !cart.length;
+}
+
+// ── CONFIRMAR / REDIMIR ──────────────────────────────────────────────
+function openConfirm(){
+    if(!cart.length) return;
+    document.getElementById('resumen').innerHTML =
+        cart.map(i => `<div class="l"><span>${i.qty}× ${esc(i.nombre)} <span style="color:var(--gris)">(${esc(i.sku)})</span></span><span>${i.puntos*i.qty} pts</span></div>`).join('')
+        + `<div class="l tt"><span>Total a redimir</span><span>${puntosUsados()} pts</span></div>`
+        + `<div class="l" style="color:var(--gris)"><span>Quedan</span><span>${puntosDisponibles()} pts</span></div>`;
+    document.getElementById('btnConfirm').disabled = false;
+    document.getElementById('btnConfirm').textContent = 'Confirmar';
+    document.getElementById('confirmModal').classList.add('active');
+}
+function closeConfirm(){ document.getElementById('confirmModal').classList.remove('active'); }
+document.getElementById('confirmModal').addEventListener('click', e => {
+    if(e.target === e.currentTarget) closeConfirm();
+});
+
+async function doRedeem(){
+    const btn = document.getElementById('btnConfirm');
+    const pointsToRedeem = puntosUsados();
+    const currentPoints  = Number(currentClient.totalPoints || 0);
+    if(!pointsToRedeem || pointsToRedeem > currentPoints) return;
+    btn.disabled = true; btn.textContent = 'Redimiendo...';
+    try{
+        const r = await fetch(REDEEM_URL, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                contactId: currentClient.id,
+                currentPoints,
+                pointsToRedeem,
+                // Detalle de lo redimido: queda en el log (puntos_log.items)
+                items: cart.map(i => ({ sku:i.sku, nombre:i.nombre, puntos:i.puntos, precio_cop:i.precio_cop, qty:i.qty }))
+            })
+        });
+        if(!r.ok) throw new Error();
+        currentClient.totalPoints = currentPoints - pointsToRedeem;
+        const idx = allContacts.findIndex(c => c.id === currentClient.id);
+        if(idx >= 0) allContacts[idx].totalPoints = currentClient.totalPoints;
+        cart = [];
+        closeConfirm(); render();
+        showStatus(`✅ ${pointsToRedeem} puntos redimidos`);
+    }catch(e){
+        console.error(e);
+        btn.disabled = false; btn.textContent = 'Confirmar';
+        showStatus('❌ Error redimiendo. No se descontaron puntos.');
+    }
+}
+
+// ── UI ───────────────────────────────────────────────────────────────
+function hideAll(){
+    document.getElementById('loading').classList.remove('active');
+    document.getElementById('notFound').classList.remove('active');
+}
+function showLoading(){ hideAll(); document.getElementById('loading').classList.add('active'); }
+function showNotFound(){ hideAll(); document.getElementById('notFound').classList.add('active'); }
+function showStatus(t){ document.getElementById('status').textContent = t; }
+
+// ── LOGIN ────────────────────────────────────────────────────────────
+const VALID_EMAIL = 'experiencias@corporativoca.com';
+const VALID_PASSWORD = 'Chuculat2026*';
+function login(){
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const err = document.getElementById('errorMsg');
+    if(email === VALID_EMAIL && password === VALID_PASSWORD){
+        sessionStorage.setItem('chuculat_auth','true');
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('protectedContent').classList.add('active');
+        err.textContent = '';
+        document.getElementById('searchInput').focus();
+    } else {
+        err.textContent = '❌ Correo o contraseña incorrectos';
+        document.getElementById('password').value = '';
+        document.getElementById('password').focus();
+    }
+}
+function logout(){ sessionStorage.removeItem('chuculat_auth'); location.reload(); }
+document.addEventListener('DOMContentLoaded', () => {
+    if(sessionStorage.getItem('chuculat_auth') === 'true'){
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('protectedContent').classList.add('active');
+    }
+    document.getElementById('password').addEventListener('keypress', e => { if(e.key === 'Enter') login(); });
+    document.getElementById('email').addEventListener('keypress', e => { if(e.key === 'Enter') document.getElementById('password').focus(); });
+});
+</script>
+</body>
+</html>
