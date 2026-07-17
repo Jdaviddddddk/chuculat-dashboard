@@ -261,8 +261,17 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 .score-row .sr-fill { height: 100%; border-radius: 50px; transition: width .6s ease; }
 .score-row .sr-val { width: 30px; text-align: right; font-size: 13px; font-weight: 800; color: var(--chocolate); }
 .score-row .sr-detail { width: 74px; text-align: right; color: var(--gris); font-size: 10px; font-weight: 600; white-space: nowrap; }
-.score-note { color: var(--gris); font-size: 10.5px; font-style: italic; line-height: 1.45; border-top: 1px dashed var(--beige); padding-top: 9px; }
 @media (max-width: 700px) { .score-head { flex-direction: column; align-items: stretch; } .score-row .sr-detail { display: none; } }
+/* Gráfica de barras verticales de la encuesta */
+.score-chart { height: 190px; margin-bottom: 18px; }
+/* Resumen completo colapsable */
+.survey-details { border-top: 1px dashed var(--beige); padding-top: 12px; }
+.survey-details summary { cursor: pointer; color: var(--chocolate); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; padding: 8px 12px; background: var(--crema); border: 1px solid var(--beige); border-radius: 50px; text-align: center; list-style: none; transition: .2s; }
+.survey-details summary::-webkit-details-marker { display: none; }
+.survey-details summary:hover { background: var(--beige); }
+.survey-details[open] summary { margin-bottom: 16px; }
+.survey-details-body { animation: fadeIn .3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .survey-respondents { padding: 0 20px 18px; }
 .survey-respondents summary { cursor: pointer; color: var(--gris); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 8px 0; }
 .survey-respondents li { color: var(--chocolate); font-size: 12px; padding: 4px 0 4px 8px; list-style: none; border-bottom: 1px dashed var(--beige); }
@@ -1310,8 +1319,61 @@ function renderSurveyScores(key, subs) {
             }).join('') +
             `</div>
         </div>
-        <p class="score-note">La mejor calificación es <strong>5</strong> y la peor es <strong>1</strong>. Puntaje = personas × nota de su respuesta · Total = puntaje ÷ respuestas · Nota = promedio de las tres.</p>
     </div>`;
+}
+
+// Gráfica de barras verticales (0-5) con el valor encima de cada barra
+const barValueLabels = {
+    id: 'barValueLabels',
+    afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        chart.getDatasetMeta(0).data.forEach((bar, i) => {
+            const v = chart.data.datasets[0].data[i];
+            if (v == null) return;
+            ctx.save();
+            ctx.fillStyle = '#3F2021';
+            ctx.font = '800 13px Montserrat, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(Number(v).toFixed(1), bar.x, bar.y - 7);
+            ctx.restore();
+        });
+    }
+};
+const surveyCharts = {};
+function drawSurveyChart(key, scores) {
+    const cv = document.getElementById('chartScore_' + key);
+    if (!cv) return;
+    if (surveyCharts[key]) surveyCharts[key].destroy();
+    const qs = scores.questions;
+    const cssVar = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+    const solid = c => c.startsWith('var(') ? cssVar(c.slice(4, -1)) : c;
+    surveyCharts[key] = new Chart(cv, {
+        type: 'bar',
+        data: {
+            labels: qs.map(q => q.name),
+            datasets: [{
+                data: qs.map(q => q.total),
+                backgroundColor: qs.map(q => q.total !== null ? solid(scoreColor(q.total)) : '#E8E0D5'),
+                borderRadius: 6, maxBarThickness: 64
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            layout: { padding: { top: 18 } },
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: c => {
+                    const q = qs[c.dataIndex];
+                    return `${c.parsed.y.toFixed(1)} de 5 · ${q.puntaje} pts ÷ ${q.respuestas} resp`;
+                } } }
+            },
+            scales: {
+                y: { beginAtZero: true, max: 5, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#E8E0D5' } },
+                x: { ticks: { font: { size: 11, weight: '700' } }, grid: { display: false } }
+            }
+        },
+        plugins: [barValueLabels]
+    });
 }
 
 async function loadSurveys() {
@@ -1338,7 +1400,7 @@ function renderSurveyCard(key,subs,bodyId,countId,respId) {
     const def=SURVEY_DEFS[key]; const body=document.getElementById(bodyId);
     document.getElementById(countId).textContent=subs.length+(subs.length===1?' respuesta':' respuestas');
     if(!subs.length){ body.innerHTML='<div class="survey-empty">📝 Aún no hay respuestas para esta encuesta</div>'; document.getElementById(respId).innerHTML=''; return; }
-    let html=renderSurveyScores(key,subs);
+    let html='';
     for(const q of def.questions){
         const values=[];
         for(const s of subs){ const v=(s.answers||{})[q.id]; if(v===undefined||v===null||v==='') continue; if(Array.isArray(v)) values.push(...v.map(x=>String(x).trim())); else values.push(String(v).trim()); }
@@ -1352,7 +1414,15 @@ function renderSurveyCard(key,subs,bodyId,countId,respId) {
                 return `<div class="survey-bar-row"><div class="survey-bar-label">${esc(opt)}</div><div class="survey-bar-track"><div class="survey-bar-fill" style="width:${w}%;background:${col}"></div></div><div class="survey-bar-count">${c} · ${pct}%</div></div>`; }).join('')+`</div>`;
         }
     }
-    body.innerHTML=html||'<div class="survey-empty">Sin respuestas procesables</div>';
+    // Vista por defecto: solo gráfica + nota. El desglose queda tras "Ver resumen completo".
+    const scores=computeSurveyScores(key,subs);
+    const tieneNota=scores.nota!==null;
+    body.innerHTML=
+        (tieneNota ? `<div class="score-chart"><canvas id="chartScore_${key}"></canvas></div>` : '') +
+        renderSurveyScores(key,subs) +
+        (html ? `<details class="survey-details"><summary>📋 Ver resumen completo</summary><div class="survey-details-body">${html}</div></details>` : '') +
+        (!tieneNota && !html ? '<div class="survey-empty">Sin respuestas procesables</div>' : '');
+    if(tieneNota) drawSurveyChart(key,scores);
     document.getElementById(respId).innerHTML=`<details><summary>👤 Ver quién respondió (${subs.length})</summary><ul>`+subs.map(s=>`<li>${esc(s.name||'Anónimo')} <span>· ${esc(s.email||'')} · ${fmtDate(s.date)}</span></li>`).join('')+`</ul></details>`;
 }
 
