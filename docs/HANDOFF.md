@@ -1,5 +1,5 @@
 # Handoff — Chuculat (fidelización + ventas + Supabase)
-_Para continuar en otro chat. Actualizado: 2026-07-16 (sesión 3)._
+_Para continuar en otro chat. Actualizado: 2026-07-16 (sesiones 3 y 4)._
 
 ## Contexto rápido
 Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymarketing.com`, header API `X-N8N-API-KEY`).
@@ -11,7 +11,7 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 
 ## Credenciales / IDs
 - **Supabase**: `https://wavqyesyqqmawjfaztvb.supabase.co`. service_role (SECRETA) en los scripts locales y nodos n8n. SQL Editor: `https://supabase.com/dashboard/project/wavqyesyqqmawjfaztvb/sql/new`
-- **GHL**: locationId `jzrg6bPH71ccLohGddsN`; token `<GHL_PRIVATE_TOKEN — ver memoria local>...` (**solo funciona desde la IP del server n8n** → usar workflows temporales como proxy; patrón en `write_ghl.py`; borrarlos al terminar).
+- **GHL**: locationId `jzrg6bPH71ccLohGddsN`; token `<GHL_PRIVATE_TOKEN — ver memoria local>` (**solo funciona desde la IP del server n8n** → usar workflows temporales como proxy; patrón en `write_ghl.py`; borrarlos al terminar).
   - Campos: identificación `4C6TxwNRElYAB1HFkJb4` · saldo `UfFc9GjS1K9az8nactO5` · histórico `ciYvzjlWfz9RcmIlqRkO` · redimidos `jyDAuEv0t1ugBAop1HAQ` · fechas recompra `wdfNkPf305JjwPdTUBwS` · última recompra `4SxhRfKQzstus8dzHsxS` · fecha redención `KK5lI6yJVEB9WhGwdFpa` · detalle redención `xmOqbRfTg5xaE2WCKfzS`
 - **Siigo**: user `<SIIGO_USERNAME — ver memoria local>`, access_key base64 en scripts. Partner-Id `n8nApp`. Factura: `document.id 30537`, `seller 10857`, `payments.id 13848`, `warehouse 30`, domicilio = SKU `672`.
 - **Centros de costo**: 166=B2B, 168=B2C, 315=Exportación, 170=Planta, 172=Admin. **Corte del programa de puntos: `2026-05-11`**.
@@ -71,12 +71,28 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 
 ---
 
+## HECHO en la sesión 4 (otra sesión, en paralelo — commits `cf70f90`..`c0347b7`)
+- **Timbrado automático DIAN** (`stamp: {send: true}`) en `Confirmar cita` (Crear Factura y Crear Factura1) y `Woocommerce-Siigo` (Crear Factura). Antes toda factura nacía en `Draft`.
+- **FIX `Confirmar cita`**: `HTTP Request1` usaba `POST /contacts/` y moría con *"This location does not allow duplicated contacts"* cuando el contacto ya existía por teléfono/email pero **sin cédula** (la búsqueda es por cédula → daba 0 → intentaba crear → chocaba). Caso real: Sergio Guerrero pagó $250.000 y quedó sin cita ni factura. Ahora usa **`POST /contacts/upsert`**: si existe lo devuelve y le graba la cédula. Recuperado: cita 29-jul + `FV-2-1189`.
+- **Encuestas**: nota 1-5 con 3 preguntas (Recomendación/Satisfacción/Servicio) + gráfica de barras; el desglose queda colapsado (tarjeta de 1802px → 572px).
+- **Cross-sell limpio**: se descartan de `parejas` los cruces triviales (categoría BOMBONES, CH/CH DE MESA, código 304 "Caja bom pre"). Ojo: el filtro usa `/^CH(\s|$)/` y NO `startsWith('CH')` porque CHUNKS también empieza con CH.
+- Ambos workflows enlazados al Error Handler.
+
+
 ## PENDIENTE
 
 1. **[Johan] Pegar `frontend/redencion.html` en GHL** y hacer **una redención de prueba con pocos puntos**: es el único eslabón sin ejercitar (no lo probé porque descontaría puntos reales). Verificar que `items` llegue a `puntos_log`.
 2. **[Johan] Confirmar tabletas 30g** (366/368): ¿$15.000/105 pts como las cargué, o $24.000/168 como decía el PDF?
 3. **[Johan] SKU a los combos en WooCommerce** (product_id **4120** "Combo para la casa" y **4118** "Combo Amateur"): ya existen en Siigo (730/731/732) pero Woo manda `sku:""` → **cada venta con combo seguirá fallando**. No son bundles (`meta_data:[]`), son productos simples.
-4. **Venta de Silvia sin facturar** ($184.000, "Chocolates" por link de pago ePayco, doc 39569600) — Johan la dejó por fuera.
+4. **[Johan] Timbrar a mano 4 facturas en `Draft`** (Siigo rechaza timbrarlas por API: `invalid_date` por la fecha retroactiva) — **$356.451**:
+   | Factura | Fecha | Cliente | Total |
+   |---|---|---|---|
+   | FV-2-1127 | 23-jun | Diego Lopez (1014240198) | $51.499 |
+   | FV-2-1157 | 02-jul | Manuel Vicente Tejada (94460233) | $58.920 |
+   | FV-2-1159 | 03-jul | juan rodriguez (1024489707) | $75.999 |
+   | FV-2-1177 | 09-jul | Aura Edilma Velandia (40046714) | $170.033 |
+   (Las 6 creadas a mano el 16-jul —FV-2-1183..1188— **ya quedaron timbradas** `Accepted` con CUFE.)
+5. **Venta de Silvia sin facturar** ($184.000, "Chocolates" por link de pago ePayco, doc 39569600) — Johan la dejó por fuera.
 5. Barrer `puntos_log` completo contra `ventas_invoices` por si hay más casos tipo Tejada (puntos de facturas que no son cc=168).
 6. (Opcional) `Get FV2` del dashboard baja TODAS las FV-2 en cada llamada y **oscila entre 2,5s y 17,6s** (API de Siigo) — es el mayor cuello de botella restante. Cachearlo requiere cuidado (ver abajo).
 
