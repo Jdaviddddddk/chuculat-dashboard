@@ -219,6 +219,18 @@ const GEN_IDS = new Set(['222222222222', '7777777777777']);
 const esModDest = nm => /^(sel\s|no aplica)/i.test(nm);
 const b2cInvs = invoices.filter(inv => channelOf(inv) === 'b2c');
 
+// Cross-sell: se descartan las parejas que incluyan bombones, su propio estuche
+// (Caja bom pre, 304) o los chocolates CH / CH DE MESA. Son cruces triviales
+// (los bombones se venden surtidos DENTRO de esa caja; los CH son el chocolate
+// que va DENTRO de la bebida) y tapaban los cruces realmente accionables.
+// Solo afecta a 'parejas'; estos productos siguen contando en el resto.
+// Ojo: /^CH(\s|$)/ y no startsWith('CH'), para no arrastrar CHUNKS.
+const CROSS_SKIP_CODES = new Set(['304']);
+const fueraDeCrossSell = (code, cat) =>
+  CROSS_SKIP_CODES.has(String(code)) ||
+  String(cat || '').toUpperCase() === 'BOMBONES' ||
+  /^CH(\s|$)/i.test(String(cat || ''));
+
 const dProdMes = {}, dProdCli = {}, dPares = {}, dCust = {};
 for (const inv of b2cInvs) {
   const fx  = fxOf(inv);
@@ -245,7 +257,7 @@ for (const inv of b2cInvs) {
       if (!dProdCli[codeK][ced]) dProdCli[codeK][ced] = { ced, name: cliName, qty: 0, subtotal: 0 };
       dProdCli[codeK][ced].qty += q; dProdCli[codeK][ced].subtotal += s;
     }
-    nombresFactura.add(prodD.name);
+    if (!fueraDeCrossSell(codeK, prodD.category)) nombresFactura.add(prodD.name);
   }
   const arrN = [...nombresFactura].sort();
   for (let i = 0; i < arrN.length; i++)
