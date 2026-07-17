@@ -340,6 +340,26 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
     .nav-item { padding: 0 8px; font-size: 11px; }
     .nav-icon { display: none; }
 }
+/* ── Secciones colapsables (panel Ventas) ── */
+.dash-section.collapsible > .section-title { cursor:pointer; user-select:none; display:flex; align-items:center; gap:10px; }
+.dash-section.collapsible > .section-title::before { content:'▾'; font-size:13px; color:var(--gris); transition:transform .2s; flex:0 0 auto; }
+.dash-section.collapsed > .section-title::before { transform:rotate(-90deg); }
+.dash-section.collapsed > *:not(.section-title) { display:none !important; }
+.dash-section.collapsed { padding-bottom:14px; }
+
+/* ── Filtro de fecha flotante ── */
+.float-filter { position:fixed; right:22px; bottom:22px; z-index:1200; }
+.float-filter-btn { width:56px; height:56px; border-radius:50%; border:none; background:var(--chocolate,#5a3921); color:#fff; font-size:22px; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.28); transition:transform .15s, box-shadow .15s; }
+.float-filter-btn:hover { transform:translateY(-2px); box-shadow:0 9px 24px rgba(0,0,0,.34); }
+.float-filter-pop { position:absolute; right:0; bottom:68px; width:270px; background:#fff; border:1px solid var(--beige,#eadfce); border-radius:16px; box-shadow:0 12px 34px rgba(0,0,0,.22); padding:16px; }
+.float-filter-pop .ff-title { font-weight:800; color:var(--chocolate,#5a3921); font-size:14px; margin-bottom:12px; }
+.float-filter-pop label { display:block; font-size:12px; font-weight:600; color:var(--gris,#8a7a67); margin:8px 0 3px; }
+.float-filter-pop input[type=date] { width:100%; padding:7px 9px; border:1px solid var(--beige,#eadfce); border-radius:9px; font-family:inherit; }
+.float-filter-pop .ff-actions { display:flex; gap:8px; margin-top:14px; }
+.float-filter-pop .ff-actions .btn-filter { flex:1; }
+.float-filter-pop .ff-period { margin-top:10px; font-size:12px; font-weight:600; color:var(--azul,#00abe1); text-align:center; }
+.float-filter-pop .ff-hint { margin-top:8px; font-size:11px; color:var(--gris,#8a7a67); line-height:1.4; }
+.float-filter.busy .float-filter-btn { opacity:.7; pointer-events:none; }
 </style>
 </head>
 <body>
@@ -365,15 +385,17 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         <a class="nav-item" href="#sec-encuestas"        onclick="b2cNav(this)"><span class="nav-icon">📝</span> Encuestas <span class="nav-badge" id="navBadgeEncuestas">0</span></a>
     </nav>
     <nav class="topbar-nav nav-b2b" id="navB2B">
+        <a class="nav-item" href="#sec-b2b-progreso" onclick="b2bNav(this)"><span class="nav-icon">📈</span> Progreso</a>
         <a class="nav-item" href="#sec-b2b-resumen"  onclick="b2bNav(this)"><span class="nav-icon">📊</span> Resumen</a>
-        <a class="nav-item" href="#sec-b2b-meta"     onclick="b2bNav(this)"><span class="nav-icon">🎯</span> Meta Mensual</a>
-        <a class="nav-item" href="#sec-b2b-canal"    onclick="b2bNav(this)"><span class="nav-icon">🔀</span> Canal</a>
+        <a class="nav-item" href="#sec-b2b-metacc"   onclick="b2bNav(this)"><span class="nav-icon">🏢</span> Meta Centro</a>
+        <a class="nav-item" href="#sec-b2b-mensual"  onclick="b2bNav(this)"><span class="nav-icon">📈</span> Tendencia</a>
+        <a class="nav-item" href="#sec-b2b-meta"     onclick="b2bNav(this)"><span class="nav-icon">🎯</span> Cumplimiento</a>
         <a class="nav-item" href="#sec-b2b-cats"     onclick="b2bNav(this)"><span class="nav-icon">🍩</span> Categorías</a>
-        <a class="nav-item" href="#sec-b2b-mensual"  onclick="b2bNav(this)"><span class="nav-icon">📈</span> Mensual</a>
-        <a class="nav-item" href="#sec-b2b-top10"    onclick="b2bNav(this)"><span class="nav-icon">🏆</span> Productos</a>
+        <a class="nav-item" href="#sec-b2b-top10"    onclick="b2bNav(this)"><span class="nav-icon">🏆</span> Ranking</a>
         <a class="nav-item" href="#sec-b2b-export"   onclick="b2bNav(this)"><span class="nav-icon">🌍</span> Exportación <span class="nav-badge" id="navBadgeExport">0</span></a>
-        <a class="nav-item" href="#sec-b2b-clientes" onclick="b2bNav(this)"><span class="nav-icon">🏢</span> Clientes <span class="nav-badge" id="navBadgeB2B">0</span></a>
         <a class="nav-item" href="#sec-b2b-cartera"  onclick="b2bNav(this)"><span class="nav-icon">📋</span> Cartera <span class="nav-badge" id="navBadgeCartera">0</span></a>
+        <a class="nav-item" href="#sec-b2b-canal"    onclick="b2bNav(this)"><span class="nav-icon">🔀</span> Canal</a>
+        <a class="nav-item" href="#sec-b2b-clientes" onclick="b2bNav(this)"><span class="nav-icon">🏢</span> Clientes <span class="nav-badge" id="navBadgeB2B">0</span></a>
     </nav>
 </header>
 
@@ -562,30 +584,15 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 <!-- ══════════════════ PANEL VENTAS (B2B) ══════════════════ -->
 <div class="panel" id="panelB2B">
 
-    <!-- Filtro de fechas -->
-    <div class="date-filter-bar" style="margin-bottom:24px">
-        <label>Desde</label><input type="date" id="b2bDateFrom">
-        <label>Hasta</label><input type="date" id="b2bDateTo">
-        <button class="btn-filter" onclick="applyB2BFilter()">Aplicar</button>
-        <button class="btn-filter secondary" onclick="clearB2BFilter()">Año actual</button>
-        <span class="kpi-filter-period" id="b2bPeriodLabel">Cargando...</span>
-    </div>
     <div class="dash-loading" id="loadingB2B"><div class="loading-spinner"></div><p>Consultando Siigo... la primera carga puede tomar unos segundos.</p></div>
     <div id="b2bContent" style="display:none">
 
-    <!-- Resumen -->
-    <section class="dash-section" id="sec-b2b-resumen">
-        <div class="section-title">📊 Resumen de Ventas</div>
-        <p class="section-note">💡 Todos los montos son <strong>subtotal sin IVA</strong>. Clasificación por centro de costo de Siigo (B2C 168 · B2B 166 · Exportación 315).</p>
-        <div class="kpi-grid">
-            <div class="kpi-card ventas"><div class="kpi-icon">💰</div><div class="kpi-label">Total Ventas</div><div class="kpi-value" id="b2bKpiTotal">—</div><div class="kpi-sub" id="b2bKpiTotalSub">—</div></div>
-            <div class="kpi-card b2c"><div class="kpi-icon">🛍️</div><div class="kpi-label">Ventas B2C</div><div class="kpi-value" id="b2bKpiB2C">—</div><div class="kpi-sub" id="b2bKpiB2CSub">—</div></div>
-            <div class="kpi-card b2b-kpi"><div class="kpi-icon">🏢</div><div class="kpi-label">Ventas B2B</div><div class="kpi-value" id="b2bKpiB2B">—</div><div class="kpi-sub" id="b2bKpiB2BSub">—</div></div>
-            <div class="kpi-card export-kpi"><div class="kpi-icon">🌍</div><div class="kpi-label">Exportación</div><div class="kpi-value" id="b2bKpiExport">—</div><div class="kpi-sub" id="b2bKpiExportSub">—</div></div>
-        </div>
+    <!-- 1. Barra de progreso -->
+    <section class="dash-section" id="sec-b2b-progreso">
+        <div class="section-title">📈 Progreso vs Meta Anual</div>
         <div class="meta-bar-wrap">
             <div class="meta-bar-label">
-                <span>📈 Progreso vs Meta Anual $1.600.000.000 <small>(subtotal)</small></span>
+                <span>Meta Anual $1.600.000.000 <small>(subtotal)</small></span>
                 <small id="metaBarInfo">—</small>
             </div>
             <div class="meta-bar-track">
@@ -595,7 +602,42 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         </div>
     </section>
 
-    <!-- Meta Mensual -->
+    <!-- 2. Resumen de ventas -->
+    <section class="dash-section" id="sec-b2b-resumen">
+        <div class="section-title">📊 Resumen de Ventas</div>
+        <p class="section-note">💡 Todos los montos son <strong>subtotal sin IVA</strong>. Clasificación por centro de costo de Siigo (B2C 168 · B2B 166 · Exportación 315).</p>
+        <div class="kpi-grid">
+            <div class="kpi-card ventas"><div class="kpi-icon">💰</div><div class="kpi-label">Total Ventas</div><div class="kpi-value" id="b2bKpiTotal">—</div><div class="kpi-sub" id="b2bKpiTotalSub">—</div></div>
+            <div class="kpi-card b2c"><div class="kpi-icon">🛍️</div><div class="kpi-label">Ventas B2C</div><div class="kpi-value" id="b2bKpiB2C">—</div><div class="kpi-sub" id="b2bKpiB2CSub">—</div></div>
+            <div class="kpi-card b2b-kpi"><div class="kpi-icon">🏢</div><div class="kpi-label">Ventas B2B</div><div class="kpi-value" id="b2bKpiB2B">—</div><div class="kpi-sub" id="b2bKpiB2BSub">—</div></div>
+            <div class="kpi-card export-kpi"><div class="kpi-icon">🌍</div><div class="kpi-label">Exportación</div><div class="kpi-value" id="b2bKpiExport">—</div><div class="kpi-sub" id="b2bKpiExportSub">—</div></div>
+        </div>
+    </section>
+
+    <!-- 3. Meta por centro de costo (MENSUAL: mes en curso) -->
+    <section class="dash-section" id="sec-b2b-metacc">
+        <div class="section-title">🏢 Meta por Centro de Costo <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· mes en curso</small></div>
+        <p class="section-note">Progreso del <strong>mes actual</strong> por centro: la meta del mes (ajustada) repartida <strong>B2C 60% · B2B 20% · Export 20%</strong>, comparada con el real del mes (subtotal sin IVA).</p>
+        <div class="table-section">
+            <div class="table-header"><h2>🎯 Cumplimiento del mes por centro</h2><span class="table-count" id="metaCCLabel">—</span></div>
+            <div class="table-wrap">
+                <table><thead><tr>
+                    <th>Centro de costo</th><th>% Split</th><th>Meta del Mes</th><th>Real del Mes</th><th>Cumplimiento</th>
+                </tr></thead><tbody id="bodyMetaCanal"></tbody></table>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. Tendencia Mensual -->
+    <section class="dash-section" id="sec-b2b-mensual">
+        <div class="section-title">📈 Tendencia Mensual <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
+        <div class="chart-card full" style="margin-bottom:28px">
+            <div class="chart-title">Ventas mes a mes por canal</div>
+            <div class="chart-wrap tall"><canvas id="chartLine"></canvas></div>
+        </div>
+    </section>
+
+    <!-- 5. Cumplimiento mes a mes -->
     <section class="dash-section" id="sec-b2b-meta">
         <div class="section-title">🎯 Meta Mensual con Redistribución</div>
         <p class="section-note">Meta anual <strong>$1.600.000.000</strong> repartida por mes según % de participación. Al cerrar un mes, el faltante se <strong>redistribuye</strong> proporcionalmente entre los meses restantes (real = subtotal sin IVA).</p>
@@ -608,32 +650,13 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             <div class="table-header"><h2>📆 Cumplimiento mes a mes</h2><span class="table-count" id="metaYearLabel">—</span></div>
             <div class="table-wrap">
                 <table><thead><tr>
-                    <th>Mes</th><th>% Part.</th><th>Meta Base</th><th>Meta Ajustada</th><th>Real</th><th>Cumplimiento</th><th>Estado</th>
+                    <th>Mes</th><th>% Part.</th><th>Meta Base</th><th>Meta Ajustada</th><th>Real</th><th>Desglose por centro</th><th>Cumplimiento</th><th>Estado</th>
                 </tr></thead><tbody id="bodyMeta"></tbody></table>
             </div>
         </div>
-        <div class="table-section" style="margin-top:20px">
-            <div class="table-header"><h2>🏢 Meta por Centro de Costo</h2><span class="table-count">B2C 40% · B2B 30% · Export 30%</span></div>
-            <div class="table-wrap">
-                <table><thead><tr>
-                    <th>Centro de costo</th><th>% Split</th><th>Meta Anual</th><th>Real Acumulado</th><th>Cumplimiento</th>
-                </tr></thead><tbody id="bodyMetaCanal"></tbody></table>
-            </div>
-        </div>
     </section>
 
-    <!-- Canal -->
-    <section class="dash-section" id="sec-b2b-canal">
-        <div class="section-title">🔀 Ventas por Canal <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
-        <div class="canal-grid">
-            <div class="canal-card b2c-canal"><div class="canal-label">B2C · Consumidor</div><div class="canal-value" id="canalB2CVal">—</div><div class="canal-pct" id="canalB2CPct">—</div></div>
-            <div class="canal-card b2b-canal"><div class="canal-label">B2B · Empresas</div><div class="canal-value" id="canalB2BVal">—</div><div class="canal-pct" id="canalB2BPct">—</div></div>
-            <div class="canal-card exp-canal"><div class="canal-label">🌍 Exportación</div><div class="canal-value" id="canalExpVal">—</div><div class="canal-pct" id="canalExpPct">—</div></div>
-            <div class="canal-card fac-canal"><div class="canal-label">Facturas Procesadas</div><div class="canal-value" id="canalFacturas">—</div><div class="canal-pct" id="canalFacturasSub">—</div></div>
-        </div>
-    </section>
-
-    <!-- Categorías -->
+    <!-- 6. Categorías -->
     <section class="dash-section" id="sec-b2b-cats">
         <div class="section-title">🍩 Ventas por Categoría <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
         <div class="chart-grid">
@@ -648,16 +671,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         </div>
     </section>
 
-    <!-- Tendencia Mensual -->
-    <section class="dash-section" id="sec-b2b-mensual">
-        <div class="section-title">📈 Tendencia Mensual <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
-        <div class="chart-card full" style="margin-bottom:28px">
-            <div class="chart-title">Ventas mes a mes por canal</div>
-            <div class="chart-wrap tall"><canvas id="chartLine"></canvas></div>
-        </div>
-    </section>
-
-    <!-- Productos -->
+    <!-- 7. Ranking por ventas -->
     <section class="dash-section" id="sec-b2b-top10">
         <div class="section-title">🏆 Productos del Período <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· ordenados por dinero (subtotal)</small></div>
         <div class="table-section">
@@ -714,29 +728,6 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         </div>
     </section>
 
-    <!-- Clientes B2B -->
-    <section class="dash-section" id="sec-b2b-clientes">
-        <div class="section-title">🏢 Clientes B2B <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
-        <div class="table-section">
-            <div class="table-header"><h2>🏢 Empresas Activas</h2>
-                <div class="table-controls">
-                    <div class="search-wrap"><input type="text" id="searchB2BClientes" placeholder="Buscar empresa, NIT..." oninput="renderB2BClientes()"></div>
-                    <span class="table-count" id="countB2BClientes">0 empresas</span>
-                </div>
-            </div>
-            <div class="table-wrap">
-                <table><thead><tr>
-                    <th onclick="sortB2BClientes('name')"         data-col="name">        Empresa         <i class="si">⇅</i></th>
-                    <th onclick="sortB2BClientes('identification')"data-col="identification">NIT            <i class="si">⇅</i></th>
-                    <th onclick="sortB2BClientes('totalCompras')" data-col="totalCompras"> Total Compras   <i class="si">⇅</i></th>
-                    <th onclick="sortB2BClientes('facturas')"     data-col="facturas">     Facturas        <i class="si">⇅</i></th>
-                    <th onclick="sortB2BClientes('ultimaCompra')" data-col="ultimaCompra"> Última Compra   <i class="si">⇅</i></th>
-                    <th onclick="sortB2BClientes('primeraCompra')"data-col="primeraCompra">Primera Compra  <i class="si">⇅</i></th>
-                </tr></thead><tbody id="bodyB2BClientes"></tbody></table>
-            </div>
-        </div>
-    </section>
-
     <!-- Cartera B2B -->
     <section class="dash-section" id="sec-b2b-cartera">
         <div class="section-title">📋 Cartera · Cuentas por Cobrar <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
@@ -763,6 +754,41 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                     <th style="color:var(--verde)">Por Vencer</th>
                     <th>Facturas</th>
                 </tr></thead><tbody id="bodyCartera"></tbody></table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Complementarias: Canal y Clientes B2B -->
+    <!-- Ventas por Canal -->
+    <section class="dash-section" id="sec-b2b-canal">
+        <div class="section-title">🔀 Ventas por Canal <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
+        <div class="canal-grid">
+            <div class="canal-card b2c-canal"><div class="canal-label">B2C · Consumidor</div><div class="canal-value" id="canalB2CVal">—</div><div class="canal-pct" id="canalB2CPct">—</div></div>
+            <div class="canal-card b2b-canal"><div class="canal-label">B2B · Empresas</div><div class="canal-value" id="canalB2BVal">—</div><div class="canal-pct" id="canalB2BPct">—</div></div>
+            <div class="canal-card exp-canal"><div class="canal-label">🌍 Exportación</div><div class="canal-value" id="canalExpVal">—</div><div class="canal-pct" id="canalExpPct">—</div></div>
+            <div class="canal-card fac-canal"><div class="canal-label">Facturas Procesadas</div><div class="canal-value" id="canalFacturas">—</div><div class="canal-pct" id="canalFacturasSub">—</div></div>
+        </div>
+    </section>
+
+    <!-- Clientes B2B -->
+    <section class="dash-section" id="sec-b2b-clientes">
+        <div class="section-title">🏢 Clientes B2B <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
+        <div class="table-section">
+            <div class="table-header"><h2>🏢 Empresas Activas</h2>
+                <div class="table-controls">
+                    <div class="search-wrap"><input type="text" id="searchB2BClientes" placeholder="Buscar empresa, NIT..." oninput="renderB2BClientes()"></div>
+                    <span class="table-count" id="countB2BClientes">0 empresas</span>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table><thead><tr>
+                    <th onclick="sortB2BClientes('name')"         data-col="name">        Empresa         <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('identification')"data-col="identification">NIT            <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('totalCompras')" data-col="totalCompras"> Total Compras   <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('facturas')"     data-col="facturas">     Facturas        <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('ultimaCompra')" data-col="ultimaCompra"> Última Compra   <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('primeraCompra')"data-col="primeraCompra">Primera Compra  <i class="si">⇅</i></th>
+                </tr></thead><tbody id="bodyB2BClientes"></tbody></table>
             </div>
         </div>
     </section>
@@ -828,14 +854,6 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 </div><!-- /panelTablas -->
 
 <div class="panel" id="panelDestacadas">
-    <!-- Filtro de fechas propio -->
-    <div class="date-filter-bar" style="margin-bottom:24px">
-        <label>Desde</label><input type="date" id="destDateFrom">
-        <label>Hasta</label><input type="date" id="destDateTo">
-        <button class="btn-filter" onclick="applyDestFilter()">Aplicar</button>
-        <button class="btn-filter secondary" onclick="clearDestFilter()">Año actual</button>
-        <span class="kpi-filter-period" id="destPeriodLabel">Cargando...</span>
-    </div>
     <div class="dash-loading" id="loadingDest"><div class="loading-spinner"></div><p>Cargando datos de compras...</p></div>
     <div id="destContent" style="display:none">
 
@@ -881,6 +899,10 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                         <label style="display:block;margin-bottom:4px">Busca por cédula o nombre</label>
                         <div class="search-wrap"><input type="text" id="searchCliProd" placeholder="Ej: 1014183640 o Johnn Peña..." oninput="renderCliProductos()"></div>
                     </div>
+                    <div style="flex:1;min-width:260px" id="cliSelectWrap" hidden>
+                        <label style="display:block;margin-bottom:4px">Elige el cliente</label>
+                        <select class="filter-select" id="cliSelect" onchange="renderCliSelected()" style="width:100%"></select>
+                    </div>
                 </div>
                 <p class="section-note" id="cliProdNota">Escribe una cédula o nombre para ver los productos que ha comprado, con cantidad y valor.</p>
                 <div class="table-wrap"><table id="cliProdTable"><thead><tr><th>#</th><th>Producto</th><th>Código</th><th style="text-align:right">Unidades</th><th style="text-align:right">Valor</th></tr></thead><tbody id="cliProdBody"></tbody></table></div>
@@ -918,6 +940,27 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 </main>
 </div><!-- /app -->
 
+<!-- Filtro de fecha flotante (visible en Ventas y Destacadas) -->
+<div class="float-filter" id="floatFilter" hidden>
+    <div class="float-filter-pop" id="floatFilterPop" hidden>
+        <div class="ff-title">📅 Filtrar por fecha</div>
+        <label>Desde</label><input type="date" id="ffFrom">
+        <label>Hasta</label><input type="date" id="ffTo">
+        <div class="ff-actions">
+            <button class="btn-filter" onclick="ffApply()">Aplicar</button>
+            <button class="btn-filter secondary" onclick="ffReset()">Año actual</button>
+        </div>
+        <div class="ff-period" id="ffPeriod">—</div>
+        <div class="ff-hint">Solo recarga las tablas que dependen de la fecha; el resto se queda como está.</div>
+    </div>
+    <button class="float-filter-btn" id="floatFilterBtn" onclick="toggleFloatFilter()" title="Filtrar por fecha">📅</button>
+    <!-- Inputs canónicos ocultos que usa el resto del JS -->
+    <input type="hidden" id="b2bDateFrom"><input type="hidden" id="b2bDateTo">
+    <span id="b2bPeriodLabel" style="display:none"></span>
+    <input type="hidden" id="destDateFrom"><input type="hidden" id="destDateTo">
+    <span id="destPeriodLabel" style="display:none"></span>
+</div>
+
 <script>
 // ── ENDPOINTS ────────────────────────────────────────────────────────────
 const CONTACTS_URL = 'https://app.rioagencymarketing.com/webhook/get-all-contacts';
@@ -933,7 +976,10 @@ const CHART_COLORS = ['#EC6197','#00ABE1','#62B22A','#F1896C','#3F2021','#9C27B0
 
 // ── HELPERS ──────────────────────────────────────────────────────────────
 const fmt    = n => Number(n).toLocaleString('es-CO');
-const fmtCOP = n => '$' + Number(n).toLocaleString('es-CO');
+// Ventas: las operaciones se hacen con decimales (los datos crudos los conservan);
+// aquí solo se REDONDEA al mostrar, para no arrastrar decimales en pantalla ni
+// perder precisión en las sumas (que ocurren sobre los floats originales).
+const fmtCOP = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CO');
 const esc    = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 function fmtDate(d) {
     if (!d) return '—';
@@ -991,6 +1037,10 @@ function setSegment(seg) {
     if ((seg==='b2b' || seg==='tablas' || seg==='destacadas') && !b2bLoaded) { b2bLoaded=true; loadB2B(); }
     if (seg==='tablas' && ventasData) { document.getElementById('loadingTablas').style.display='none'; document.getElementById('tablasContent').style.display='block'; renderTablas(); }
     if (seg==='destacadas' && ventasData) { document.getElementById('loadingDest').style.display='none'; document.getElementById('destContent').style.display='block'; renderDestacadas(); }
+    // Botón flotante de filtro: solo en Ventas y Destacadas
+    const ff = document.getElementById('floatFilter');
+    if (ff){ ff.hidden = !(seg==='b2b' || seg==='destacadas'); closeFloatFilter(); ffSegment = seg; }
+    if (seg==='b2b') initVentasCollapsibles();
 }
 
 // ── NAV ──────────────────────────────────────────────────────────────────
@@ -1449,9 +1499,108 @@ let chartInstances = {};
 
 (function initB2BDates(){
     const now = new Date();
-    document.getElementById('b2bDateFrom').value = now.getFullYear() + '-01-01';
-    document.getElementById('b2bDateTo').value   = now.toISOString().split('T')[0];
+    const from = now.getFullYear() + '-01-01';
+    const to   = now.toISOString().split('T')[0];
+    document.getElementById('b2bDateFrom').value = from;
+    document.getElementById('b2bDateTo').value   = to;
+    document.getElementById('destDateFrom').value = from;
+    document.getElementById('destDateTo').value   = to;
+    document.getElementById('ffFrom').value = from;
+    document.getElementById('ffTo').value   = to;
 })();
+
+// ── FILTRO DE FECHA FLOTANTE ─────────────────────────────────────────────
+// Un botón flotante (esquina inferior derecha) con popup. Es contextual al
+// segmento activo (Ventas / Destacadas). Al aplicar, recarga SOLO las tablas
+// que dependen de la fecha, sin ocultar el resto ni mover el scroll.
+let ffSegment = 'b2b';   // segmento al que aplica el filtro flotante ahora
+function toggleFloatFilter(){
+    const pop = document.getElementById('floatFilterPop');
+    pop.hidden = !pop.hidden;
+    if (!pop.hidden){
+        // Sincroniza los inputs visibles con el rango vigente
+        document.getElementById('ffFrom').value = document.getElementById('b2bDateFrom').value;
+        document.getElementById('ffTo').value   = document.getElementById('b2bDateTo').value;
+    }
+}
+function closeFloatFilter(){ document.getElementById('floatFilterPop').hidden = true; }
+function setFfPeriod(txt){ const el=document.getElementById('ffPeriod'); if(el) el.textContent = txt; }
+function ffReset(){
+    const now = new Date();
+    document.getElementById('ffFrom').value = now.getFullYear()+'-01-01';
+    document.getElementById('ffTo').value   = now.toISOString().split('T')[0];
+    ffApply();
+}
+function ffApply(){
+    const from = document.getElementById('ffFrom').value;
+    const to   = document.getElementById('ffTo').value;
+    if(!from || !to){ return; }
+    document.getElementById('b2bDateFrom').value = from;
+    document.getElementById('b2bDateTo').value   = to;
+    document.getElementById('destDateFrom').value = from;
+    document.getElementById('destDateTo').value   = to;
+    closeFloatFilter();
+    filterVentasFloat(from, to);
+}
+
+// Recarga preservando el scroll y SIN ocultar el contenido. Marca el botón
+// como "busy" mientras trae el rango; al volver, re-renderiza solo lo filtrable.
+async function filterVentasFloat(from, to){
+    const y = window.scrollY;
+    const ff = document.getElementById('floatFilter');
+    ff && ff.classList.add('busy');
+    try {
+        // Siigo tiene latencia errática (10–25s) → un reintento si falla el 1er intento.
+        let data = null;
+        for (let intento=0; intento<2 && !(data && data.meta); intento++){
+            try { data = await (await fetch(VENTAS_URL + '?date_start='+from+'&date_end='+to)).json(); }
+            catch(_){ data = null; }
+        }
+        if(!data || !data.meta) throw new Error('Respuesta inválida');
+        ventasData = data;
+        const label = fmtDate(data.meta.dateStart) + ' → ' + fmtDate(data.meta.dateEnd);
+        document.getElementById('b2bPeriodLabel').textContent   = label;
+        document.getElementById('destPeriodLabel').textContent  = label;
+        setFfPeriod(label);
+        // Tablas que dependen de la fecha (no toca meta/tendencia/cartera/tablas)
+        renderB2BFiltered();
+        renderDestacadas();
+    } catch(e){
+        console.error('filtro flotante:', e);
+        setFfPeriod('❌ Error al filtrar');
+    } finally {
+        ff && ff.classList.remove('busy');
+        window.scrollTo(0, y);   // el scroll se queda donde estaba
+    }
+}
+
+// Solo las secciones filtrables de Ventas (más los clientes de exportación).
+function renderB2BFiltered(){
+    if(!ventasData) return;
+    renderB2BKPIs();
+    renderB2BCanal();
+    renderB2BCategorias();
+    renderB2BTop10();
+    renderExportClientes(((ventasData.exportacion)||{}).clientes || []);
+}
+
+// ── SECCIONES COLAPSABLES (panel Ventas) ─────────────────────────────────
+// Todas abiertas al inicio; el estado comprimido se recuerda en localStorage.
+function initVentasCollapsibles(){
+    document.querySelectorAll('#panelB2B .dash-section').forEach(sec=>{
+        if(!sec.id || sec.dataset.collapsibleReady) return;
+        const title = sec.querySelector(':scope > .section-title');
+        if(!title) return;
+        sec.classList.add('collapsible');
+        sec.dataset.collapsibleReady = '1';
+        const key = 'chuculat.collapse.' + sec.id;
+        if(localStorage.getItem(key) === '1') sec.classList.add('collapsed');
+        title.addEventListener('click', ()=>{
+            sec.classList.toggle('collapsed');
+            localStorage.setItem(key, sec.classList.contains('collapsed') ? '1' : '0');
+        });
+    });
+}
 
 // ── Filtro rápido (client-side) ──────────────────────────────────────────
 // Si el rango son meses completos y ya tenemos el histórico (ventasAllTime),
@@ -1704,39 +1853,75 @@ function renderDestClientes(){
 }
 
 // Invierte clientesPorProducto (producto -> clientes) en cliente -> productos
+// Clientes que coinciden con la búsqueda actual, cada uno con sus productos.
+// En vez de SUMAR todas las coincidencias, se listan por separado y el usuario
+// elige uno en el selector (#cliSelect) → renderCliSelected() lo pinta.
+let cliMatches = [];
 function renderCliProductos(){
     const d  = ventasData && ventasData.destacadas;
     const tb = document.getElementById('cliProdBody');
     const nota = document.getElementById('cliProdNota');
+    const selWrap = document.getElementById('cliSelectWrap');
+    const sel = document.getElementById('cliSelect');
     if (!d || !tb) return;
+    cliMatches = [];
     const q = (document.getElementById('searchCliProd').value || '').toLowerCase().trim();
     if (!q) {
+        selWrap.hidden = true;
         tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gris);padding:20px">Escribe una cédula o nombre para buscar.</td></tr>';
         nota.textContent = 'Escribe una cédula o nombre para ver los productos que ha comprado, con cantidad y valor.';
         return;
     }
-    // Busca el cliente en todos los productos
-    const filas = [];
-    const nombres = new Set(); const ceds = new Set();
+    // Agrupa las coincidencias por CLIENTE (clave = cédula si existe, si no el nombre).
+    const byClient = new Map();
     for (const p of (d.clientesPorProducto || [])) {
         for (const c of (p.clientes || [])) {
             const nm = String(c.name || '').toLowerCase();
             const cd = String(c.ced || '').toLowerCase();
             if (!cd.includes(q) && !nm.includes(q)) continue;
-            filas.push({ producto: p.name, code: p.code, qty: c.qty, subtotal: c.subtotal });
-            if (c.name) nombres.add(c.name);
-            if (c.ced)  ceds.add(c.ced);
+            const key = (c.ced || c.name || '¿?').toString();
+            let g = byClient.get(key);
+            if (!g) { g = { key, name: c.name || '(sin nombre)', ced: c.ced || '', filas: [] }; byClient.set(key, g); }
+            g.filas.push({ producto: p.name, code: p.code, qty: c.qty, subtotal: c.subtotal });
         }
     }
-    if (!filas.length) {
+    cliMatches = [...byClient.values()];
+    // Total gastado por cliente (para ordenar el selector) + orden de sus productos.
+    cliMatches.forEach(g => {
+        g.filas.sort((a,b)=>b.subtotal-a.subtotal);
+        g.totSub = g.filas.reduce((s,f)=>s+f.subtotal,0);
+    });
+    cliMatches.sort((a,b)=>b.totSub-a.totSub);
+
+    if (!cliMatches.length) {
+        selWrap.hidden = true;
         tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gris);padding:20px">Sin resultados para «' + esc(q) + '» en el período.</td></tr>';
         nota.textContent = 'Sin coincidencias. Ojo: solo aparecen los productos del top de Compras Destacadas.';
         return;
     }
-    filas.sort((a,b)=>b.subtotal-a.subtotal);
+    // Selector visible solo cuando hay más de un cliente que coincide.
+    if (cliMatches.length > 1) {
+        selWrap.hidden = false;
+        sel.innerHTML = cliMatches.map((g,i)=>`<option value="${i}">${esc(g.name)}${g.ced?' · '+esc(g.ced):''} — ${fmtCOP(g.totSub)}</option>`).join('');
+        sel.value = '0';
+    } else {
+        selWrap.hidden = true;
+    }
+    renderCliSelected();
+}
+
+function renderCliSelected(){
+    const tb = document.getElementById('cliProdBody');
+    const nota = document.getElementById('cliProdNota');
+    if (!cliMatches.length || !tb) return;
+    const sel = document.getElementById('cliSelect');
+    const idx = (cliMatches.length > 1 && sel) ? (parseInt(sel.value,10)||0) : 0;
+    const g = cliMatches[idx] || cliMatches[0];
+    const filas = g.filas;
     const totQty = filas.reduce((s,f)=>s+f.qty,0);
     const totSub = filas.reduce((s,f)=>s+f.subtotal,0);
-    nota.textContent = [...nombres].join(', ') + (ceds.size ? ' · ' + [...ceds].join(', ') : '') +
+    nota.textContent = g.name + (g.ced ? ' · ' + g.ced : '') +
+        (cliMatches.length>1 ? ' (' + cliMatches.length + ' clientes coinciden — elige arriba)' : '') +
         ' — ' + filas.length + ' productos · ' + fmt(totQty) + ' und · ' + fmtCOP(totSub);
     tb.innerHTML = filas.map((f,i)=>`<tr>
         <td>${i+1}</td>
@@ -1788,11 +1973,16 @@ function renderMeta() {
     // Meta NO se filtra por fechas: siempre sobre el rango por defecto (año en curso)
     const VD = ventasFull || ventasData;
     const year = (VD.meta.dateStart || '').slice(0,4) || String(new Date().getFullYear());
-    // Real por mes (subtotal) desde meses[]
-    const realMes = {};
+    // Real por mes (subtotal) desde meses[], total y desglosado por centro
+    const realMes = {}, realMesCC = { b2c:{}, b2b:{}, export:{} };
     for (const m of (VD.meses || [])) {
         const [y, mo] = m.mes.split('-');
-        if (y === year) realMes[parseInt(mo,10)] = m.total;
+        if (y !== year) continue;
+        const mi = parseInt(mo,10);
+        realMes[mi] = m.total;
+        realMesCC.b2c[mi]    = m.b2c || 0;
+        realMesCC.b2b[mi]    = m.b2b || 0;
+        realMesCC.export[mi] = m.export || 0;
     }
     // Mes actual (si el año consultado es el año en curso; si es pasado, todos cerrados)
     const now = new Date();
@@ -1843,12 +2033,17 @@ function renderMeta() {
         else                 { estado='🔴 Bajo meta'; color='var(--cereza)'; }
         const barW = Math.min(r.pct,100);
         const redistrib = (!r.closed && Math.abs(r.adj-r.base)>1) ? ` <small style="color:var(--naranja)">${r.adj>r.base?'▲':'▼'}</small>` : '';
+        const desglose = r.real ? `<small style="line-height:1.5;display:inline-block">
+            <span style="color:var(--cereza)">B2C ${fmtCOP(realMesCC.b2c[r.m]||0)}</span> ·
+            <span style="color:var(--naranja)">B2B ${fmtCOP(realMesCC.b2b[r.m]||0)}</span> ·
+            <span style="color:var(--morado)">Export ${fmtCOP(realMesCC.export[r.m]||0)}</span></small>` : '<span style="color:var(--gris)">—</span>';
         return `<tr style="${r.isCur?'background:rgba(0,171,225,.05)':''}">
             <td class="td-name">${MESES[r.m-1]}${r.isCur?' <small style="color:var(--azul)">· actual</small>':''}</td>
             <td>${(META_PCT[r.m]*100).toFixed(1)}%</td>
             <td style="color:var(--gris)">${fmtCOP(Math.round(r.base))}</td>
             <td class="td-pts azul">${fmtCOP(Math.round(r.adj))}${redistrib}</td>
             <td class="td-pts verde">${r.real?fmtCOP(r.real):'—'}</td>
+            <td style="min-width:190px;font-size:11px">${desglose}</td>
             <td style="min-width:130px">
                 <div style="display:flex;align-items:center;gap:8px">
                     <div style="flex:1;background:var(--beige);border-radius:50px;height:14px;overflow:hidden">
@@ -1861,14 +2056,20 @@ function renderMeta() {
         </tr>`;
     }).join('');
 
-    // Meta por centro de costo (split fijo B2C 60 / B2B 20 / Export 20)
+    // Meta por centro de costo — MENSUAL (mes en curso): la meta del mes ya
+    // ajustada (curRow.adj) repartida B2C 60 / B2B 20 / Export 20, comparada
+    // con el real del mes por centro.
     const CC_SPLIT = { 'B2C · Consumidor':0.60, 'B2B · Empresas':0.20, '🌍 Exportación':0.20 };
-    const r = VD.resumen;
-    const realCC = { 'B2C · Consumidor': r.totalB2C||0, 'B2B · Empresas': r.totalB2B||0, '🌍 Exportación': r.totalExport||0 };
+    const ccKeyReal = { 'B2C · Consumidor':'b2c', 'B2B · Empresas':'b2b', '🌍 Exportación':'export' };
     const ccColors = { 'B2C · Consumidor':'var(--cereza)', 'B2B · Empresas':'var(--naranja)', '🌍 Exportación':'var(--morado)' };
+    const mRow = curRow || [...rows].reverse().find(r=>r.real>0) || rows[0];
+    const metaMesVal = mRow ? mRow.adj : 0;
+    const mesNombre = mRow ? MESES[mRow.m-1] : '—';
+    const lblCC = document.getElementById('metaCCLabel');
+    if (lblCC) lblCC.textContent = mesNombre + ' ' + year;
     document.getElementById('bodyMetaCanal').innerHTML = Object.keys(CC_SPLIT).map(k=>{
-        const metaCC = CC_SPLIT[k]*META_ANUAL_VAL;
-        const real = realCC[k];
+        const metaCC = CC_SPLIT[k]*metaMesVal;
+        const real = mRow ? (realMesCC[ccKeyReal[k]][mRow.m]||0) : 0;
         const pct = metaCC>0 ? Math.round(real/metaCC*100) : 0;
         const barW = Math.min(pct,100);
         return `<tr>
@@ -2250,8 +2451,14 @@ function renderExport() {
         <td style="text-align:center">${p.facturas}</td>
     </tr>`).join('') : '<tr class="empty-row"><td colspan="6">Sin exportaciones en el período</td></tr>';
 
-    // Clientes export
-    const clis = e.clientes || [];
+    // Clientes export — ESTA tabla SÍ responde al filtro de fecha (usa ventasData)
+    renderExportClientes(((ventasData && ventasData.exportacion) || e).clientes || []);
+}
+
+// Tabla de clientes de exportación: se re-renderiza sola al aplicar el filtro
+// de fecha, tomando el rango filtrado (ventasData.exportacion).
+function renderExportClientes(clis){
+    clis = clis || [];
     document.getElementById('expCliCount').textContent = clis.length + ' clientes';
     const cb = document.getElementById('bodyExpCli');
     cb.innerHTML = clis.length ? clis.map(c=>`<tr>
