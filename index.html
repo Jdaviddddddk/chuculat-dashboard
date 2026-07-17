@@ -347,6 +347,14 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 .dash-section.collapsed > *:not(.section-title) { display:none !important; }
 .dash-section.collapsed { padding-bottom:14px; }
 
+/* ── Grupos de secciones (panel Ventas) ── */
+.sec-group { margin-bottom:10px; }
+.grp-head { width:100%; text-align:left; font-family:inherit; font-weight:800; font-size:16px; color:var(--chocolate,#5a3921); background:var(--crema,#faf6ef); border:1px solid var(--beige,#eadfce); border-radius:14px; padding:15px 20px; margin-bottom:14px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; transition:background .15s; }
+.grp-head:hover { background:var(--beige,#f0e7d8); }
+.grp-chev { flex:0 0 auto; font-size:13px; color:var(--gris,#8a7a67); transition:transform .2s; }
+.sec-group.collapsed .grp-chev { transform:rotate(-90deg); }
+.sec-group.collapsed .grp-body { display:none; }
+
 /* ── Filtro de fecha flotante ── */
 .float-filter { position:fixed; right:22px; bottom:22px; z-index:1200; }
 .float-filter-btn { width:56px; height:56px; border-radius:50%; border:none; background:var(--chocolate,#5a3921); color:#fff; font-size:22px; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.28); transition:transform .15s, box-shadow .15s; }
@@ -587,6 +595,9 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
     <div class="dash-loading" id="loadingB2B"><div class="loading-spinner"></div><p>Consultando Siigo... la primera carga puede tomar unos segundos.</p></div>
     <div id="b2bContent" style="display:none">
 
+    <!-- ═══ GRUPO FIJO (arriba, sin comprimir): Progreso · Resumen · Meta por Centro ═══ -->
+    <div class="sec-group" id="grp-general">
+
     <!-- 1. Barra de progreso -->
     <section class="dash-section" id="sec-b2b-progreso">
         <div class="section-title">📈 Progreso vs Meta Anual</div>
@@ -628,16 +639,14 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         </div>
     </section>
 
-    <!-- 4. Tendencia Mensual -->
-    <section class="dash-section" id="sec-b2b-mensual">
-        <div class="section-title">📈 Tendencia Mensual <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
-        <div class="chart-card full" style="margin-bottom:28px">
-            <div class="chart-title">Ventas mes a mes por canal</div>
-            <div class="chart-wrap tall"><canvas id="chartLine"></canvas></div>
-        </div>
-    </section>
+    </div><!-- /grp-general -->
 
-    <!-- 5. Cumplimiento mes a mes -->
+    <!-- ═══ GRUPO: Meta mensual y tendencia ═══ -->
+    <div class="sec-group collapsible-group" id="grp-metas">
+        <button class="grp-head" onclick="toggleGroup('grp-metas')"><span>🎯 Meta mensual y tendencia mensual</span> <span class="grp-chev">▾</span></button>
+        <div class="grp-body">
+
+    <!-- Cumplimiento mes a mes (Meta mensual) -->
     <section class="dash-section" id="sec-b2b-meta">
         <div class="section-title">🎯 Meta Mensual con Redistribución</div>
         <p class="section-note">Meta anual <strong>$1.600.000.000</strong> repartida por mes según % de participación. Al cerrar un mes, el faltante se <strong>redistribuye</strong> proporcionalmente entre los meses restantes (real = subtotal sin IVA).</p>
@@ -656,7 +665,24 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         </div>
     </section>
 
-    <!-- 6. Categorías -->
+    <!-- Tendencia Mensual -->
+    <section class="dash-section" id="sec-b2b-mensual">
+        <div class="section-title">📈 Tendencia Mensual <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
+        <div class="chart-card full" style="margin-bottom:28px">
+            <div class="chart-title">Ventas mes a mes por canal</div>
+            <div class="chart-wrap tall"><canvas id="chartLine"></canvas></div>
+        </div>
+    </section>
+
+        </div>
+    </div><!-- /grp-metas -->
+
+    <!-- ═══ GRUPO: Ventas por categoría, productos y clientes B2B ═══ -->
+    <div class="sec-group collapsible-group" id="grp-productos">
+        <button class="grp-head" onclick="toggleGroup('grp-productos')"><span>🍩 Ventas por categoría, productos del período y clientes B2B</span> <span class="grp-chev">▾</span></button>
+        <div class="grp-body">
+
+    <!-- Categorías -->
     <section class="dash-section" id="sec-b2b-cats">
         <div class="section-title">🍩 Ventas por Categoría <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
         <div class="chart-grid">
@@ -695,6 +721,37 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             </div>
         </div>
     </section>
+
+    <!-- Clientes B2B -->
+    <section class="dash-section" id="sec-b2b-clientes">
+        <div class="section-title">🏢 Clientes B2B <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
+        <div class="table-section">
+            <div class="table-header"><h2>🏢 Empresas Activas</h2>
+                <div class="table-controls">
+                    <div class="search-wrap"><input type="text" id="searchB2BClientes" placeholder="Buscar empresa, NIT..." oninput="renderB2BClientes()"></div>
+                    <span class="table-count" id="countB2BClientes">0 empresas</span>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table><thead><tr>
+                    <th onclick="sortB2BClientes('name')"         data-col="name">        Empresa         <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('identification')"data-col="identification">NIT            <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('totalCompras')" data-col="totalCompras"> Total Compras   <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('facturas')"     data-col="facturas">     Facturas        <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('ultimaCompra')" data-col="ultimaCompra"> Última Compra   <i class="si">⇅</i></th>
+                    <th onclick="sortB2BClientes('primeraCompra')"data-col="primeraCompra">Primera Compra  <i class="si">⇅</i></th>
+                </tr></thead><tbody id="bodyB2BClientes"></tbody></table>
+            </div>
+        </div>
+    </section>
+
+        </div>
+    </div><!-- /grp-productos -->
+
+    <!-- ═══ GRUPO: Exportación, cartera y canal ═══ -->
+    <div class="sec-group collapsible-group" id="grp-export">
+        <button class="grp-head" onclick="toggleGroup('grp-export')"><span>🌍 Exportación, cartera y canal</span> <span class="grp-chev">▾</span></button>
+        <div class="grp-body">
 
     <!-- Exportación -->
     <section class="dash-section" id="sec-b2b-export">
@@ -758,7 +815,6 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         </div>
     </section>
 
-    <!-- Complementarias: Canal y Clientes B2B -->
     <!-- Ventas por Canal -->
     <section class="dash-section" id="sec-b2b-canal">
         <div class="section-title">🔀 Ventas por Canal <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
@@ -770,28 +826,8 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         </div>
     </section>
 
-    <!-- Clientes B2B -->
-    <section class="dash-section" id="sec-b2b-clientes">
-        <div class="section-title">🏢 Clientes B2B <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
-        <div class="table-section">
-            <div class="table-header"><h2>🏢 Empresas Activas</h2>
-                <div class="table-controls">
-                    <div class="search-wrap"><input type="text" id="searchB2BClientes" placeholder="Buscar empresa, NIT..." oninput="renderB2BClientes()"></div>
-                    <span class="table-count" id="countB2BClientes">0 empresas</span>
-                </div>
-            </div>
-            <div class="table-wrap">
-                <table><thead><tr>
-                    <th onclick="sortB2BClientes('name')"         data-col="name">        Empresa         <i class="si">⇅</i></th>
-                    <th onclick="sortB2BClientes('identification')"data-col="identification">NIT            <i class="si">⇅</i></th>
-                    <th onclick="sortB2BClientes('totalCompras')" data-col="totalCompras"> Total Compras   <i class="si">⇅</i></th>
-                    <th onclick="sortB2BClientes('facturas')"     data-col="facturas">     Facturas        <i class="si">⇅</i></th>
-                    <th onclick="sortB2BClientes('ultimaCompra')" data-col="ultimaCompra"> Última Compra   <i class="si">⇅</i></th>
-                    <th onclick="sortB2BClientes('primeraCompra')"data-col="primeraCompra">Primera Compra  <i class="si">⇅</i></th>
-                </tr></thead><tbody id="bodyB2BClientes"></tbody></table>
-            </div>
         </div>
-    </section>
+    </div><!-- /grp-export -->
 
     </div><!-- /b2bContent -->
 </div><!-- /panelB2B -->
@@ -1040,7 +1076,7 @@ function setSegment(seg) {
     // Botón flotante de filtro: solo en Ventas y Destacadas
     const ff = document.getElementById('floatFilter');
     if (ff){ ff.hidden = !(seg==='b2b' || seg==='destacadas'); closeFloatFilter(); ffSegment = seg; }
-    if (seg==='b2b') initVentasCollapsibles();
+    if (seg==='b2b') initVentasGroups();
 }
 
 // ── NAV ──────────────────────────────────────────────────────────────────
@@ -1584,21 +1620,19 @@ function renderB2BFiltered(){
     renderExportClientes(((ventasData.exportacion)||{}).clientes || []);
 }
 
-// ── SECCIONES COLAPSABLES (panel Ventas) ─────────────────────────────────
-// Todas abiertas al inicio; el estado comprimido se recuerda en localStorage.
-function initVentasCollapsibles(){
-    document.querySelectorAll('#panelB2B .dash-section').forEach(sec=>{
-        if(!sec.id || sec.dataset.collapsibleReady) return;
-        const title = sec.querySelector(':scope > .section-title');
-        if(!title) return;
-        sec.classList.add('collapsible');
-        sec.dataset.collapsibleReady = '1';
-        const key = 'chuculat.collapse.' + sec.id;
-        if(localStorage.getItem(key) === '1') sec.classList.add('collapsed');
-        title.addEventListener('click', ()=>{
-            sec.classList.toggle('collapsed');
-            localStorage.setItem(key, sec.classList.contains('collapsed') ? '1' : '0');
-        });
+// ── GRUPOS DE SECCIONES (panel Ventas) ───────────────────────────────────
+// El grupo "general" (Progreso · Resumen · Meta por Centro) queda fijo arriba,
+// sin comprimir. Los demás grupos son desplegables/recogibles y recuerdan su
+// estado en localStorage. Todos abiertos al inicio.
+function toggleGroup(id){
+    const g = document.getElementById(id);
+    if(!g) return;
+    g.classList.toggle('collapsed');
+    localStorage.setItem('chuculat.group.' + id, g.classList.contains('collapsed') ? '1' : '0');
+}
+function initVentasGroups(){
+    document.querySelectorAll('#panelB2B .collapsible-group').forEach(g=>{
+        if(localStorage.getItem('chuculat.group.' + g.id) === '1') g.classList.add('collapsed');
     });
 }
 
