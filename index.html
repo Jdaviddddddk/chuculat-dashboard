@@ -777,46 +777,51 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         <section class="dash-section">
             <div class="section-title">🧮 Tablas Dinámicas</div>
             <p class="section-note">Cruza dimensiones × meses como una tabla dinámica de Excel. Montos = subtotal sin IVA.</p>
+            <p class="section-note">Cruza <strong>Centro de costo · Categoría · Producto</strong> (los filtros se acotan entre sí) y elige qué ver en las filas. Valor + cantidad, siempre juntos. Datos en vivo desde Supabase.</p>
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
                 <button class="btn-filter" id="btnTablasFilters" onclick="toggleTablasFilters()">🔎 Filtros ▾</button>
-                <span class="table-count" id="tablasFilterSummary">Categoría · todas · todos los meses</span>
+                <span class="table-count" id="tablasFilterSummary">Cargando…</span>
             </div>
             <div id="tablasFilters" style="display:none">
-            <div class="kpi-filter-bar" style="gap:16px">
-                <div><label style="display:block;margin-bottom:4px">Analizar por</label>
-                    <select class="filter-select" id="pivotDim" onchange="onPivotDimChange()">
-                        <option value="categorias">Categoría</option>
-                        <option value="productos">Producto</option>
-                        <option value="centros">Centro de costo</option>
-                    </select>
+                <div class="kpi-filter-bar" style="gap:16px;flex-wrap:wrap">
+                    <div><label style="display:block;margin-bottom:4px">Ver por (filas)</label>
+                        <select class="filter-select" id="cxVerPor" onchange="cxRenderPivot()">
+                            <option value="categoria">Categoría</option>
+                            <option value="producto">Producto</option>
+                            <option value="canal">Centro de costo</option>
+                        </select>
+                    </div>
+                    <div><label style="display:block;margin-bottom:4px">Centro de costo</label>
+                        <div id="cxCanales" style="display:flex;gap:6px;flex-wrap:wrap"></div></div>
+                    <div style="flex:1;min-width:200px"><label style="display:block;margin-bottom:4px">Meses</label>
+                        <div id="cxMeses" style="display:flex;flex-wrap:wrap;gap:6px"></div></div>
                 </div>
-                <div style="flex:1;min-width:220px"><label style="display:block;margin-bottom:4px">Meses</label>
-                    <div id="pivotMonths" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-                </div>
-            </div>
-            <!-- Selector de filas -->
-            <div class="table-section" style="margin-bottom:18px">
-                <div class="table-header">
-                    <h2 id="rowSelTitle">Seleccionar categorías</h2>
-                    <div class="table-controls">
-                        <div class="search-wrap"><input type="text" id="rowSelSearch" placeholder="Buscar para seleccionar..." oninput="renderRowSelector()"></div>
-                        <button class="btn-filter secondary" onclick="rowSelAll(true)">Todos</button>
-                        <button class="btn-filter secondary" onclick="rowSelAll(false)">Ninguno</button>
-                        <span class="table-count" id="rowSelCount">0</span>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px">
+                    <div class="table-section" style="margin:0">
+                        <div class="table-header"><h2>Categorías <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">(filtro)</small></h2>
+                            <div class="table-controls">
+                                <button class="btn-filter secondary" onclick="cxSelAll('cat',true)">Todas</button>
+                                <button class="btn-filter secondary" onclick="cxSelAll('cat',false)">Ninguna</button>
+                                <span class="table-count" id="cxCatCount">todas</span>
+                            </div></div>
+                        <div id="cxCatList" style="max-height:170px;overflow-y:auto;padding:12px 18px;display:flex;flex-wrap:wrap;gap:8px"></div>
+                    </div>
+                    <div class="table-section" style="margin:0">
+                        <div class="table-header"><h2>Productos <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">(filtro)</small></h2>
+                            <div class="table-controls">
+                                <div class="search-wrap"><input type="text" id="cxProdSearch" placeholder="Buscar producto..." oninput="cxRenderProdList()"></div>
+                                <button class="btn-filter secondary" onclick="cxSelAll('prod',false)">Ninguno</button>
+                                <span class="table-count" id="cxProdCount">todos</span>
+                            </div></div>
+                        <div id="cxProdList" style="max-height:170px;overflow-y:auto;padding:12px 18px;display:flex;flex-wrap:wrap;gap:8px"></div>
                     </div>
                 </div>
-                <div id="rowSelList" style="max-height:200px;overflow-y:auto;padding:12px 18px;display:flex;flex-wrap:wrap;gap:8px"></div>
-            </div>
             </div><!-- /tablasFilters -->
-            <!-- Tabla dinámica -->
             <div class="table-section">
-                <div class="table-header"><h2 id="pivotTitle">Categoría × Mes</h2>
-                    <div class="table-controls">
-                        <div class="search-wrap"><input type="text" id="pivotSearch" placeholder="Buscar en la tabla..." oninput="renderPivot()"></div>
-                        <span class="table-count" id="pivotCount">0 filas</span>
-                    </div>
+                <div class="table-header"><h2 id="cxTitle">Categoría × Mes</h2>
+                    <div class="table-controls"><span class="table-count" id="cxCount">0 filas</span></div>
                 </div>
-                <div class="table-wrap"><table id="pivotTable"><thead id="pivotHead"></thead><tbody id="pivotBody"></tbody></table></div>
+                <div class="table-wrap"><table><thead id="cxHead"></thead><tbody id="cxBody"></tbody></table></div>
             </div>
         </section>
     </div>
@@ -1895,25 +1900,111 @@ function pivotItems(dim) {
     return src.map(c=>({ key:c.categoria, label:c.categoria, extra:'' }));
 }
 
-function renderTablas() {
-    // Tablas Dinámicas NO se filtra por fechas: muestra siempre el histórico
-    // completo (ya tiene su propio selector de meses con checkboxes).
-    pivotSource = ventasAllTime || ventasFull || ventasData;
-    if (!pivotSource || !pivotSource.pivot) return;
-    // Meses (chips)
-    const meses = pivotSource.pivot.meses || [];
-    pivotSelectedMonths = new Set(meses);
-    document.getElementById('pivotMonths').innerHTML = meses.map(mk=>{
-        const [y,mo]=mk.split('-');
-        return `<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--chocolate);cursor:pointer;background:var(--crema);border:1px solid var(--beige);border-radius:50px;padding:3px 10px">
-            <input type="checkbox" checked data-month="${mk}" onchange="togglePivotMonth(this)" style="cursor:pointer"> ${MESES_CORTO[parseInt(mo,10)-1]} ${y.slice(2)}
-        </label>`;
-    }).join('');
-    // Selector de filas (todas seleccionadas por defecto)
-    const dim = document.getElementById('pivotDim').value;
-    pivotRowSel = new Set(pivotItems(dim).map(i=>i.key));
-    renderRowSelector();
-    renderPivot();
+// ── TABLAS DINÁMICAS CON CRUCE (cascada, en vivo desde Supabase) ──────────
+const CROSS_URL = 'https://app.rioagencymarketing.com/webhook/get-ventas-cross';
+const CX_CANALES = [['B2C','🍫 B2C'],['B2B','🏢 B2B'],['Exportacion','🌍 Export']];
+let cxSel = { canales:new Set(CX_CANALES.map(c=>c[0])), categorias:new Set(), productos:new Set(), meses:new Set() };
+let cxCats = [], cxProds = [], cxMonths = [], cxInited = false;
+
+async function cxFetch(params){
+    const qs = Object.entries(params).filter(([k,v])=>v!=null&&v!=='').map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
+    try { const r = await fetch(CROSS_URL+'?'+qs); const j = await r.json(); return j.rows||[]; } catch(e){ return []; }
+}
+const cxCanalesParam = () => [...cxSel.canales].join(',');
+function cxChip(label,type,val,checked){
+    return `<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--chocolate);cursor:pointer;background:var(--crema);border:1px solid var(--beige);border-radius:50px;padding:3px 10px">
+        <input type="checkbox" ${checked?'checked':''} data-type="${type}" data-val="${esc(val)}" onchange="cxToggle(this)" style="cursor:pointer"> ${esc(label)}</label>`;
+}
+
+async function renderTablas(){
+    document.getElementById('loadingTablas').style.display='none';
+    document.getElementById('tablasContent').style.display='block';
+    if (cxInited) return;
+    cxInited = true;
+    document.getElementById('cxCanales').innerHTML = CX_CANALES.map(([v,l])=>cxChip(l,'canal',v,true)).join('');
+    // meses del universo (pivot por canal sin filtro)
+    const rows = await cxFetch({ mode:'pivot', ver_por:'canal', canales:cxCanalesParam() });
+    cxMonths = [...new Set(rows.map(r=>r.mes))].sort();
+    cxSel.meses = new Set(cxMonths);
+    document.getElementById('cxMeses').innerHTML = cxMonths.map(mk=>{ const [y,mo]=mk.split('-'); return cxChip(MESES_CORTO[+mo-1]+' '+y.slice(2),'mes',mk,true); }).join('');
+    await cxLoadOpciones();
+    cxRenderPivot();
+}
+function cxToggle(cb){
+    const t=cb.dataset.type, v=cb.dataset.val;
+    const set = t==='canal'?cxSel.canales : t==='mes'?cxSel.meses : t==='cat'?cxSel.categorias : cxSel.productos;
+    if (cb.checked) set.add(v); else set.delete(v);
+    if (t==='canal' || t==='cat') { cxLoadOpciones().then(cxRenderPivot); } else { cxRenderPivot(); }
+}
+async function cxLoadOpciones(){
+    const cats = cxSel.categorias.size ? [...cxSel.categorias].join(',') : null;
+    const rows = await cxFetch({ mode:'opciones', canales:cxCanalesParam(), categorias:cats });
+    cxCats  = rows.filter(r=>r.tipo==='categoria').map(r=>r.valor).sort((a,b)=>String(a).localeCompare(String(b),'es'));
+    cxProds = rows.filter(r=>r.tipo==='producto').map(r=>({code:r.valor,name:r.label})).sort((a,b)=>String(a.name).localeCompare(String(b.name),'es'));
+    cxSel.categorias = new Set([...cxSel.categorias].filter(c=>cxCats.includes(c)));
+    cxSel.productos  = new Set([...cxSel.productos].filter(p=>cxProds.some(x=>x.code===p)));
+    cxRenderCatList(); cxRenderProdList();
+}
+function cxRenderCatList(){
+    document.getElementById('cxCatCount').textContent = cxSel.categorias.size ? cxSel.categorias.size+' de '+cxCats.length : 'todas';
+    document.getElementById('cxCatList').innerHTML = cxCats.map(c=>{
+        const on = cxSel.categorias.has(c);
+        return `<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--chocolate);cursor:pointer;background:${on?'rgba(0,171,225,.08)':'var(--crema)'};border:1px solid ${on?'var(--azul)':'var(--beige)'};border-radius:8px;padding:5px 10px">
+            <input type="checkbox" ${on?'checked':''} data-type="cat" data-val="${esc(c)}" onchange="cxToggle(this)"> ${esc(c)}</label>`;
+    }).join('') || '<span style="color:var(--gris);font-size:13px">—</span>';
+}
+function cxRenderProdList(){
+    const q = (document.getElementById('cxProdSearch').value||'').toLowerCase().trim();
+    let list = cxProds; if (q) list = list.filter(p=>(p.name+' '+p.code).toLowerCase().includes(q));
+    document.getElementById('cxProdCount').textContent = cxSel.productos.size ? cxSel.productos.size+' de '+cxProds.length : 'todos';
+    document.getElementById('cxProdList').innerHTML = list.slice(0,500).map(p=>{
+        const on = cxSel.productos.has(p.code);
+        return `<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--chocolate);cursor:pointer;background:${on?'rgba(0,171,225,.08)':'var(--crema)'};border:1px solid ${on?'var(--azul)':'var(--beige)'};border-radius:8px;padding:5px 10px">
+            <input type="checkbox" ${on?'checked':''} data-type="prod" data-val="${esc(p.code)}" onchange="cxToggle(this)"> ${esc(p.name)}</label>`;
+    }).join('') || '<span style="color:var(--gris);font-size:13px">Sin coincidencias</span>';
+}
+function cxSelAll(type,on){
+    if (type==='cat') { cxSel.categorias = on ? new Set(cxCats) : new Set(); cxLoadOpciones().then(cxRenderPivot); }
+    else { cxSel.productos = on ? new Set(cxProds.map(p=>p.code)) : new Set(); cxRenderProdList(); cxRenderPivot(); }
+}
+async function cxRenderPivot(){
+    const verPor = document.getElementById('cxVerPor').value;
+    document.getElementById('cxTitle').textContent = (verPor==='canal'?'Centro de costo':verPor==='producto'?'Producto':'Categoría')+' × Mes';
+    document.getElementById('cxBody').innerHTML = '<tr><td colspan="99" style="padding:20px;color:var(--gris)">Cargando…</td></tr>';
+    const rows = await cxFetch({ mode:'pivot', ver_por:verPor, canales:cxCanalesParam(),
+        categorias: cxSel.categorias.size?[...cxSel.categorias].join(','):null,
+        productos:  cxSel.productos.size ?[...cxSel.productos].join(','):null,
+        meses:      cxSel.meses.size     ?[...cxSel.meses].join(','):null });
+    const months = [...cxSel.meses].sort();
+    const map = {};
+    for (const r of rows){
+        if (!map[r.fila]) map[r.fila] = { label:(verPor==='producto'?(r.extra||r.fila):r.fila), extra:(verPor==='producto'?r.fila:''), meses:{}, tSub:0, tQty:0 };
+        map[r.fila].meses[r.mes] = { sub:Number(r.subtotal)||0, qty:Number(r.qty)||0 };
+        map[r.fila].tSub += Number(r.subtotal)||0; map[r.fila].tQty += Number(r.qty)||0;
+    }
+    let list = Object.values(map).sort((a,b)=>b.tSub-a.tSub);
+    document.getElementById('cxCount').textContent = list.length + ' filas';
+    const colSub={}, colQty={}; months.forEach(m=>{colSub[m]=0;colQty[m]=0;}); let gS=0,gQ=0;
+    list.forEach(r=>{ months.forEach(m=>{ colSub[m]+=(r.meses[m]?r.meses[m].sub:0); colQty[m]+=(r.meses[m]?r.meses[m].qty:0); }); gS+=r.tSub; gQ+=r.tQty; });
+    const cell = o => (!o||(!o.sub&&!o.qty)) ? '<div style="color:var(--beige)">·</div>' : `<div style="font-weight:700">${fmtCOP(o.sub)}</div><div style="font-size:11px;color:var(--gris)">${fmt(o.qty)} und</div>`;
+    document.getElementById('cxHead').innerHTML = '<tr><th style="position:sticky;left:0;background:var(--crema);z-index:2">'+(verPor==='producto'?'Producto':verPor==='canal'?'Centro':'Categoría')+'</th>'
+        + months.map(mk=>{const[y,mo]=mk.split('-');return `<th style="text-align:right">${MESES_CORTO[+mo-1]} ${y.slice(2)}</th>`}).join('') + '<th style="text-align:right">Total</th></tr>';
+    let body = list.map(r=>`<tr><td class="td-name" style="position:sticky;left:0;background:var(--blanco);z-index:1">${esc(r.label)}${r.extra?` <small style="color:var(--gris)">${esc(r.extra)}</small>`:''}</td>`
+        + months.map(m=>`<td style="text-align:right">${cell(r.meses[m])}</td>`).join('')
+        + `<td style="text-align:right"><div style="font-weight:800;color:var(--azul)">${fmtCOP(r.tSub)}</div><div style="font-size:11px;color:var(--verde);font-weight:700">${fmt(r.tQty)} und</div></td></tr>`).join('');
+    body += `<tr style="border-top:2px solid var(--beige);font-weight:800;background:var(--crema)"><td style="position:sticky;left:0;background:var(--crema)">TOTAL</td>`
+        + months.map(m=>`<td style="text-align:right"><div>${fmtCOP(colSub[m])}</div><div style="font-size:11px;color:var(--gris)">${fmt(colQty[m])} und</div></td>`).join('')
+        + `<td style="text-align:right;color:var(--azul)"><div>${fmtCOP(gS)}</div><div style="font-size:11px;color:var(--verde)">${fmt(gQ)} und</div></td></tr>`;
+    document.getElementById('cxBody').innerHTML = list.length ? body : '<tr class="empty-row"><td colspan="99">Sin datos para el cruce seleccionado</td></tr>';
+    cxUpdateSummary();
+}
+function cxUpdateSummary(){
+    const vp = document.getElementById('cxVerPor').value;
+    const lbl = vp==='canal'?'Centro':vp==='producto'?'Producto':'Categoría';
+    const cn = cxSel.canales.size===CX_CANALES.length ? 'todos los centros' : ([...cxSel.canales].join('/')||'ninguno');
+    const ct = cxSel.categorias.size ? cxSel.categorias.size+' cat' : 'todas cat';
+    const pr = cxSel.productos.size ? cxSel.productos.size+' prod' : 'todos prod';
+    document.getElementById('tablasFilterSummary').textContent = `Ver por ${lbl} · ${cn} · ${ct} · ${pr}`;
 }
 function togglePivotMonth(cb){ const mk=cb.dataset.month; if(cb.checked) pivotSelectedMonths.add(mk); else pivotSelectedMonths.delete(mk); renderPivot(); }
 
