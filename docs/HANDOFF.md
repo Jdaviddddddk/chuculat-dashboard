@@ -79,6 +79,13 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 - Ambos workflows enlazados al Error Handler.
 
 
+## HECHO en la sesión 5 (16-jul-2026, misma sesión — filtro rápido)
+- **Filtro de Ventas por meses completos: instantáneo (client-side), sin llamar al backend.** Si `[b2bDateFrom,b2bDateTo]` es una racha de meses enteros y `ventasAllTime` ya cargó, `applyB2BFilter()`/`clearB2BFilter()` suman los meses desde el histórico en el navegador (`fullMonthsInRange` + `buildClientSideVentas`) en vez de pedir `get-ventas`: **10-25s → ~11ms**. Si el rango son días sueltos, o el histórico no ha cargado, o el rango no está cubierto → cae intacto al fetch de siempre (sin riesgo). Verificado cifra por cifra contra el backend real (KPIs, categorías, 162-207 productos: exacto ±$1 de redondeo).
+- **Tablas Dinámicas y Clientes B2B salieron del filtro superior**: se renderizan una sola vez (como Meta/Cartera/Exportación) y muestran siempre el histórico completo. Tablas usa la nueva variable `pivotSource` (`ventasAllTime` con fallback a `ventasFull`).
+- **Backend** (`Compute Stats`): se agregó `facturas` por mes a `pivot.productos` (aditivo) para que el Top10 client-side muestre la columna de facturas correcta en cualquier sub-rango.
+- **Simplificación conocida**: la etiqueta "N empresas · N consumidores" (y el badge de nav junto a B2B) usa el conteo de clientes únicos de `ventasFull` (año en curso), no el del sub-rango exacto filtrado — no hay desglose de clientes únicos por mes en los datos precalculados. Mismo criterio que Clientes B2B, que tampoco se filtra.
+
+
 ## PENDIENTE
 
 1. **[Johan] Pegar `frontend/redencion.html` en GHL** y hacer **una redención de prueba con pocos puntos**: es el único eslabón sin ejercitar (no lo probé porque descontaría puntos reales). Verificar que `items` llegue a `puntos_log`.
