@@ -247,6 +247,22 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 .survey-text-answer:last-child { border-bottom: none; }
 .survey-text-answer .sta-meta { color: var(--gris); font-size: 10px; display: block; margin-top: 2px; }
 .survey-empty { color: var(--gris); font-size: 13px; text-align: center; padding: 30px 10px; }
+/* Puntuación 1-5 de la encuesta */
+.score-block { background: var(--crema); border: 1px solid var(--beige); border-radius: 12px; padding: 16px 18px; margin-bottom: 22px; }
+.score-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.score-nota { text-align: center; min-width: 92px; background: var(--blanco); border: 1px solid var(--beige); border-radius: 10px; padding: 10px 8px; }
+.score-nota .sn-val { font-size: 34px; font-weight: 800; line-height: 1; }
+.score-nota .sn-max { color: var(--gris); font-size: 11px; font-weight: 700; margin-top: 2px; }
+.score-nota .sn-lbl { color: var(--gris); font-size: 9.5px; text-transform: uppercase; letter-spacing: .8px; font-weight: 700; margin-top: 5px; }
+.score-bars { flex: 1; display: flex; flex-direction: column; gap: 9px; }
+.score-row { display: flex; align-items: center; gap: 9px; }
+.score-row .sr-name { width: 92px; color: var(--chocolate); font-size: 11.5px; font-weight: 700; }
+.score-row .sr-track { flex: 1; background: var(--blanco); border: 1px solid var(--beige); border-radius: 50px; height: 16px; overflow: hidden; }
+.score-row .sr-fill { height: 100%; border-radius: 50px; transition: width .6s ease; }
+.score-row .sr-val { width: 30px; text-align: right; font-size: 13px; font-weight: 800; color: var(--chocolate); }
+.score-row .sr-detail { width: 74px; text-align: right; color: var(--gris); font-size: 10px; font-weight: 600; white-space: nowrap; }
+.score-note { color: var(--gris); font-size: 10.5px; font-style: italic; line-height: 1.45; border-top: 1px dashed var(--beige); padding-top: 9px; }
+@media (max-width: 700px) { .score-head { flex-direction: column; align-items: stretch; } .score-row .sr-detail { display: none; } }
 .survey-respondents { padding: 0 20px 18px; }
 .survey-respondents summary { cursor: pointer; color: var(--gris); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 8px 0; }
 .survey-respondents li { color: var(--chocolate); font-size: 12px; padding: 4px 0 4px 8px; list-style: none; border-bottom: 1px dashed var(--beige); }
@@ -1237,6 +1253,67 @@ const SURVEY_DEFS = {
 };
 const SURVEY_BAR_COLORS=['var(--verde)','var(--azul)','var(--naranja)','var(--cereza)','var(--chocolate-light)','#9C27B0','#607D8B','#795548'];
 
+// ── PUNTUACIÓN 1-5 DE LAS ENCUESTAS ──────────────────────────────────────
+// Solo se puntúan 3 preguntas. En las 3 las opciones vienen ordenadas de mejor a
+// peor, así que la nota es 5 - índice (opción 1 = 5 … opción 5 = 1).
+//   puntaje      = Σ(personas que eligieron la opción × nota de la opción)
+//   total        = puntaje ÷ respuestas de esa pregunta
+//   nota general = promedio de los 3 totales
+// Se resuelven por TEXTO y no por id: Chuculatología reutiliza el id
+// JRPwosOSS2qb3aWpY2II para "Servicio", que en Experiencias es otra pregunta.
+const SCORED_QUESTIONS = [
+    { name:'Recomendación', match:/recomendar/i },
+    { name:'Satisfacción',  match:/frente a tus expectativas/i },
+    // ojo: nada de \w cerca de tildes ("calificarías") — \w no matchea "í"
+    { name:'Servicio',      match:/tu experiencia en general/i }
+];
+function scoreOf(options, answer) {
+    const i = (options||[]).indexOf(String(answer||'').trim());
+    return i < 0 ? null : 5 - i;
+}
+function computeSurveyScores(key, subs) {
+    const def = SURVEY_DEFS[key];
+    const questions = SCORED_QUESTIONS.map(sq => {
+        const q = (def.questions||[]).find(x => x.type==='single' && sq.match.test(x.label));
+        if (!q) return { name:sq.name, puntaje:0, respuestas:0, total:null };
+        let puntaje=0, respuestas=0;
+        for (const s of subs) {
+            const v = scoreOf(q.options, (s.answers||{})[q.id]);
+            if (v === null) continue;
+            puntaje += v; respuestas++;
+        }
+        return { name:sq.name, label:q.label, puntaje, respuestas, total: respuestas ? puntaje/respuestas : null };
+    });
+    const vals = questions.filter(q => q.total !== null).map(q => q.total);
+    return { questions, nota: vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null };
+}
+const scoreColor = n => n>=4.5 ? 'var(--verde)' : n>=3.5 ? 'var(--azul)' : n>=2.5 ? 'var(--naranja)' : 'var(--cereza)';
+function renderSurveyScores(key, subs) {
+    const { questions, nota } = computeSurveyScores(key, subs);
+    if (nota === null) return '';
+    return `<div class="score-block">
+        <div class="score-head">
+            <div class="score-nota">
+                <div class="sn-val" style="color:${scoreColor(nota)}">${nota.toFixed(1)}</div>
+                <div class="sn-max">de 5.0</div>
+                <div class="sn-lbl">Nota</div>
+            </div>
+            <div class="score-bars">` +
+            questions.map(q => {
+                const pct = q.total !== null ? (q.total/5*100) : 0;
+                return `<div class="score-row">
+                    <div class="sr-name">${q.name}</div>
+                    <div class="sr-track"><div class="sr-fill" style="width:${pct}%;background:${q.total!==null?scoreColor(q.total):'var(--beige)'}"></div></div>
+                    <div class="sr-val">${q.total!==null?q.total.toFixed(1):'—'}</div>
+                    <div class="sr-detail">${q.puntaje} pts · ${q.respuestas} resp</div>
+                </div>`;
+            }).join('') +
+            `</div>
+        </div>
+        <p class="score-note">La mejor calificación es <strong>5</strong> y la peor es <strong>1</strong>. Puntaje = personas × nota de su respuesta · Total = puntaje ÷ respuestas · Nota = promedio de las tres.</p>
+    </div>`;
+}
+
 async function loadSurveys() {
     try {
         let data=null;
@@ -1261,7 +1338,7 @@ function renderSurveyCard(key,subs,bodyId,countId,respId) {
     const def=SURVEY_DEFS[key]; const body=document.getElementById(bodyId);
     document.getElementById(countId).textContent=subs.length+(subs.length===1?' respuesta':' respuestas');
     if(!subs.length){ body.innerHTML='<div class="survey-empty">📝 Aún no hay respuestas para esta encuesta</div>'; document.getElementById(respId).innerHTML=''; return; }
-    let html='';
+    let html=renderSurveyScores(key,subs);
     for(const q of def.questions){
         const values=[];
         for(const s of subs){ const v=(s.answers||{})[q.id]; if(v===undefined||v===null||v==='') continue; if(Array.isArray(v)) values.push(...v.map(x=>String(x).trim())); else values.push(String(v).trim()); }
