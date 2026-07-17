@@ -1,90 +1,88 @@
 {
- "name": "CHUCULAT | Error Handler",
- "nodes": [
-  {
-   "id": "et",
-   "name": "Error Trigger",
-   "type": "n8n-nodes-base.errorTrigger",
-   "typeVersion": 1,
-   "position": [
-    0,
-    0
-   ],
-   "parameters": {}
-  },
-  {
-   "id": "code",
-   "name": "Formatear",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    240,
-    0
-   ],
-   "parameters": {
-    "mode": "runOnceForAllItems",
-    "jsCode": "const e = $json;\nconst wfName = (e.workflow && e.workflow.name) || 'desconocido';\nconst node   = (e.execution && e.execution.lastNodeExecuted) || (e.lastNodeExecuted) || '—';\nlet errMsg = '';\ntry { errMsg = e.execution.error.message || e.execution.error.description || ''; } catch(_){}\nif(!errMsg){ try { errMsg = e.error.message; } catch(_){} }\nconst when = new Date().toLocaleString('es-CO',{ timeZone:'America/Bogota' });\nconst msg = '🚨 *Error en n8n — CHUCULAT*\\n\\n*Workflow:* '+wfName+'\\n*Nodo:* '+node+'\\n*Error:* '+(errMsg||'sin detalle')+'\\n*Hora:* '+when;\nreturn [{ json: { msg } }];"
-   }
-  },
-  {
-   "id": "send",
-   "name": "Enviar SMS",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    480,
-    0
-   ],
-   "parameters": {
-    "method": "POST",
-    "url": "https://services.leadconnectorhq.com/conversations/messages",
-    "sendHeaders": true,
-    "headerParameters": {
-     "parameters": [
-      {
-       "name": "Authorization",
-       "value": "Bearer <GHL_PRIVATE_TOKEN>"
-      },
-      {
-       "name": "Version",
-       "value": "2021-04-15"
-      }
-     ]
+  "name": "CHUCULAT | Error Handler",
+  "nodes": [
+    {
+      "id": "et",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
     },
-    "sendBody": true,
-    "specifyBody": "json",
-    "jsonBody": "={ \"type\":\"SMS\", \"contactId\":\"Vjg9EwykevCwzxbZA4hA\", \"message\": {{ JSON.stringify($json.msg) }} }",
-    "options": {}
-   }
-  }
- ],
- "connections": {
-  "Error Trigger": {
-   "main": [
-    [
-     {
-      "node": "Formatear",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
+    {
+      "id": "code",
+      "name": "Formatear",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const e = $json;\nconst wfName = (e.workflow && e.workflow.name) || 'desconocido';\nconst node   = (e.execution && e.execution.lastNodeExecuted) || (e.lastNodeExecuted) || '—';\nlet errMsg = '';\ntry { errMsg = e.execution.error.message || e.execution.error.description || ''; } catch(_){}\nif(!errMsg){ try { errMsg = e.error.message; } catch(_){} }\nconst when = new Date().toLocaleString('es-CO',{ timeZone:'America/Bogota' });\nconst msg = '🚨 *Error en n8n — CHUCULAT*\\n\\n*Workflow:* '+wfName+'\\n*Nodo:* '+node+'\\n*Error:* '+(errMsg||'sin detalle')+'\\n*Hora:* '+when;\nreturn [{ json: { msg } }];"
+      }
+    },
+    {
+      "id": "send",
+      "name": "Enviar SMS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://services.leadconnectorhq.com/conversations/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <GHL_GWA_TOKEN>"
+            },
+            {
+              "name": "Version",
+              "value": "2021-04-15"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"type\":\"SMS\", \"contactId\":\"Vjg9EwykevCwzxbZA4hA\", \"message\": {{ JSON.stringify($json.msg) }} }",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Formatear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear": {
+      "main": [
+        [
+          {
+            "node": "Enviar SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "Formatear": {
-   "main": [
-    [
-     {
-      "node": "Enviar SMS",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
+  "settings": {
+    "executionOrder": "v1"
   }
- },
- "settings": {
-  "executionOrder": "v1",
-  "callerPolicy": "workflowsFromSameOwner",
-  "availableInMCP": false
- }
 }

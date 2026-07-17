@@ -1,658 +1,655 @@
 {
- "name": "CHUCULAT | Siigo → GHL Enriquecimiento",
- "nodes": [
-  {
-   "id": "n01",
-   "name": "Schedule",
-   "type": "n8n-nodes-base.scheduleTrigger",
-   "typeVersion": 1.2,
-   "position": [
-    -400,
-    0
-   ],
-   "parameters": {
-    "rule": {
-     "interval": [
-      {
-       "field": "hours",
-       "hoursInterval": 1
+  "name": "CHUCULAT | Siigo → GHL Enriquecimiento",
+  "nodes": [
+    {
+      "id": "n01",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
       }
-     ]
-    }
-   }
-  },
-  {
-   "id": "n02",
-   "name": "Auth Siigo",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    -180,
-    0
-   ],
-   "parameters": {
-    "method": "POST",
-    "url": "https://api.siigo.com/auth",
-    "sendBody": true,
-    "specifyBody": "json",
-    "jsonBody": "{\"username\":\"<SIIGO_USERNAME>\",\"access_key\":\"<SIIGO_ACCESS_KEY>\"}",
-    "options": {}
-   }
-  },
-  {
-   "id": "n03",
-   "name": "Gen Product Pages",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    40,
-    0
-   ],
-   "parameters": {
-    "mode": "runOnceForAllItems",
-    "jsCode": "return [1,2,3,4,5].map(p => ({ json: { page: p } }));"
-   }
-  },
-  {
-   "id": "n04",
-   "name": "Get Products",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    260,
-    0
-   ],
-   "parameters": {
-    "method": "GET",
-    "url": "=https://api.siigo.com/v1/products?page={{ $json.page }}&page_size=100",
-    "sendHeaders": true,
-    "headerParameters": {
-     "parameters": [
-      {
-       "name": "Authorization",
-       "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
-      },
-      {
-       "name": "Partner-Id",
-       "value": "n8nApp"
-      }
-     ]
     },
-    "options": {
-     "batching": {
-      "batch": {
-       "batchSize": 1,
-       "batchInterval": 400
+    {
+      "id": "n02",
+      "name": "Auth Siigo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -180,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.siigo.com/auth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"username\":\"<SIIGO_USERNAME>\",\"access_key\":\"<SIIGO_ACCESS_KEY>\"}",
+        "options": {}
       }
-     }
-    }
-   }
-  },
-  {
-   "id": "n05",
-   "name": "Get New Invoices",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    480,
-    0
-   ],
-   "parameters": {
-    "method": "GET",
-    "url": "=https://api.siigo.com/v1/invoices?page=1&page_size=100&created_start={{ new Date(Date.now() - 3*3600*1000).toISOString().slice(0,19) }}",
-    "sendHeaders": true,
-    "headerParameters": {
-     "parameters": [
-      {
-       "name": "Authorization",
-       "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
-      },
-      {
-       "name": "Partner-Id",
-       "value": "n8nApp"
-      }
-     ]
     },
-    "options": {}
-   }
-  },
-  {
-   "id": "n06",
-   "name": "Build Items",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    700,
-    0
-   ],
-   "parameters": {
-    "mode": "runOnceForAllItems",
-    "jsCode": "// Mapa de productos desde Get Products (5 páginas)\nconst productMap = {};\nfor (const p of $('Get Products').all()) {\n  for (const prod of (p.json.results || [])) {\n    productMap[prod.code] = { name: prod.name, category: (prod.account_group && prod.account_group.name) || 'Sin categoria' };\n  }\n}\n\n// Facturas nuevas\nconst invoices = [];\nfor (const p of $input.all()) {\n  for (const inv of (p.json.results || [])) invoices.push(inv);\n}\n\n// Dedup: facturas ya procesadas\nconst sd = $getWorkflowStaticData('global');\nif (!sd.ghlEnriquecidas) sd.ghlEnriquecidas = {};\nconst done = sd.ghlEnriquecidas;\n// limpiar entradas > 90 días\nconst cutoff = Date.now() - 90*86400000;\nfor (const k of Object.keys(done)) { if (done[k] < cutoff) delete done[k]; }\n\nconst BLOCKED = new Set(['222222222222','7777777777777']);\nfunction isNIT(id) {\n  const raw = String(id||'').trim();\n  if (/\\d{8,9}-\\d$/.test(raw)) return true;\n  const d = raw.replace(/[^0-9]/g,'');\n  if (d.length !== 9 && d.length !== 10) return false;\n  return /^(800|811|812|813|820|830|832|860|890|891|892|899|900|901|902)/.test(d);\n}\nfunction slug(s) {\n  return String(s||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'')\n    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);\n}\nfunction fxOf(doc) { return (doc.currency && doc.currency.exchange_rate) ? Number(doc.currency.exchange_rate) : 1; }\nfunction itemSub(it) { return Number(it.price||0)*Number(it.quantity||1) - Number((it.discount&&it.discount.value)||0); }\nconst esMod = nm => /^(sel\\s|no aplica)/i.test(nm);\n\n// Agrupar por cédula (solo persona natural, facturas no procesadas)\nconst byCed = {};\nfor (const inv of invoices) {\n  if (done[inv.id]) continue;\n  const ced = String((inv.customer && inv.customer.identification) || '').replace(/[^0-9]/g,'');\n  if (!ced || BLOCKED.has(ced) || isNIT(ced)) continue;\n  if (!byCed[ced]) byCed[ced] = [];\n  byCed[ced].push(inv);\n}\n\nconst out = [];\nfor (const [ced, invs] of Object.entries(byCed)) {\n  invs.sort((a,b) => String(a.date).localeCompare(String(b.date)));\n  let total = 0; const prodTotals = {}; const tags = new Set(); const notas = [];\n  for (const inv of invs) {\n    const fx = fxOf(inv);\n    let invTotal = 0; const lines = [];\n    for (const it of (inv.items || [])) {\n      const s = itemSub(it) * fx;\n      total += s; invTotal += s;\n      const prod = productMap[it.code] || { name: it.description || it.code, category: 'Sin categoria' };\n      lines.push('• ' + prod.name + ' x' + Number(it.quantity));\n      if (s <= 0 || esMod(prod.name)) continue;\n      prodTotals[prod.name] = (prodTotals[prod.name]||0) + s;\n      tags.add('cat:' + slug(prod.category));\n      tags.add('prod:' + slug(prod.name));\n    }\n    notas.push('🛒 Compra ' + inv.name + ' — ' + String(inv.date).slice(0,10) + '\\n' + lines.join('\\n') + '\\nTotal: $' + Math.round(invTotal).toLocaleString('es-CO'));\n  }\n  const lastInv = invs[invs.length-1];\n  const lastProds = (lastInv.items||[])\n    .map(it => ({ nm: (productMap[it.code]||{}).name || it.description || it.code, s: itemSub(it) }))\n    .filter(x => x.s > 0 && !esMod(x.nm)).map(x => x.nm).slice(0,5).join(', ');\n  const fav = Object.entries(prodTotals).sort((a,b)=>b[1]-a[1])[0];\n  out.push({ json: {\n    ced, invoiceIds: invs.map(i=>i.id),\n    totalNuevo: Math.round(total), comprasNuevas: invs.length,\n    lastDate: String(lastInv.date).slice(0,10), lastProds,\n    favNuevo: fav ? fav[0] : '', favMontoNuevo: fav ? Math.round(fav[1]) : 0,\n    tags: [...tags], notas\n  }});\n}\nreturn out.length ? out : [];"
-   }
-  },
-  {
-   "id": "n07",
-   "name": "Search GHL",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    920,
-    0
-   ],
-   "parameters": {
-    "method": "POST",
-    "url": "https://services.leadconnectorhq.com/contacts/search",
-    "sendHeaders": true,
-    "headerParameters": {
-     "parameters": [
-      {
-       "name": "Authorization",
-       "value": "Bearer <GHL_PRIVATE_TOKEN>"
-      },
-      {
-       "name": "Version",
-       "value": "2021-07-28"
-      },
-      {
-       "name": "Accept",
-       "value": "application/json"
+    {
+      "id": "n03",
+      "name": "Gen Product Pages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        40,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [1,2,3,4,5].map(p => ({ json: { page: p } }));"
       }
-     ]
     },
-    "sendBody": true,
-    "specifyBody": "json",
-    "jsonBody": "={\"locationId\":\"jzrg6bPH71ccLohGddsN\",\"pageLimit\":3,\"filters\":[{\"field\":\"customFields.4C6TxwNRElYAB1HFkJb4\",\"operator\":\"eq\",\"value\":\"{{ $json.ced }}\"}]}",
-    "options": {
-     "batching": {
-      "batch": {
-       "batchSize": 1,
-       "batchInterval": 250
+    {
+      "id": "n04",
+      "name": "Get Products",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.siigo.com/v1/products?page={{ $json.page }}&page_size=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
+            },
+            {
+              "name": "Partner-Id",
+              "value": "n8nApp"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          }
+        }
       }
-     }
-    }
-   }
-  },
-  {
-   "id": "n08",
-   "name": "Prep Actions",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    1140,
-    0
-   ],
-   "parameters": {
-    "mode": "runOnceForAllItems",
-    "jsCode": "// Combina resultado de búsqueda GHL con los datos por cédula\nconst CF = {\n  cedula: '4C6TxwNRElYAB1HFkJb4', totalGastado: '4XeNF2WH8ENigBGp2p3y',\n  cantidad: 'ZgAmsrhK3c9txQDdamoK', ultimaFecha: 'awOZU9UMdqsEtOzeohst',\n  ultimosProds: '5kLgbedHcudIHOb4QCYs', prodFavorito: 'M2v7Jx24UrBCKxdULFp0'\n};\nconst buildItems = $('Build Items').all();\nconst searches = $input.all();\nconst out = [];\nfor (let i = 0; i < buildItems.length; i++) {\n  const b = buildItems[i].json;\n  const s = (searches[i] && searches[i].json) || {};\n  const contact = (s.contacts || [])[0];\n  let totalPrev = 0, cantPrev = 0, favPrev = '', favMontoPrev = 0;\n  if (contact) {\n    for (const cf of (contact.customFields || [])) {\n      if (cf.id === CF.totalGastado) totalPrev = Number(cf.value) || 0;\n      if (cf.id === CF.cantidad) cantPrev = Number(cf.value) || 0;\n      if (cf.id === CF.prodFavorito) favPrev = String(cf.value || '');\n    }\n  }\n  // favorito: si el nuevo monto supera, cambia; si no hay previo, usa el nuevo\n  const fav = b.favNuevo && (!favPrev || b.favMontoNuevo >= totalPrev * 0.3) ? (favPrev && b.favMontoNuevo < favMontoPrev ? favPrev : b.favNuevo) : (favPrev || b.favNuevo);\n  out.push({ json: {\n    ...b,\n    contactId: contact ? contact.id : null,\n    necesitaCrear: !contact,\n    fields: [\n      { id: CF.totalGastado, value: totalPrev + b.totalNuevo },\n      { id: CF.cantidad, value: cantPrev + b.comprasNuevas },\n      { id: CF.ultimaFecha, value: b.lastDate },\n      { id: CF.ultimosProds, value: b.lastProds },\n      { id: CF.prodFavorito, value: fav }\n    ]\n  }});\n}\nreturn out;"
-   }
-  },
-  {
-   "id": "n09",
-   "name": "Filter Creates",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    1360,
-    -160
-   ],
-   "parameters": {
-    "mode": "runOnceForAllItems",
-    "jsCode": "// Solo cédulas que necesitan crear contacto → buscar datos en Siigo\nconst items = $input.all().filter(i => i.json.necesitaCrear);\nreturn items.length ? items : [];"
-   }
-  },
-  {
-   "id": "n10",
-   "name": "Get Siigo Customer",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    1580,
-    -160
-   ],
-   "parameters": {
-    "method": "GET",
-    "url": "=https://api.siigo.com/v1/customers?identification={{ $json.ced }}",
-    "sendHeaders": true,
-    "headerParameters": {
-     "parameters": [
-      {
-       "name": "Authorization",
-       "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
-      },
-      {
-       "name": "Partner-Id",
-       "value": "n8nApp"
-      }
-     ]
     },
-    "options": {
-     "batching": {
-      "batch": {
-       "batchSize": 1,
-       "batchInterval": 400
+    {
+      "id": "n05",
+      "name": "Get New Invoices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.siigo.com/v1/invoices?page=1&page_size=100&created_start={{ new Date(Date.now() - 3*3600*1000).toISOString().slice(0,19) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
+            },
+            {
+              "name": "Partner-Id",
+              "value": "n8nApp"
+            }
+          ]
+        },
+        "options": {}
       }
-     }
-    }
-   }
-  },
-  {
-   "id": "n11",
-   "name": "Merge Create",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    1800,
-    -160
-   ],
-   "parameters": {
-    "mode": "runOnceForAllItems",
-    "jsCode": "// Prepara body de creación de contacto con datos del cliente Siigo\nconst lookups = $input.all();\nconst pending = $('Prep Actions').all().filter(i => i.json.necesitaCrear);\nconst out = [];\nfunction normPhone(p) {\n  const d = String(p||'').replace(/[^0-9]/g,'');\n  if (d.length === 10 && d.startsWith('3')) return '+57' + d;\n  if (d.length === 12 && d.startsWith('57')) return '+' + d;\n  return null;\n}\nfor (let i = 0; i < pending.length; i++) {\n  const b = pending[i].json;\n  const cust = (((lookups[i]||{}).json||{}).results || [])[0] || {};\n  const nameArr = cust.name || [];\n  const body = {\n    locationId: 'jzrg6bPH71ccLohGddsN',\n    firstName: nameArr[0] || 'Cliente',\n    lastName: nameArr.slice(1).join(' ') || b.ced,\n    customFields: [{ id: '4C6TxwNRElYAB1HFkJb4', value: b.ced }]\n  };\n  const phone = normPhone(cust.phones && cust.phones[0] && cust.phones[0].number);\n  const email = cust.contacts && cust.contacts[0] && cust.contacts[0].email;\n  if (phone) body.phone = phone;\n  if (email) body.email = email;\n  out.push({ json: { ...b, createBody: body } });\n}\nreturn out.length ? out : [];"
-   }
-  },
-  {
-   "id": "n12",
-   "name": "Create Contact",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    2020,
-    -160
-   ],
-   "parameters": {
-    "method": "POST",
-    "url": "https://services.leadconnectorhq.com/contacts/",
-    "sendHeaders": true,
-    "headerParameters": {
-     "parameters": [
-      {
-       "name": "Authorization",
-       "value": "Bearer <GHL_PRIVATE_TOKEN>"
-      },
-      {
-       "name": "Version",
-       "value": "2021-07-28"
-      },
-      {
-       "name": "Accept",
-       "value": "application/json"
-      }
-     ]
     },
-    "sendBody": true,
-    "specifyBody": "json",
-    "jsonBody": "={{ JSON.stringify($json.createBody) }}",
-    "options": {
-     "batching": {
-      "batch": {
-       "batchSize": 1,
-       "batchInterval": 300
+    {
+      "id": "n06",
+      "name": "Build Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Mapa de productos desde Get Products (5 páginas)\nconst productMap = {};\nfor (const p of $('Get Products').all()) {\n  for (const prod of (p.json.results || [])) {\n    productMap[prod.code] = { name: prod.name, category: (prod.account_group && prod.account_group.name) || 'Sin categoria' };\n  }\n}\n\n// Facturas nuevas\nconst invoices = [];\nfor (const p of $input.all()) {\n  for (const inv of (p.json.results || [])) invoices.push(inv);\n}\n\n// Dedup: facturas ya procesadas\nconst sd = $getWorkflowStaticData('global');\nif (!sd.ghlEnriquecidas) sd.ghlEnriquecidas = {};\nconst done = sd.ghlEnriquecidas;\n// limpiar entradas > 90 días\nconst cutoff = Date.now() - 90*86400000;\nfor (const k of Object.keys(done)) { if (done[k] < cutoff) delete done[k]; }\n\nconst BLOCKED = new Set(['222222222222','7777777777777']);\nfunction isNIT(id) {\n  const raw = String(id||'').trim();\n  if (/\\d{8,9}-\\d$/.test(raw)) return true;\n  const d = raw.replace(/[^0-9]/g,'');\n  if (d.length !== 9 && d.length !== 10) return false;\n  return /^(800|811|812|813|820|830|832|860|890|891|892|899|900|901|902)/.test(d);\n}\nfunction slug(s) {\n  return String(s||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'')\n    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);\n}\nfunction fxOf(doc) { return (doc.currency && doc.currency.exchange_rate) ? Number(doc.currency.exchange_rate) : 1; }\nfunction itemSub(it) { return Number(it.price||0)*Number(it.quantity||1) - Number((it.discount&&it.discount.value)||0); }\nconst esMod = nm => /^(sel\\s|no aplica)/i.test(nm);\n\n// Agrupar por cédula (solo persona natural, facturas no procesadas)\nconst byCed = {};\nfor (const inv of invoices) {\n  if (done[inv.id]) continue;\n  const ced = String((inv.customer && inv.customer.identification) || '').replace(/[^0-9]/g,'');\n  if (!ced || BLOCKED.has(ced) || isNIT(ced)) continue;\n  if (!byCed[ced]) byCed[ced] = [];\n  byCed[ced].push(inv);\n}\n\nconst out = [];\nfor (const [ced, invs] of Object.entries(byCed)) {\n  invs.sort((a,b) => String(a.date).localeCompare(String(b.date)));\n  let total = 0; const prodTotals = {}; const tags = new Set(); const notas = [];\n  for (const inv of invs) {\n    const fx = fxOf(inv);\n    let invTotal = 0; const lines = [];\n    for (const it of (inv.items || [])) {\n      const s = itemSub(it) * fx;\n      total += s; invTotal += s;\n      const prod = productMap[it.code] || { name: it.description || it.code, category: 'Sin categoria' };\n      lines.push('• ' + prod.name + ' x' + Number(it.quantity));\n      if (s <= 0 || esMod(prod.name)) continue;\n      prodTotals[prod.name] = (prodTotals[prod.name]||0) + s;\n      tags.add('cat:' + slug(prod.category));\n      tags.add('prod:' + slug(prod.name));\n    }\n    notas.push('🛒 Compra ' + inv.name + ' — ' + String(inv.date).slice(0,10) + '\\n' + lines.join('\\n') + '\\nTotal: $' + Math.round(invTotal).toLocaleString('es-CO'));\n  }\n  const lastInv = invs[invs.length-1];\n  const lastProds = (lastInv.items||[])\n    .map(it => ({ nm: (productMap[it.code]||{}).name || it.description || it.code, s: itemSub(it) }))\n    .filter(x => x.s > 0 && !esMod(x.nm)).map(x => x.nm).slice(0,5).join(', ');\n  const fav = Object.entries(prodTotals).sort((a,b)=>b[1]-a[1])[0];\n  out.push({ json: {\n    ced, invoiceIds: invs.map(i=>i.id),\n    totalNuevo: Math.round(total), comprasNuevas: invs.length,\n    lastDate: String(lastInv.date).slice(0,10), lastProds,\n    favNuevo: fav ? fav[0] : '', favMontoNuevo: fav ? Math.round(fav[1]) : 0,\n    tags: [...tags], notas\n  }});\n}\nreturn out.length ? out : [];"
       }
-     }
-    }
-   }
-  },
-  {
-   "id": "n13",
-   "name": "Finalize",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    2240,
-    0
-   ],
-   "parameters": {
-    "mode": "runOnceForAllItems",
-    "jsCode": "// Junta contactos existentes + creados, genera items de acción para los updates\nconst prep = $('Prep Actions').all();\nlet created = [];\ntry { created = $('Create Contact').all(); } catch(e) {}\nconst createdByCed = {};\nfor (let i = 0; i < created.length; i++) {\n  const src = $('Merge Create').all()[i];\n  const cid = (created[i].json.contact && created[i].json.contact.id) || (created[i].json.meta && created[i].json.meta.contactId);\n  if (src && cid) createdByCed[src.json.ced] = cid;\n}\nconst out = [];\nfor (const p of prep) {\n  const b = p.json;\n  const contactId = b.contactId || createdByCed[b.ced];\n  if (!contactId) continue;\n  out.push({ json: { ...b, contactId } });\n}\nreturn out.length ? out : [];"
-   }
-  },
-  {
-   "id": "n14",
-   "name": "Update Fields",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    2460,
-    0
-   ],
-   "parameters": {
-    "method": "PUT",
-    "url": "=https://services.leadconnectorhq.com/contacts/{{ $json.contactId }}",
-    "sendHeaders": true,
-    "headerParameters": {
-     "parameters": [
-      {
-       "name": "Authorization",
-       "value": "Bearer <GHL_PRIVATE_TOKEN>"
-      },
-      {
-       "name": "Version",
-       "value": "2021-07-28"
-      },
-      {
-       "name": "Accept",
-       "value": "application/json"
-      }
-     ]
     },
-    "sendBody": true,
-    "specifyBody": "json",
-    "jsonBody": "={{ JSON.stringify({ customFields: $json.fields }) }}",
-    "options": {
-     "batching": {
-      "batch": {
-       "batchSize": 1,
-       "batchInterval": 300
+    {
+      "id": "n07",
+      "name": "Search GHL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        920,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://services.leadconnectorhq.com/contacts/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <GHL_PRIVATE_TOKEN>"
+            },
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"locationId\":\"jzrg6bPH71ccLohGddsN\",\"pageLimit\":3,\"filters\":[{\"field\":\"customFields.4C6TxwNRElYAB1HFkJb4\",\"operator\":\"eq\",\"value\":\"{{ $json.ced }}\"}]}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 250
+            }
+          }
+        }
       }
-     }
-    }
-   }
-  },
-  {
-   "id": "n15",
-   "name": "Add Tags",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    2680,
-    0
-   ],
-   "parameters": {
-    "method": "POST",
-    "url": "=https://services.leadconnectorhq.com/contacts/{{ $('Finalize').item.json.contactId }}/tags",
-    "sendHeaders": true,
-    "headerParameters": {
-     "parameters": [
-      {
-       "name": "Authorization",
-       "value": "Bearer <GHL_PRIVATE_TOKEN>"
-      },
-      {
-       "name": "Version",
-       "value": "2021-07-28"
-      },
-      {
-       "name": "Accept",
-       "value": "application/json"
-      }
-     ]
     },
-    "sendBody": true,
-    "specifyBody": "json",
-    "jsonBody": "={{ JSON.stringify({ tags: $('Finalize').item.json.tags }) }}",
-    "options": {
-     "batching": {
-      "batch": {
-       "batchSize": 1,
-       "batchInterval": 300
+    {
+      "id": "n08",
+      "name": "Prep Actions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Combina resultado de búsqueda GHL con los datos por cédula\nconst CF = {\n  cedula: '4C6TxwNRElYAB1HFkJb4', totalGastado: '4XeNF2WH8ENigBGp2p3y',\n  cantidad: 'ZgAmsrhK3c9txQDdamoK', ultimaFecha: 'awOZU9UMdqsEtOzeohst',\n  ultimosProds: '5kLgbedHcudIHOb4QCYs', prodFavorito: 'M2v7Jx24UrBCKxdULFp0'\n};\nconst buildItems = $('Build Items').all();\nconst searches = $input.all();\nconst out = [];\nfor (let i = 0; i < buildItems.length; i++) {\n  const b = buildItems[i].json;\n  const s = (searches[i] && searches[i].json) || {};\n  const contact = (s.contacts || [])[0];\n  let totalPrev = 0, cantPrev = 0, favPrev = '', favMontoPrev = 0;\n  if (contact) {\n    for (const cf of (contact.customFields || [])) {\n      if (cf.id === CF.totalGastado) totalPrev = Number(cf.value) || 0;\n      if (cf.id === CF.cantidad) cantPrev = Number(cf.value) || 0;\n      if (cf.id === CF.prodFavorito) favPrev = String(cf.value || '');\n    }\n  }\n  // favorito: si el nuevo monto supera, cambia; si no hay previo, usa el nuevo\n  const fav = b.favNuevo && (!favPrev || b.favMontoNuevo >= totalPrev * 0.3) ? (favPrev && b.favMontoNuevo < favMontoPrev ? favPrev : b.favNuevo) : (favPrev || b.favNuevo);\n  out.push({ json: {\n    ...b,\n    contactId: contact ? contact.id : null,\n    necesitaCrear: !contact,\n    fields: [\n      { id: CF.totalGastado, value: totalPrev + b.totalNuevo },\n      { id: CF.cantidad, value: cantPrev + b.comprasNuevas },\n      { id: CF.ultimaFecha, value: b.lastDate },\n      { id: CF.ultimosProds, value: b.lastProds },\n      { id: CF.prodFavorito, value: fav }\n    ]\n  }});\n}\nreturn out;"
       }
-     }
-    }
-   }
-  },
-  {
-   "id": "n16",
-   "name": "Gen Notes",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    2900,
-    0
-   ],
-   "parameters": {
-    "mode": "runOnceForAllItems",
-    "jsCode": "// Un item por nota (contactId + texto)\nconst out = [];\nfor (const p of $input.all()) {\n  for (const nota of (p.json.notas || [])) {\n    out.push({ json: { contactId: p.json.contactId, nota } });\n  }\n}\nreturn out.length ? out : [];"
-   }
-  },
-  {
-   "id": "n17",
-   "name": "Add Notes",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    3120,
-    0
-   ],
-   "parameters": {
-    "method": "POST",
-    "url": "=https://services.leadconnectorhq.com/contacts/{{ $json.contactId }}/notes",
-    "sendHeaders": true,
-    "headerParameters": {
-     "parameters": [
-      {
-       "name": "Authorization",
-       "value": "Bearer <GHL_PRIVATE_TOKEN>"
-      },
-      {
-       "name": "Version",
-       "value": "2021-07-28"
-      },
-      {
-       "name": "Accept",
-       "value": "application/json"
-      }
-     ]
     },
-    "sendBody": true,
-    "specifyBody": "json",
-    "jsonBody": "={{ JSON.stringify({ body: $json.nota }) }}",
-    "options": {
-     "batching": {
-      "batch": {
-       "batchSize": 1,
-       "batchInterval": 300
+    {
+      "id": "n09",
+      "name": "Filter Creates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Solo cédulas que necesitan crear contacto → buscar datos en Siigo\nconst items = $input.all().filter(i => i.json.necesitaCrear);\nreturn items.length ? items : [];"
       }
-     }
+    },
+    {
+      "id": "n10",
+      "name": "Get Siigo Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        -160
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.siigo.com/v1/customers?identification={{ $json.ced }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
+            },
+            {
+              "name": "Partner-Id",
+              "value": "n8nApp"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "n11",
+      "name": "Merge Create",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Prepara body de creación de contacto con datos del cliente Siigo\nconst lookups = $input.all();\nconst pending = $('Prep Actions').all().filter(i => i.json.necesitaCrear);\nconst out = [];\nfunction normPhone(p) {\n  const d = String(p||'').replace(/[^0-9]/g,'');\n  if (d.length === 10 && d.startsWith('3')) return '+57' + d;\n  if (d.length === 12 && d.startsWith('57')) return '+' + d;\n  return null;\n}\nfor (let i = 0; i < pending.length; i++) {\n  const b = pending[i].json;\n  const cust = (((lookups[i]||{}).json||{}).results || [])[0] || {};\n  const nameArr = cust.name || [];\n  const body = {\n    locationId: 'jzrg6bPH71ccLohGddsN',\n    firstName: nameArr[0] || 'Cliente',\n    lastName: nameArr.slice(1).join(' ') || b.ced,\n    customFields: [{ id: '4C6TxwNRElYAB1HFkJb4', value: b.ced }]\n  };\n  const phone = normPhone(cust.phones && cust.phones[0] && cust.phones[0].number);\n  const email = cust.contacts && cust.contacts[0] && cust.contacts[0].email;\n  if (phone) body.phone = phone;\n  if (email) body.email = email;\n  out.push({ json: { ...b, createBody: body } });\n}\nreturn out.length ? out : [];"
+      }
+    },
+    {
+      "id": "n12",
+      "name": "Create Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2020,
+        -160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://services.leadconnectorhq.com/contacts/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <GHL_PRIVATE_TOKEN>"
+            },
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.createBody) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 300
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "n13",
+      "name": "Finalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Junta contactos existentes + creados, genera items de acción para los updates\nconst prep = $('Prep Actions').all();\nlet created = [];\ntry { created = $('Create Contact').all(); } catch(e) {}\nconst createdByCed = {};\nfor (let i = 0; i < created.length; i++) {\n  const src = $('Merge Create').all()[i];\n  const cid = (created[i].json.contact && created[i].json.contact.id) || (created[i].json.meta && created[i].json.meta.contactId);\n  if (src && cid) createdByCed[src.json.ced] = cid;\n}\nconst out = [];\nfor (const p of prep) {\n  const b = p.json;\n  const contactId = b.contactId || createdByCed[b.ced];\n  if (!contactId) continue;\n  out.push({ json: { ...b, contactId } });\n}\nreturn out.length ? out : [];"
+      }
+    },
+    {
+      "id": "n14",
+      "name": "Update Fields",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2460,
+        0
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://services.leadconnectorhq.com/contacts/{{ $json.contactId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <GHL_PRIVATE_TOKEN>"
+            },
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ customFields: $json.fields }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 300
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "n15",
+      "name": "Add Tags",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2680,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://services.leadconnectorhq.com/contacts/{{ $('Finalize').item.json.contactId }}/tags",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <GHL_PRIVATE_TOKEN>"
+            },
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tags: $('Finalize').item.json.tags }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 300
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "n16",
+      "name": "Gen Notes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2900,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Un item por nota (contactId + texto)\nconst out = [];\nfor (const p of $input.all()) {\n  for (const nota of (p.json.notas || [])) {\n    out.push({ json: { contactId: p.json.contactId, nota } });\n  }\n}\nreturn out.length ? out : [];"
+      }
+    },
+    {
+      "id": "n17",
+      "name": "Add Notes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://services.leadconnectorhq.com/contacts/{{ $json.contactId }}/notes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <GHL_PRIVATE_TOKEN>"
+            },
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: $json.nota }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 300
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "n18",
+      "name": "Mark Processed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3340,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Marca las facturas como procesadas en staticData\nconst sd = $getWorkflowStaticData('global');\nif (!sd.ghlEnriquecidas) sd.ghlEnriquecidas = {};\nlet count = 0;\nfor (const p of $('Finalize').all()) {\n  for (const id of (p.json.invoiceIds || [])) { sd.ghlEnriquecidas[id] = Date.now(); count++; }\n}\nreturn [{ json: { procesadas: count, ts: new Date().toISOString() } }];"
+      }
     }
-   }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Auth Siigo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Siigo": {
+      "main": [
+        [
+          {
+            "node": "Gen Product Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gen Product Pages": {
+      "main": [
+        [
+          {
+            "node": "Get Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Products": {
+      "main": [
+        [
+          {
+            "node": "Get New Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get New Invoices": {
+      "main": [
+        [
+          {
+            "node": "Build Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Items": {
+      "main": [
+        [
+          {
+            "node": "Search GHL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search GHL": {
+      "main": [
+        [
+          {
+            "node": "Prep Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Actions": {
+      "main": [
+        [
+          {
+            "node": "Filter Creates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Creates": {
+      "main": [
+        [
+          {
+            "node": "Get Siigo Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Siigo Customer": {
+      "main": [
+        [
+          {
+            "node": "Merge Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Create": {
+      "main": [
+        [
+          {
+            "node": "Create Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Contact": {
+      "main": [
+        [
+          {
+            "node": "Finalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize": {
+      "main": [
+        [
+          {
+            "node": "Update Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Fields": {
+      "main": [
+        [
+          {
+            "node": "Add Tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Tags": {
+      "main": [
+        [
+          {
+            "node": "Gen Notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gen Notes": {
+      "main": [
+        [
+          {
+            "node": "Add Notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Notes": {
+      "main": [
+        [
+          {
+            "node": "Mark Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  {
-   "id": "n18",
-   "name": "Mark Processed",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    3340,
-    0
-   ],
-   "parameters": {
-    "mode": "runOnceForAllItems",
-    "jsCode": "// Marca las facturas como procesadas en staticData\nconst sd = $getWorkflowStaticData('global');\nif (!sd.ghlEnriquecidas) sd.ghlEnriquecidas = {};\nlet count = 0;\nfor (const p of $('Finalize').all()) {\n  for (const id of (p.json.invoiceIds || [])) { sd.ghlEnriquecidas[id] = Date.now(); count++; }\n}\nreturn [{ json: { procesadas: count, ts: new Date().toISOString() } }];"
-   }
+  "settings": {
+    "executionOrder": "v1"
   }
- ],
- "connections": {
-  "Schedule": {
-   "main": [
-    [
-     {
-      "node": "Auth Siigo",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Auth Siigo": {
-   "main": [
-    [
-     {
-      "node": "Gen Product Pages",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Gen Product Pages": {
-   "main": [
-    [
-     {
-      "node": "Get Products",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Get Products": {
-   "main": [
-    [
-     {
-      "node": "Get New Invoices",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Get New Invoices": {
-   "main": [
-    [
-     {
-      "node": "Build Items",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Build Items": {
-   "main": [
-    [
-     {
-      "node": "Search GHL",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Search GHL": {
-   "main": [
-    [
-     {
-      "node": "Prep Actions",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Prep Actions": {
-   "main": [
-    [
-     {
-      "node": "Filter Creates",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Filter Creates": {
-   "main": [
-    [
-     {
-      "node": "Get Siigo Customer",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Get Siigo Customer": {
-   "main": [
-    [
-     {
-      "node": "Merge Create",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Merge Create": {
-   "main": [
-    [
-     {
-      "node": "Create Contact",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Create Contact": {
-   "main": [
-    [
-     {
-      "node": "Finalize",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Finalize": {
-   "main": [
-    [
-     {
-      "node": "Update Fields",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Update Fields": {
-   "main": [
-    [
-     {
-      "node": "Add Tags",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Add Tags": {
-   "main": [
-    [
-     {
-      "node": "Gen Notes",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Gen Notes": {
-   "main": [
-    [
-     {
-      "node": "Add Notes",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Add Notes": {
-   "main": [
-    [
-     {
-      "node": "Mark Processed",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  }
- },
- "settings": {
-  "executionOrder": "v1",
-  "callerPolicy": "workflowsFromSameOwner",
-  "availableInMCP": false,
-  "errorWorkflow": "iVi686P2BTWp2nFg"
- }
 }

@@ -1,119 +1,117 @@
 {
- "name": "CHUCULAT | Get Logs",
- "nodes": [
-  {
-   "parameters": {
-    "path": "get-logs",
-    "responseMode": "responseNode",
-    "options": {}
-   },
-   "id": "gl-n1",
-   "name": "Webhook",
-   "type": "n8n-nodes-base.webhook",
-   "typeVersion": 2,
-   "position": [
-    240,
-    304
-   ],
-   "webhookId": "chuculat-get-logs-001"
-  },
-  {
-   "parameters": {
-    "url": "https://wavqyesyqqmawjfaztvb.supabase.co/rest/v1/puntos_log?select=*&order=timestamp.asc&limit=100000",
-    "sendHeaders": true,
-    "headerParameters": {
-     "parameters": [
-      {
-       "name": "apikey",
-       "value": "<SUPABASE_SERVICE_ROLE>"
+  "name": "CHUCULAT | Get Logs",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "get-logs",
+        "responseMode": "responseNode",
+        "options": {}
       },
-      {
-       "name": "Authorization",
-       "value": "Bearer <SUPABASE_SERVICE_ROLE>"
-      }
-     ]
+      "id": "gl-n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        304
+      ],
+      "webhookId": "chuculat-get-logs-001"
     },
-    "options": {}
-   },
-   "id": "sb-get",
-   "name": "Get Supabase",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    460,
-    300
-   ],
-   "retryOnFail": true,
-   "maxTries": 3,
-   "waitBetweenTries": 2000
+    {
+      "parameters": {
+        "url": "https://wavqyesyqqmawjfaztvb.supabase.co/rest/v1/puntos_log?select=*&order=timestamp.asc&limit=100000",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "<JWT_REDACTED>"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer <JWT_REDACTED>"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "sb-get",
+      "name": "Get Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const items=$input.all();\nlet rows=[];\nif(items.length>1){rows=items.map(i=>i.json);}else if(items.length===1){const j=items[0].json;rows=Array.isArray(j)?j:(Array.isArray(j.data)?j.data:[j]);}\nconst logs=rows.filter(r=>r&&r.tipo).map(r=>({id:r.ext_id||r.id,timestamp:r.timestamp,date:r.fecha,type:r.tipo,contactId:r.contact_id,contactName:r.contact_name,phone:r.phone,points:r.points,source:r.source,invoiceId:r.invoice_id,siigoId:r.siigo_id,items:r.items||null}));\nreturn [{ json: { logs } }];"
+      },
+      "id": "sb-map",
+      "name": "Mapear",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "sb-resp",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Supabase": {
+      "main": [
+        [
+          {
+            "node": "Mapear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapear": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  {
-   "parameters": {
-    "jsCode": "const items=$input.all();\nlet rows=[];\nif(items.length>1){rows=items.map(i=>i.json);}else if(items.length===1){const j=items[0].json;rows=Array.isArray(j)?j:(Array.isArray(j.data)?j.data:[j]);}\nconst logs=rows.filter(r=>r&&r.tipo).map(r=>({id:r.ext_id||r.id,timestamp:r.timestamp,date:r.fecha,type:r.tipo,contactId:r.contact_id,contactName:r.contact_name,phone:r.phone,points:r.points,source:r.source,invoiceId:r.invoice_id,siigoId:r.siigo_id,items:r.items||null}));\nreturn [{ json: { logs } }];"
-   },
-   "id": "sb-map",
-   "name": "Mapear",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    680,
-    300
-   ]
-  },
-  {
-   "parameters": {
-    "respondWith": "json",
-    "responseBody": "={{ JSON.stringify($json) }}",
-    "options": {}
-   },
-   "id": "sb-resp",
-   "name": "Responder",
-   "type": "n8n-nodes-base.respondToWebhook",
-   "typeVersion": 1,
-   "position": [
-    900,
-    300
-   ]
+  "settings": {
+    "executionOrder": "v1"
   }
- ],
- "connections": {
-  "Webhook": {
-   "main": [
-    [
-     {
-      "node": "Get Supabase",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Get Supabase": {
-   "main": [
-    [
-     {
-      "node": "Mapear",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Mapear": {
-   "main": [
-    [
-     {
-      "node": "Responder",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  }
- },
- "settings": {
-  "executionOrder": "v1",
-  "callerPolicy": "workflowsFromSameOwner",
-  "availableInMCP": false
- }
 }
