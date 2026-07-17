@@ -1,726 +1,730 @@
 {
-  "name": "CHUCULAT | Dashboard Ventas Siigo",
-  "nodes": [
-    {
-      "parameters": {
-        "path": "get-ventas",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "n01",
-      "name": "Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        -80,
-        -16
-      ],
-      "webhookId": "chuculat-ventas-v2"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.siigo.com/auth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{\"username\":\"<SIIGO_USERNAME>\",\"access_key\":\"<SIIGO_ACCESS_KEY>\"}",
-        "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 1,
-              "batchInterval": 400
-            }
-          }
-        }
-      },
-      "id": "n02",
-      "name": "Auth Siigo",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        224,
-        304
-      ],
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 3000
-    },
-    {
-      "parameters": {
-        "jsCode": "const query = $('Webhook').first().json.query || {};\nconst today = new Date().toISOString().split('T')[0];\nconst year = String(query.year || new Date().getFullYear());\nconst dateStart = query.date_start || (year + '-01-01');\nconst rawEnd = query.date_end || (year + '-12-31');\nconst dateEnd = rawEnd > today ? today : rawEnd;\nconst monthStart = today.slice(0,8) + '01';\n// Historico viene del archivo; en vivo solo el mes actual\nconst productPages = [1,2,3,4,5].map(p => ({ page:p, pageSize:100, dateStart, dateEnd, monthStart, fetchStart: monthStart }));\nreturn productPages.map(p => ({ json: p }));"
-      },
-      "id": "n03",
-      "name": "Setup",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        448,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Productos + Clientes de Siigo, CACHEADOS en staticData.\n// No dependen del filtro de fechas -> antes se re-descargaban (~6s) en cada cambio de rango.\nconst setup = $('Setup').first().json;\nconst token = $('Auth Siigo').first().json.access_token;\nconst H = { Authorization: 'Bearer ' + token, 'Partner-Id': 'n8nApp' };\nconst sd = $getWorkflowStaticData('global');\nconst TTL = 60 * 60 * 1000; // 1 h\n// Version del cache: subir este numero invalida mapsCache al cambiar la logica\n// (p.ej. al agregar la fusion de categorias). Si no, se sirve un mapa viejo.\nconst MAPS_V = 5;\n\nlet productMap, customerMap;\nif (sd.mapsCache && sd.mapsCache.v === MAPS_V && sd.mapsCache.productMap && (Date.now() - sd.mapsCache.ts) < TTL) {\n  productMap  = sd.mapsCache.productMap;\n  customerMap = sd.mapsCache.customerMap;\n} else {\n  // Productos (5 páginas x 100)\n  productMap = {};\n  for (let p = 1; p <= 5; p++) {\n    const res = await this.helpers.httpRequest({ method:'GET',\n      url:'https://api.siigo.com/v1/products?page=' + p + '&page_size=100', headers:H, json:true });\n    for (const it of (res.results || [])) {\n      productMap[String(it.code)] = { name: it.name, category: (it.account_group && it.account_group.name) || 'Sin categoria' };\n    }\n    if (!(res.results || []).length) break;\n  }\n  // Clientes (paginado segun total_results)\n  customerMap = {};\n  const first = await this.helpers.httpRequest({ method:'GET',\n    url:'https://api.siigo.com/v1/customers?page=1&page_size=1', headers:H, json:true });\n  const total = (first.pagination && first.pagination.total_results) || 0;\n  const numPages = Math.ceil(total / 100);\n  for (let p = 1; p <= numPages; p++) {\n    const res = await this.helpers.httpRequest({ method:'GET',\n      url:'https://api.siigo.com/v1/customers?page=' + p + '&page_size=100', headers:H, json:true });\n    for (const c of (res.results || [])) {\n      const digits = String(c.identification || '').replace(/[^0-9]/g, '');\n      if (!digits) continue;\n      const raw = c.name;\n      const name = Array.isArray(raw) ? raw.filter(Boolean).join(' ') : (raw || digits);\n      customerMap[digits] = { name: name || digits,\n        idType: String((c.id_type && c.id_type.code) || ''),\n        personType: String(c.person_type || '') };\n    }\n  }\n  // Categorias propias (tabla productos_categorias en Supabase) pisan al\n  // account_group de Siigo. Siigo no distingue p.ej. BOMBONES de CHUNKS.\n  // Los productos que no esten en la tabla conservan la categoria de Siigo.\n  try {\n    const cats = await this.helpers.httpRequest({ method:'GET',\n      url: 'https://wavqyesyqqmawjfaztvb.supabase.co/rest/v1/productos_categorias?select=code,categoria',\n      headers: { apikey: '<JWT_REDACTED>', Authorization: 'Bearer <JWT_REDACTED>' }, json: true });\n    const mapeados = new Set();  // codigos presentes en productos_categorias\n    for (const r of (Array.isArray(cats) ? cats : [])) {\n      const k = String(r.code || '').trim();\n      if (!k || !r.categoria) continue;\n      const cat = String(r.categoria).trim();\n      mapeados.add(k);\n      if (productMap[k]) productMap[k].category = cat;\n      else productMap[k] = { name: k, category: cat };\n    }\n    // Solo si la tabla respondio: lo que NO este en ella va a 'Sin categoria'.\n    // (Si la tabla fallara, el catch deja las categorias de Siigo y no se\n    //  borra todo por un error de red.)\n    if (mapeados.size > 0) {\n      for (const k of Object.keys(productMap)) {\n        if (!mapeados.has(k)) productMap[k].category = 'Sin categoría';\n      }\n    }\n  } catch (e) { /* si falla, se quedan las categorias de Siigo */ }\n\n  sd.mapsCache = { v: MAPS_V, ts: Date.now(), productMap, customerMap };\n}\n\nreturn [{ json: { productMap, customerMap, dateStart: setup.dateStart, dateEnd: setup.dateEnd,\n  fetchStart: setup.fetchStart, usedHist: setup.usedHist, monthStart: setup.monthStart } }];"
-      },
-      "id": "n05",
-      "name": "Build Product Map",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        880,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "url": "=https://api.siigo.com/v1/invoices?page=1&page_size=1&created_start={{ $json.fetchStart }}T00:00:00&created_end={{ $json.dateEnd }}T23:59:59",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 1,
-              "batchInterval": 400
-            }
-          }
-        }
-      },
-      "id": "n06",
-      "name": "Get Invoice Count",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1104,
-        304
-      ],
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 3000
-    },
-    {
-      "parameters": {
-        "jsCode": "const total = $input.first().json.pagination.total_results || 0;\nconst setup = $('Build Product Map').first().json;\nconst PAGE_SIZE = 100;\nconst numPages = Math.ceil(total / PAGE_SIZE);\nconst pages = [];\nfor (let i = 1; i <= numPages; i++) {\n  pages.push({ json: { page: i, pageSize: PAGE_SIZE, dateStart: setup.dateStart, dateEnd: setup.dateEnd, fetchStart: setup.fetchStart, totalInvoices: total } });\n}\nreturn pages.length > 0 ? pages : [{ json: { page: 1, pageSize: PAGE_SIZE, dateStart: setup.dateStart, dateEnd: setup.dateEnd, fetchStart: setup.fetchStart, totalInvoices: 0 } }];"
-      },
-      "id": "n07",
-      "name": "Gen Invoice Pages",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1328,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "url": "=https://api.siigo.com/v1/invoices?page={{ $json.page }}&page_size={{ $json.pageSize }}&created_start={{ $json.fetchStart }}T00:00:00&created_end={{ $json.dateEnd }}T23:59:59",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 3,
-              "batchInterval": 600
-            }
-          }
-        }
-      },
-      "id": "n08",
-      "name": "Get Invoices",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1552,
-        304
-      ],
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 3000
-    },
-    {
-      "parameters": {
-        "jsCode": "const productMap = $('Build Customer Map').first().json.productMap || {};\r\nconst setup      = $('Build Customer Map').first().json;\r\n\r\n// ── Separar input: páginas de facturas vs resumen de notas crédito ─\r\nconst __allInput = $input.all();\r\nconst __ncItem   = __allInput.find(p => p.json._type === 'nc_summary');\r\nconst allNCs     = __ncItem ? (__ncItem.json.ncs || []) : [];\r\n\r\n// ── Facturas del mes activo (en vivo) ─────────────────────────────\r\nconst liveInvoices = [];\r\nfor (const p of __allInput) {\r\n  if (p.json._type === 'nc_summary') continue;\r\n  for (const inv of (p.json.results || [])) liveInvoices.push(inv);\r\n}\r\n\r\n// ── Facturas históricas (archivo permanente hasta cierre de mes) ──\r\nlet histRows = [];\r\ntry {\r\n  const ph = $('Parse Hist').first().json;\r\n  histRows = Array.isArray(ph) ? ph : (ph.rows || ph.data || []);\r\n} catch (e) { histRows = []; }\r\n\r\n// ── Merge + dedup por id (la versión viva pisa la histórica) ──────\r\nconst byId = {};\r\nfor (const inv of histRows)     byId[inv.id] = inv;\r\nfor (const inv of liveInvoices) byId[inv.id] = inv;\r\nlet invoices = Object.values(byId);\r\n\r\n// ── Filtro por rango solicitado (fecha de factura) ────────────────\r\nconst ds = setup.dateStart, de = setup.dateEnd;\r\nconst invoicesFull = invoices.slice(); // set completo (sin filtro de rango) para \"primera compra\"\r\ninvoices = invoices.filter(inv => { const d = String(inv.date || '').slice(0,10); return d >= ds && d <= de; });\r\n\r\nconst META_ANUAL = 1600000000;\r\nconst TODAY = new Date();\r\nconst customerMap = setup.customerMap || {};\r\n\r\n// NIT colombiano\r\nfunction isNIT(identification) {\r\n  const raw = String(identification || '').trim();\r\n  if (/\\d{8,9}-\\d$/.test(raw)) return true;\r\n  const digits = raw.replace(/[^0-9]/g, '');\r\n  if (digits.length !== 9 && digits.length !== 10) return false;\r\n  return /^(800|811|812|813|820|830|832|860|890|891|892|899|900|901|902)/.test(digits);\r\n}\r\nconst B2B_OVERRIDE_IDS = new Set(['1007703532']);\r\nfunction isCompany(inv) {\r\n  const id     = String((inv.customer && inv.customer.identification) || '');\r\n  const digits = id.replace(/[^0-9]/g, '');\r\n  if (B2B_OVERRIDE_IDS.has(digits)) return true;\r\n  const entry = customerMap[digits];\r\n  if (entry && (entry.idType === '31' || entry.personType === 'Company')) return true;\r\n  if (isNIT(id)) return true;\r\n  const name = String((entry && entry.name) || (inv.customer && inv.customer.name) || '').toLowerCase();\r\n  if (/\\b(s\\.?a\\.?s\\.?|ltda\\.?|s\\.?a\\b|corp|inc|group|grupo|distribu|comercial|industria|soluciones|servicios|hospitality|retail|inversiones|supertienda|supermercados)\\b/i.test(name)) return true;\r\n  return false;\r\n}\r\n// Canal por centro de costo (168=B2C, 166=B2B, 315=Exportación); override empresa en 168 -> B2B\r\nfunction channelOf(inv) {\r\n  const cc = Number(inv.cost_center);\r\n  if (cc === 315) return 'export';\r\n  if (cc === 166) return 'b2b';\r\n  if (cc === 168) return isCompany(inv) ? 'b2b' : 'b2c';\r\n  return null; // 170 planta / 172 admin / otros: no son venta\r\n}\r\n\r\n// Subtotal (sin impuestos) por ítem y por factura: precio × cantidad − descuento\r\nfunction itemSubtotal(it) {\r\n  const base = Number(it.price || 0) * Number(it.quantity || 1);\r\n  const disc = (it.discount && it.discount.value) ? Number(it.discount.value) : 0;\r\n  return base - disc;\r\n}\r\n// Facturas en moneda extranjera (exportación EUR/USD): convertir a COP con la tasa del documento\r\nfunction fxOf(doc) { return (doc.currency && doc.currency.exchange_rate) ? Number(doc.currency.exchange_rate) : 1; }\r\nfunction invSubtotal(inv) { return (inv.items || []).reduce((s, it) => s + itemSubtotal(it), 0) * fxOf(inv); }\r\n\r\nfunction daysSince(d) { if (!d) return 0; return Math.floor((TODAY - new Date(d)) / 86400000); }\r\nfunction agingBucket(x) { if (x>180) return '>180'; if (x>120) return '>120'; if (x>90) return '>90'; if (x>31) return '>31'; return 'por_vencer'; }\r\n\r\nconst byCategory = {}, byMonth = {}, byProduct = {}, byCustomer = {};\r\nconst expByMonth = {}, expByProduct = {}, expByCustomer = {};\r\nconst catMonth = {}, prodMonth = {};   // pivots: categoria/producto x mes\r\nconst monthsSet = {};\r\nconst carteraFacturas = [];\r\nlet totalB2C = 0, totalB2B = 0, totalExport = 0, totalImpuestos = 0;\r\n\r\nfor (const inv of invoices) {\r\n  const ch = channelOf(inv);\r\n  if (!ch) continue;                       // ignora planta/admin\r\n  const date  = String(inv.date || '');\r\n  const month = date.slice(0, 7);\r\n  const sub   = invSubtotal(inv);          // ← BASE: subtotal sin IVA\r\n  const custId   = String((inv.customer && inv.customer.identification) || inv.id || 'desconocido');\r\n  const __ce     = customerMap[custId.replace(/[^0-9]/g, '')];\r\n  const custName = (__ce && __ce.name) || (inv.customer && inv.customer.name) || custId;\r\n\r\n  if (month) monthsSet[month] = 1;\r\n\r\n  if (ch === 'export') totalExport += sub;\r\n  else if (ch === 'b2b') totalB2B += sub;\r\n  else totalB2C += sub;\r\n\r\n  // Impuestos (informativo)\r\n  const __fx = fxOf(inv);\r\n  for (const it of (inv.items || [])) totalImpuestos += (it.taxes || []).reduce((s,t)=>s+Number(t.value||0),0) * __fx;\r\n\r\n  // Cartera (proporcional al subtotal): pendiente_sub = balance * sub/total\r\n  const balance = Number(inv.balance || 0);\r\n  if (balance > 0 && (ch === 'b2b' || ch === 'export')) {\r\n    const tot = Number(inv.total || 0);\r\n    const pendSub = tot > 0 ? balance * (sub / tot) : balance;\r\n    const dias = daysSince(date);\r\n    carteraFacturas.push({\r\n      numero: inv.name || '', fecha: date, cliente: custName, nit: custId, canal: ch,\r\n      total: Math.round(sub), pendiente: Math.round(pendSub),\r\n      diasVencido: dias, bucket: agingBucket(dias)\r\n    });\r\n  }\r\n\r\n  // Mensual global\r\n  if (!byMonth[month]) byMonth[month] = { total:0, facturas:0, b2b:0, b2c:0, export:0 };\r\n  byMonth[month].total += sub; byMonth[month].facturas += 1;\r\n  if (ch==='export') byMonth[month].export += sub; else if (ch==='b2b') byMonth[month].b2b += sub; else byMonth[month].b2c += sub;\r\n\r\n  // Cliente global\r\n  if (!byCustomer[custId]) byCustomer[custId] = { identification:custId, name:custName, canal:ch, totalCompras:0, facturas:0, ultimaCompra:'', primeraCompra:'' };\r\n  byCustomer[custId].totalCompras += sub; byCustomer[custId].facturas += 1;\r\n  if (!byCustomer[custId].ultimaCompra  || date > byCustomer[custId].ultimaCompra)  byCustomer[custId].ultimaCompra  = date;\r\n  if (!byCustomer[custId].primeraCompra || date < byCustomer[custId].primeraCompra) byCustomer[custId].primeraCompra = date;\r\n\r\n  // Productos / categorías (global) + exportación aparte\r\n  for (const it of (inv.items || [])) {\r\n    const code = String(it.code || '');\r\n    const prod = productMap[code] || { name: it.description || code, category: 'Sin categoria' };\r\n    const s = itemSubtotal(it) * __fx, q = Number(it.quantity || 1);\r\n\r\n    if (!byCategory[prod.category]) byCategory[prod.category] = { subtotal:0, qty:0, facturas:0 };\r\n    byCategory[prod.category].subtotal += s; byCategory[prod.category].qty += q; byCategory[prod.category].facturas += 1;\r\n\r\n    if (!byProduct[code]) byProduct[code] = { code, name:prod.name, category:prod.category, subtotal:0, qty:0, facturas:0 };\r\n    byProduct[code].subtotal += s; byProduct[code].qty += q; byProduct[code].facturas += 1;\r\n\r\n    // Pivots x mes\r\n    if (month) {\r\n      if (!catMonth[prod.category]) catMonth[prod.category] = {};\r\n      if (!catMonth[prod.category][month]) catMonth[prod.category][month] = { subtotal:0, qty:0 };\r\n      catMonth[prod.category][month].subtotal += s; catMonth[prod.category][month].qty += q;\r\n      if (!prodMonth[code]) prodMonth[code] = { code, name:prod.name, category:prod.category, m:{} };\r\n      if (!prodMonth[code].m[month]) prodMonth[code].m[month] = { subtotal:0, qty:0 };\r\n      prodMonth[code].m[month].subtotal += s; prodMonth[code].m[month].qty += q;\r\n    }\r\n\r\n    if (ch === 'export') {\r\n      if (!expByProduct[code]) expByProduct[code] = { code, name:prod.name, category:prod.category, subtotal:0, qty:0, facturas:0 };\r\n      expByProduct[code].subtotal += s; expByProduct[code].qty += q; expByProduct[code].facturas += 1;\r\n    }\r\n  }\r\n\r\n  // Exportación: mensual y clientes\r\n  if (ch === 'export') {\r\n    if (!expByMonth[month]) expByMonth[month] = { total:0, facturas:0 };\r\n    expByMonth[month].total += sub; expByMonth[month].facturas += 1;\r\n    if (!expByCustomer[custId]) expByCustomer[custId] = { identification:custId, name:custName, totalCompras:0, facturas:0, ultimaCompra:'', primeraCompra:'' };\r\n    expByCustomer[custId].totalCompras += sub; expByCustomer[custId].facturas += 1;\r\n    if (!expByCustomer[custId].ultimaCompra  || date > expByCustomer[custId].ultimaCompra)  expByCustomer[custId].ultimaCompra  = date;\r\n    if (!expByCustomer[custId].primeraCompra || date < expByCustomer[custId].primeraCompra) expByCustomer[custId].primeraCompra = date;\r\n  }\r\n}\r\n\r\n// ── Netear Notas Crédito del período (totales, meses, productos, pivots) ──\r\nconst ncsInRange = allNCs.filter(nc => {\r\n  const d = String(nc.date || '').slice(0,10);\r\n  return d >= ds && d <= de;\r\n});\r\nfor (const nc of ncsInRange) {\r\n  const ch = channelOf(nc);\r\n  if (!ch) continue;\r\n  const ncFx  = fxOf(nc);\r\n  const ncSub = (nc.items || []).reduce((s, it) => s + itemSubtotal(it), 0) * ncFx;\r\n  if (ch === 'export') totalExport -= ncSub;\r\n  else if (ch === 'b2b') totalB2B -= ncSub;\r\n  else totalB2C -= ncSub;\r\n\r\n  const month = String(nc.date || '').slice(0, 7);\r\n  if (byMonth[month]) {\r\n    byMonth[month].total -= ncSub;\r\n    if (ch === 'export') byMonth[month].export -= ncSub;\r\n    else if (ch === 'b2b') byMonth[month].b2b -= ncSub;\r\n    else byMonth[month].b2c -= ncSub;\r\n  }\r\n\r\n  // Restar por producto / categoría / pivots (igual que el reporte de Siigo)\r\n  for (const it of (nc.items || [])) {\r\n    const code = String(it.code || '');\r\n    const prod = productMap[code] || { name: it.description || code, category: 'Sin categoria' };\r\n    const s = itemSubtotal(it) * ncFx, q = Number(it.quantity || 1);\r\n    if (byCategory[prod.category]) { byCategory[prod.category].subtotal -= s; byCategory[prod.category].qty -= q; }\r\n    if (byProduct[code]) { byProduct[code].subtotal -= s; byProduct[code].qty -= q; }\r\n    if (month && catMonth[prod.category] && catMonth[prod.category][month]) {\r\n      catMonth[prod.category][month].subtotal -= s; catMonth[prod.category][month].qty -= q;\r\n    }\r\n    if (month && prodMonth[code] && prodMonth[code].m[month]) {\r\n      prodMonth[code].m[month].subtotal -= s; prodMonth[code].m[month].qty -= q;\r\n    }\r\n    if (ch === 'export' && expByProduct[code]) { expByProduct[code].subtotal -= s; expByProduct[code].qty -= q; }\r\n  }\r\n\r\n  // Restar del cliente y de exportación mensual\r\n  const ncCed = String((nc.customer && nc.customer.identification) || '');\r\n  if (ncCed && byCustomer[ncCed]) byCustomer[ncCed].totalCompras -= ncSub;\r\n  if (ch === 'export') {\r\n    if (expByMonth[month]) expByMonth[month].total -= ncSub;\r\n    if (ncCed && expByCustomer[ncCed]) expByCustomer[ncCed].totalCompras -= ncSub;\r\n  }\r\n}\r\n\r\n// ── Compras Destacadas (solo B2C, insumo para campañas) ──────────\r\nconst GEN_IDS = new Set(['222222222222', '7777777777777']);\r\nconst esModDest = nm => /^(sel\\s|no aplica)/i.test(nm);\r\nconst b2cInvs = invoices.filter(inv => channelOf(inv) === 'b2c');\r\n\r\n// Cross-sell: se descartan las parejas que incluyan bombones, su propio estuche\r\n// (Caja bom pre, 304) o los chocolates CH / CH DE MESA. Son cruces triviales\r\n// (los bombones se venden surtidos DENTRO de esa caja; los CH son el chocolate\r\n// que va DENTRO de la bebida) y tapaban los cruces realmente accionables.\r\n// Solo afecta a 'parejas'; estos productos siguen contando en el resto.\r\n// Ojo: /^CH(\\s|$)/ y no startsWith('CH'), para no arrastrar CHUNKS.\r\nconst CROSS_SKIP_CODES = new Set(['304']);\r\nconst fueraDeCrossSell = (code, cat) =>\r\n  CROSS_SKIP_CODES.has(String(code)) ||\r\n  String(cat || '').toUpperCase() === 'BOMBONES' ||\r\n  /^CH(\\s|$)/i.test(String(cat || ''));\r\n\r\nconst dProdMes = {}, dProdCli = {}, dPares = {}, dCust = {};\r\nfor (const inv of b2cInvs) {\r\n  const fx  = fxOf(inv);\r\n  const mes = String(inv.date || '').slice(0, 7);\r\n  const dia = String(inv.date || '').slice(0, 10);\r\n  const cedRaw = String((inv.customer && inv.customer.identification) || '').replace(/[^0-9]/g, '');\r\n  const ced = (cedRaw && !GEN_IDS.has(cedRaw)) ? cedRaw : null;\r\n  const ceD = ced ? customerMap[ced] : null;\r\n  const cliName = (ceD && ceD.name) || ced || '';\r\n  const nombresFactura = new Set();\r\n  for (const it of (inv.items || [])) {\r\n    const s = itemSubtotal(it) * fx;\r\n    if (s <= 0) continue;\r\n    const prodD = productMap[String(it.code || '')] || { name: it.description || it.code };\r\n    if (esModDest(prodD.name)) continue;\r\n    const q = Number(it.quantity || 1);\r\n    const codeK = String(it.code || prodD.name);\r\n    if (!dProdMes[codeK]) dProdMes[codeK] = { code: codeK, name: prodD.name, total: 0, meses: {} };\r\n    dProdMes[codeK].total += s;\r\n    if (!dProdMes[codeK].meses[mes]) dProdMes[codeK].meses[mes] = { qty: 0, subtotal: 0 };\r\n    dProdMes[codeK].meses[mes].qty += q; dProdMes[codeK].meses[mes].subtotal += s;\r\n    if (ced) {\r\n      if (!dProdCli[codeK]) dProdCli[codeK] = {};\r\n      if (!dProdCli[codeK][ced]) dProdCli[codeK][ced] = { ced, name: cliName, qty: 0, subtotal: 0 };\r\n      dProdCli[codeK][ced].qty += q; dProdCli[codeK][ced].subtotal += s;\r\n    }\r\n    if (!fueraDeCrossSell(codeK, prodD.category)) nombresFactura.add(prodD.name);\r\n  }\r\n  const arrN = [...nombresFactura].sort();\r\n  for (let i = 0; i < arrN.length; i++)\r\n    for (let j = i + 1; j < arrN.length; j++) {\r\n      const k = arrN[i] + '|||' + arrN[j];\r\n      dPares[k] = (dPares[k] || 0) + 1;\r\n    }\r\n  if (ced) {\r\n    if (!dCust[ced]) dCust[ced] = { ced, name: cliName, total: 0, compras: 0, ultima: '' };\r\n    dCust[ced].total += invSubtotal(inv); dCust[ced].compras += 1;\r\n    if (dia > dCust[ced].ultima) dCust[ced].ultima = dia;\r\n  }\r\n}\r\nconst dTop = Object.values(dProdMes).sort((a, b) => b.total - a.total);\r\nconst dst_productosPorMes = dTop.slice(0, 8).map(p => ({\r\n  code: p.code, name: p.name, total: Math.round(p.total),\r\n  series: Object.entries(p.meses).sort((a, b) => a[0].localeCompare(b[0]))\r\n    .map(e => ({ mes: e[0], qty: Math.round(e[1].qty * 100) / 100, subtotal: Math.round(e[1].subtotal) }))\r\n}));\r\nconst dst_clientesPorProducto = dTop.slice(0, 30).map(p => ({\r\n  code: p.code, name: p.name, total: Math.round(p.total),\r\n  clientes: Object.values(dProdCli[p.code] || {}).sort((a, b) => b.subtotal - a.subtotal).slice(0, 10)\r\n    .map(c => ({ name: c.name, ced: c.ced, qty: Math.round(c.qty * 100) / 100, subtotal: Math.round(c.subtotal) }))\r\n}));\r\nconst dst_parejas = Object.entries(dPares).sort((a, b) => b[1] - a[1]).slice(0, 15)\r\n  .map(e => { const p = e[0].split('|||'); return { a: p[0], b: p[1], veces: e[1] }; });\r\nconst dst_reactivar = Object.values(dCust)\r\n  .filter(c => c.ultima && (TODAY - new Date(c.ultima)) / 86400000 > 60)\r\n  .sort((a, b) => b.total - a.total).slice(0, 30)\r\n  .map(c => ({ name: c.name, ced: c.ced, total: Math.round(c.total), compras: c.compras,\r\n    ultima: c.ultima, diasSin: Math.floor((TODAY - new Date(c.ultima)) / 86400000) }));\r\nconst dPrimera = {};\r\nfor (const inv of invoicesFull) {\r\n  const cf = String((inv.customer && inv.customer.identification) || '').replace(/[^0-9]/g, '');\r\n  if (!cf || GEN_IDS.has(cf)) continue;\r\n  const df = String(inv.date || '').slice(0, 10);\r\n  if (!dPrimera[cf] || df < dPrimera[cf]) dPrimera[cf] = df;\r\n}\r\nconst dNR = {}, dVistos = {};\r\nfor (const inv of b2cInvs) {\r\n  const cf = String((inv.customer && inv.customer.identification) || '').replace(/[^0-9]/g, '');\r\n  if (!cf || GEN_IDS.has(cf)) continue;\r\n  const mesNR = String(inv.date || '').slice(0, 7);\r\n  if (!dVistos[mesNR]) dVistos[mesNR] = {};\r\n  if (dVistos[mesNR][cf]) continue;\r\n  dVistos[mesNR][cf] = true;\r\n  if (!dNR[mesNR]) dNR[mesNR] = { nuevos: 0, recurrentes: 0 };\r\n  if (String(dPrimera[cf] || '').slice(0, 7) === mesNR) dNR[mesNR].nuevos++;\r\n  else dNR[mesNR].recurrentes++;\r\n}\r\nconst dst_nuevosRecurrentes = Object.entries(dNR).sort((a, b) => a[0].localeCompare(b[0]))\r\n  .map(e => ({ mes: e[0], nuevos: e[1].nuevos, recurrentes: e[1].recurrentes }));\r\n\r\nconst totalGeneral = totalB2C + totalB2B + totalExport;\r\n\r\nconst categorias = Object.entries(byCategory).map(([cat,v]) => ({ categoria:cat, subtotal:Math.round(v.subtotal), qty:v.qty, facturas:v.facturas })).sort((a,b)=>b.subtotal-a.subtotal);\r\nconst catTotal = categorias.reduce((s,c)=>s+c.subtotal,0);\r\ncategorias.forEach(c=>{ c.pct = catTotal>0 ? Math.round(c.subtotal/catTotal*1000)/10 : 0; });\r\n\r\nconst meses = Object.entries(byMonth).sort((a,b)=>a[0].localeCompare(b[0])).map(([mes,v])=>({ mes, total:Math.round(v.total), facturas:v.facturas, b2b:Math.round(v.b2b), b2c:Math.round(v.b2c), export:Math.round(v.export) }));\r\n\r\nconst todosProductos = Object.values(byProduct).sort((a,b)=>b.subtotal-a.subtotal).map(p=>({ code:p.code, name:p.name, category:p.category, subtotal:Math.round(p.subtotal), qty:p.qty, facturas:p.facturas }));\r\n\r\nconst carteraResumen = {\r\n  totalDeuda: Math.round(carteraFacturas.reduce((s,c)=>s+c.pendiente,0)),\r\n  masde180: Math.round(carteraFacturas.filter(c=>c.diasVencido>180).reduce((s,c)=>s+c.pendiente,0)),\r\n  masde120: Math.round(carteraFacturas.filter(c=>c.diasVencido>120&&c.diasVencido<=180).reduce((s,c)=>s+c.pendiente,0)),\r\n  masde90:  Math.round(carteraFacturas.filter(c=>c.diasVencido>90&&c.diasVencido<=120).reduce((s,c)=>s+c.pendiente,0)),\r\n  masde31:  Math.round(carteraFacturas.filter(c=>c.diasVencido>31&&c.diasVencido<=90).reduce((s,c)=>s+c.pendiente,0)),\r\n  porVencer:Math.round(carteraFacturas.filter(c=>c.diasVencido<=31).reduce((s,c)=>s+c.pendiente,0)),\r\n};\r\nconst byCli = {};\r\nfor (const c of carteraFacturas) {\r\n  if (!byCli[c.nit]) byCli[c.nit] = { cliente:c.cliente, nit:c.nit, deudaTotal:0, masde180:0, masde120:0, masde90:0, masde31:0, porVencer:0, facturas:0 };\r\n  const b = byCli[c.nit]; b.deudaTotal += c.pendiente; b.facturas += 1;\r\n  if (c.diasVencido>180) b.masde180+=c.pendiente; else if (c.diasVencido>120) b.masde120+=c.pendiente; else if (c.diasVencido>90) b.masde90+=c.pendiente; else if (c.diasVencido>31) b.masde31+=c.pendiente; else b.porVencer+=c.pendiente;\r\n}\r\nconst carteraPorCliente = Object.values(byCli).sort((a,b)=>b.deudaTotal-a.deudaTotal).map(c=>({ ...c, deudaTotal:Math.round(c.deudaTotal), masde180:Math.round(c.masde180), masde120:Math.round(c.masde120), masde90:Math.round(c.masde90), masde31:Math.round(c.masde31), porVencer:Math.round(c.porVencer) }));\r\n\r\nconst clientesB2B = Object.values(byCustomer).filter(c=>c.canal==='b2b').sort((a,b)=>b.totalCompras-a.totalCompras).map(c=>({ ...c, totalCompras:Math.round(c.totalCompras) }));\r\nconst clientesB2C = Object.values(byCustomer).filter(c=>c.canal==='b2c').map(c=>({ ...c, totalCompras:Math.round(c.totalCompras) }));\r\n\r\n// Exportación\r\nconst expMeses = Object.entries(expByMonth).sort((a,b)=>a[0].localeCompare(b[0])).map(([mes,v])=>({ mes, total:Math.round(v.total), facturas:v.facturas }));\r\nconst expProductos = Object.values(expByProduct).sort((a,b)=>b.subtotal-a.subtotal).map(p=>({ code:p.code, name:p.name, category:p.category, subtotal:Math.round(p.subtotal), qty:p.qty, facturas:p.facturas }));\r\nconst expClientes = Object.values(expByCustomer).sort((a,b)=>b.totalCompras-a.totalCompras).map(c=>({ ...c, totalCompras:Math.round(c.totalCompras) }));\r\n\r\nconst __payload = {\r\n  meta: { dateStart:setup.dateStart, dateEnd:setup.dateEnd, totalFacturas:invoices.filter(i=>channelOf(i)).length, totalNCs:ncsInRange.length, generadoEn:new Date().toISOString(), base:'subtotal_neto' },\r\n  resumen: {\r\n    totalGeneral:Math.round(totalGeneral), totalB2C:Math.round(totalB2C), totalB2B:Math.round(totalB2B), totalExport:Math.round(totalExport),\r\n    totalSubtotal:Math.round(totalGeneral), totalImpuestos:Math.round(totalImpuestos),\r\n    cumplimientoPct: totalGeneral>0 ? Math.round(totalGeneral/META_ANUAL*1000)/10 : 0,\r\n    metaAnual:META_ANUAL, diferenciaMeta:Math.round(META_ANUAL-totalGeneral)\r\n  },\r\n  categorias, meses,\r\n  top10Productos: todosProductos.slice(0,10), todosProductos,\r\n  carteraB2B: carteraFacturas.sort((a,b)=>b.pendiente-a.pendiente), carteraResumen, carteraPorCliente,\r\n  clientesB2B, clientesB2C, totalClientesB2B:clientesB2B.length, totalClientesB2C:clientesB2C.length,\r\n  exportacion: {\r\n    total: Math.round(totalExport), facturas: invoices.filter(i=>channelOf(i)==='export').length,\r\n    meses: expMeses, productos: expProductos, top10Productos: expProductos.slice(0,10),\r\n    clientes: expClientes, totalClientes: expClientes.length\r\n  },\r\n  destacadas: {\r\n    productosPorMes: dst_productosPorMes,\r\n    clientesPorProducto: dst_clientesPorProducto,\r\n    parejas: dst_parejas,\r\n    reactivar: dst_reactivar,\r\n    nuevosRecurrentes: dst_nuevosRecurrentes\r\n  },\r\n  pivot: {\r\n    meses: Object.keys(monthsSet).sort(),\r\n    categorias: Object.entries(catMonth).map(([cat, mm]) => {\r\n      const meses = {}; let tSub = 0, tQty = 0;\r\n      for (const [m, v] of Object.entries(mm)) { meses[m] = { subtotal: Math.round(v.subtotal), qty: Math.round(v.qty) }; tSub += v.subtotal; tQty += v.qty; }\r\n      return { categoria: cat, totalSubtotal: Math.round(tSub), totalQty: Math.round(tQty), meses };\r\n    }).sort((a,b)=>b.totalSubtotal-a.totalSubtotal),\r\n    productos: Object.values(prodMonth).map(p => {\r\n      const meses = {}; let tSub = 0, tQty = 0;\r\n      for (const [m, v] of Object.entries(p.m)) { meses[m] = { subtotal: Math.round(v.subtotal), qty: Math.round(v.qty) }; tSub += v.subtotal; tQty += v.qty; }\r\n      return { code: p.code, name: p.name, categoria: p.category, totalSubtotal: Math.round(tSub), totalQty: Math.round(tQty), meses };\r\n    }).sort((a,b)=>b.totalSubtotal-a.totalSubtotal),\r\n    centros: meses.map(m => ({ mes: m.mes, b2c: m.b2c, b2b: m.b2b, export: m.export, total: m.total }))\r\n  }\r\n};\r\n\r\n// Cache 10 min (evita rate limits en recargas)\r\nconst __sd = $getWorkflowStaticData('global');\r\nconst __q = $('Webhook').first().json.query || {};\r\n__sd.ventasCache = { key:(__q.date_start||'')+'|'+(__q.date_end||''), ts:Date.now(), payload:__payload };\r\nreturn [{ json: __payload }];\r\n"
-      },
-      "id": "n09",
-      "name": "Compute Stats",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1760,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($json) }}",
-        "options": {
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "name": "Access-Control-Allow-Origin",
-                "value": "*"
-              }
-            ]
-          }
-        }
-      },
-      "id": "n10",
-      "name": "Respond",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        1984,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Passthrough: los mapas ya vienen cacheados de Build Product Map.\n// Se conserva este nodo porque Compute Stats lo referencia por nombre.\nreturn [{ json: $('Build Product Map').first().json }];"
-      },
-      "id": "n14",
-      "name": "Build Customer Map",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1552,
-        544
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const sd = $getWorkflowStaticData('global');\n// Limpieza de datos legados que inflan staticData\nif (sd.histInvoices) delete sd.histInvoices;\r\nif (sd.liveCache) delete sd.liveCache;   // huerfano de un experimento revertido (inflaba staticData)\nconst q = $input.first().json.query || {};\nconst key = (q.date_start || '') + '|' + (q.date_end || '');\nconst TTL = 60 * 60 * 1000; // 60 minutos (se mantiene caliente con pre-warm)\nconst c = sd.ventasCache;\nif (c && c.key === key && (Date.now() - c.ts) < TTL && c.payload) {\n  return [{ json: { __cached: true, payload: c.payload } }];\n}\nreturn [{ json: { __cached: false, query: q } }];"
-      },
-      "id": "ncache1",
-      "name": "Check Cache",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -608,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $json.__cached }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "nif1",
-      "name": "Cache Fresh?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        -448,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($json.payload) }}",
-        "options": {
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "name": "Access-Control-Allow-Origin",
-                "value": "*"
-              }
-            ]
-          }
-        }
-      },
-      "id": "nrc1",
-      "name": "Respond Cached",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        -304,
-        208
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Histórico desde Supabase (columna raw = factura Siigo completa).\n// Solo baja el RANGO pedido (antes bajaba las ~10.5k facturas en cada llamada).\nconst SB='https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY='<JWT_REDACTED>';\nconst H={ apikey:KEY, Authorization:'Bearer '+KEY };\n\n// Mismo cálculo de rango que el nodo Setup (este nodo corre antes que él)\nconst q = $('Webhook').first().json.query || {};\nconst today = new Date().toISOString().split('T')[0];\nconst year = String(q.year || new Date().getFullYear());\nconst dateStart = q.date_start || (year + '-01-01');\nconst rawEnd = q.date_end || (year + '-12-31');\nconst dateEnd = rawEnd > today ? today : rawEnd;\n\n// 1) Facturas del rango (payload completo)\nconst rows = [];\n{\n  const step = 1000; let from = 0;\n  const url = SB + '/rest/v1/ventas_invoices?select=raw&fecha=gte.' + dateStart + '&fecha=lte.' + dateEnd + '&order=id.asc';\n  while (true) {\n    const res = await this.helpers.httpRequest({ method:'GET', url,\n      headers:{ ...H, 'Range-Unit':'items', 'Range': from + '-' + (from + step - 1) }, json:true });\n    const arr = Array.isArray(res) ? res : [];\n    for (const r of arr) { if (r && r.raw) rows.push(r.raw); }\n    if (arr.length < step) break;\n    from += step; if (from > 100000) break;\n  }\n}\n\n// 2) Primera compra por cédula: cacheada en staticData (no depende del rango pedido).\n//    Solo cambia cuando entran facturas nuevas a Supabase (cierre mensual / backfill).\nconst sd = $getWorkflowStaticData('global');\nconst PRIMERAS_TTL = 6 * 60 * 60 * 1000; // 6 h\nlet primeras = null;\nif (sd.primerasCache && sd.primerasCache.map && (Date.now() - sd.primerasCache.ts) < PRIMERAS_TTL) {\n  primeras = sd.primerasCache.map;\n} else {\n  primeras = {};\n  const step = 1000; let from = 0;\n  const url = SB + '/rest/v1/ventas_invoices?select=ident:raw->customer->>identification,fecha&order=fecha.asc';\n  while (true) {\n    const res = await this.helpers.httpRequest({ method:'GET', url,\n      headers:{ ...H, 'Range-Unit':'items', 'Range': from + '-' + (from + step - 1) }, json:true });\n    const arr = Array.isArray(res) ? res : [];\n    for (const r of arr) {\n      const cf = String((r && r.ident) || '').replace(/[^0-9]/g, '');\n      const df = String((r && r.fecha) || '').slice(0, 10);\n      if (!cf || !df) continue;\n      if (!primeras[cf] || df < primeras[cf]) primeras[cf] = df;\n    }\n    if (arr.length < step) break;\n    from += step; if (from > 100000) break;\n  }\n  sd.primerasCache = { ts: Date.now(), map: primeras };\n}\n\nreturn [{ json: { rows, count: rows.length, primeras, dateStart, dateEnd } }];"
-      },
-      "id": "histparse01",
-      "name": "Parse Hist",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        420,
-        120
-      ]
-    },
-    {
-      "id": "nc01",
-      "name": "Get NC P1",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        224,
-        560
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "https://api.siigo.com/v1/credit-notes?page=1&page_size=100",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "nc02",
-      "name": "Get NC P2",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        448,
-        560
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "https://api.siigo.com/v1/credit-notes?page=2&page_size=100",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "nc03",
-      "name": "Merge NCs",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        672,
-        560
-      ],
-      "parameters": {
-        "jsCode": "// Page 1 viene desde Get NC P1 (referenciado por nombre)\nlet page1 = [];\ntry { page1 = $('Get NC P1').first().json.results || []; } catch(e) {}\n// Page 2 viene como input directo (desde Get NC P2)\nconst page2 = $input.first().json.results || [];\nconst allNCs = [...page1, ...page2];\nreturn [{ json: { _type: 'nc_summary', ncs: allNCs } }];",
-        "mode": "runOnceForAllItems"
-      }
-    },
-    {
-      "id": "nc04",
-      "name": "Wait for NCs",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 2.1,
-      "position": [
-        1660,
-        400
-      ],
-      "parameters": {
-        "mode": "append"
-      }
-    },
-    {
-      "id": "fv201",
-      "name": "Get FV2 Count",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        896,
-        560
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "https://api.siigo.com/v1/invoices?document_id=30537&page=1&page_size=1",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "fv202",
-      "name": "Gen FV2 Pages",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1120,
-        560
-      ],
-      "parameters": {
-        "jsCode": "const total = $input.first().json.pagination.total_results || 0;\nconst numPages = Math.max(1, Math.ceil(total / 100));\nconst pages = [];\nfor (let i = 1; i <= numPages; i++) pages.push({ json: { page: i } });\nreturn pages;",
-        "mode": "runOnceForAllItems"
-      }
-    },
-    {
-      "id": "fv203",
-      "name": "Get FV2",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1344,
-        560
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "=https://api.siigo.com/v1/invoices?document_id=30537&page={{ $json.page }}&page_size=100",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 1,
-              "batchInterval": 400
-            }
-          }
-        }
-      }
-    },
-    {
-      "id": "fv204",
-      "name": "Merge FV2",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1520,
-        560
-      ],
-      "parameters": {
-        "jsCode": "// Junta todas las páginas FV-2 y reenvía también el resumen de NCs\nconst pages = $input.all();\nconst invs = [];\nfor (const p of pages) {\n  for (const inv of (p.json.results || [])) invs.push(inv);\n}\nconst ncSummary = $('Merge NCs').first().json;\nreturn [{ json: ncSummary }, { json: { results: invs, _source: 'fv2_live' } }];",
-        "mode": "runOnceForAllItems"
-      }
-    }
-  ],
-  "connections": {
-    "Webhook": {
-      "main": [
-        [
-          {
-            "node": "Check Cache",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Auth Siigo": {
-      "main": [
-        [
-          {
-            "node": "Parse Hist",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Get NC P1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Setup": {
-      "main": [
-        [
-          {
-            "node": "Build Product Map",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Product Map": {
-      "main": [
-        [
-          {
-            "node": "Build Customer Map",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Invoice Count": {
-      "main": [
-        [
-          {
-            "node": "Gen Invoice Pages",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Gen Invoice Pages": {
-      "main": [
-        [
-          {
-            "node": "Get Invoices",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Invoices": {
-      "main": [
-        [
-          {
-            "node": "Wait for NCs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Compute Stats": {
-      "main": [
-        [
-          {
-            "node": "Respond",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Customer Map": {
-      "main": [
-        [
-          {
-            "node": "Get Invoice Count",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Cache": {
-      "main": [
-        [
-          {
-            "node": "Cache Fresh?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Cache Fresh?": {
-      "main": [
-        [
-          {
-            "node": "Respond Cached",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Auth Siigo",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Hist": {
-      "main": [
-        [
-          {
-            "node": "Setup",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get NC P1": {
-      "main": [
-        [
-          {
-            "node": "Get NC P2",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get NC P2": {
-      "main": [
-        [
-          {
-            "node": "Merge NCs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge NCs": {
-      "main": [
-        [
-          {
-            "node": "Get FV2 Count",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait for NCs": {
-      "main": [
-        [
-          {
-            "node": "Compute Stats",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get FV2 Count": {
-      "main": [
-        [
-          {
-            "node": "Gen FV2 Pages",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Gen FV2 Pages": {
-      "main": [
-        [
-          {
-            "node": "Get FV2",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get FV2": {
-      "main": [
-        [
-          {
-            "node": "Merge FV2",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge FV2": {
-      "main": [
-        [
-          {
-            "node": "Wait for NCs",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    }
+ "name": "CHUCULAT | Dashboard Ventas Siigo",
+ "nodes": [
+  {
+   "parameters": {
+    "path": "get-ventas",
+    "responseMode": "responseNode",
+    "options": {}
+   },
+   "id": "n01",
+   "name": "Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    -80,
+    -16
+   ],
+   "webhookId": "chuculat-ventas-v2"
   },
-  "settings": {
-    "executionOrder": "v1"
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/auth",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "{\"username\":\"<SIIGO_USERNAME>\",\"access_key\":\"<SIIGO_ACCESS_KEY>\"}",
+    "options": {
+     "batching": {
+      "batch": {
+       "batchSize": 1,
+       "batchInterval": 400
+      }
+     }
+    }
+   },
+   "id": "n02",
+   "name": "Auth Siigo",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    224,
+    304
+   ],
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 3000
+  },
+  {
+   "parameters": {
+    "jsCode": "const query = $('Webhook').first().json.query || {};\nconst today = new Date().toISOString().split('T')[0];\nconst year = String(query.year || new Date().getFullYear());\nconst dateStart = query.date_start || (year + '-01-01');\nconst rawEnd = query.date_end || (year + '-12-31');\nconst dateEnd = rawEnd > today ? today : rawEnd;\nconst monthStart = today.slice(0,8) + '01';\n// Historico viene del archivo; en vivo solo el mes actual\nconst productPages = [1,2,3,4,5].map(p => ({ page:p, pageSize:100, dateStart, dateEnd, monthStart, fetchStart: monthStart }));\nreturn productPages.map(p => ({ json: p }));"
+   },
+   "id": "n03",
+   "name": "Setup",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    448,
+    304
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "// Productos + Clientes de Siigo, CACHEADOS en staticData.\n// No dependen del filtro de fechas -> antes se re-descargaban (~6s) en cada cambio de rango.\nconst setup = $('Setup').first().json;\nconst token = $('Auth Siigo').first().json.access_token;\nconst H = { Authorization: 'Bearer ' + token, 'Partner-Id': 'n8nApp' };\nconst sd = $getWorkflowStaticData('global');\nconst TTL = 60 * 60 * 1000; // 1 h\n// Version del cache: subir este numero invalida mapsCache al cambiar la logica\n// (p.ej. al agregar la fusion de categorias). Si no, se sirve un mapa viejo.\nconst MAPS_V = 5;\n\nlet productMap, customerMap;\nif (sd.mapsCache && sd.mapsCache.v === MAPS_V && sd.mapsCache.productMap && (Date.now() - sd.mapsCache.ts) < TTL) {\n  productMap  = sd.mapsCache.productMap;\n  customerMap = sd.mapsCache.customerMap;\n} else {\n  // Productos (5 páginas x 100)\n  productMap = {};\n  for (let p = 1; p <= 5; p++) {\n    const res = await this.helpers.httpRequest({ method:'GET',\n      url:'https://api.siigo.com/v1/products?page=' + p + '&page_size=100', headers:H, json:true });\n    for (const it of (res.results || [])) {\n      productMap[String(it.code)] = { name: it.name, category: (it.account_group && it.account_group.name) || 'Sin categoria' };\n    }\n    if (!(res.results || []).length) break;\n  }\n  // Clientes (paginado segun total_results)\n  customerMap = {};\n  const first = await this.helpers.httpRequest({ method:'GET',\n    url:'https://api.siigo.com/v1/customers?page=1&page_size=1', headers:H, json:true });\n  const total = (first.pagination && first.pagination.total_results) || 0;\n  const numPages = Math.ceil(total / 100);\n  for (let p = 1; p <= numPages; p++) {\n    const res = await this.helpers.httpRequest({ method:'GET',\n      url:'https://api.siigo.com/v1/customers?page=' + p + '&page_size=100', headers:H, json:true });\n    for (const c of (res.results || [])) {\n      const digits = String(c.identification || '').replace(/[^0-9]/g, '');\n      if (!digits) continue;\n      const raw = c.name;\n      const name = Array.isArray(raw) ? raw.filter(Boolean).join(' ') : (raw || digits);\n      customerMap[digits] = { name: name || digits,\n        idType: String((c.id_type && c.id_type.code) || ''),\n        personType: String(c.person_type || '') };\n    }\n  }\n  // Categorias propias (tabla productos_categorias en Supabase) pisan al\n  // account_group de Siigo. Siigo no distingue p.ej. BOMBONES de CHUNKS.\n  // Los productos que no esten en la tabla conservan la categoria de Siigo.\n  try {\n    const cats = await this.helpers.httpRequest({ method:'GET',\n      url: 'https://wavqyesyqqmawjfaztvb.supabase.co/rest/v1/productos_categorias?select=code,categoria',\n      headers: { apikey: '<SUPABASE_SERVICE_ROLE>', Authorization: 'Bearer <SUPABASE_SERVICE_ROLE>' }, json: true });\n    const mapeados = new Set();  // codigos presentes en productos_categorias\n    for (const r of (Array.isArray(cats) ? cats : [])) {\n      const k = String(r.code || '').trim();\n      if (!k || !r.categoria) continue;\n      const cat = String(r.categoria).trim();\n      mapeados.add(k);\n      if (productMap[k]) productMap[k].category = cat;\n      else productMap[k] = { name: k, category: cat };\n    }\n    // Solo si la tabla respondio: lo que NO este en ella va a 'Sin categoria'.\n    // (Si la tabla fallara, el catch deja las categorias de Siigo y no se\n    //  borra todo por un error de red.)\n    if (mapeados.size > 0) {\n      for (const k of Object.keys(productMap)) {\n        if (!mapeados.has(k)) productMap[k].category = 'Sin categoría';\n      }\n    }\n  } catch (e) { /* si falla, se quedan las categorias de Siigo */ }\n\n  sd.mapsCache = { v: MAPS_V, ts: Date.now(), productMap, customerMap };\n}\n\nreturn [{ json: { productMap, customerMap, dateStart: setup.dateStart, dateEnd: setup.dateEnd,\n  fetchStart: setup.fetchStart, usedHist: setup.usedHist, monthStart: setup.monthStart } }];"
+   },
+   "id": "n05",
+   "name": "Build Product Map",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    880,
+    304
+   ]
+  },
+  {
+   "parameters": {
+    "url": "=https://api.siigo.com/v1/invoices?page=1&page_size=1&created_start={{ $json.fetchStart }}T00:00:00&created_end={{ $json.dateEnd }}T23:59:59",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "options": {
+     "batching": {
+      "batch": {
+       "batchSize": 1,
+       "batchInterval": 400
+      }
+     }
+    }
+   },
+   "id": "n06",
+   "name": "Get Invoice Count",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1104,
+    304
+   ],
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 3000
+  },
+  {
+   "parameters": {
+    "jsCode": "const total = $input.first().json.pagination.total_results || 0;\nconst setup = $('Build Product Map').first().json;\nconst PAGE_SIZE = 100;\nconst numPages = Math.ceil(total / PAGE_SIZE);\nconst pages = [];\nfor (let i = 1; i <= numPages; i++) {\n  pages.push({ json: { page: i, pageSize: PAGE_SIZE, dateStart: setup.dateStart, dateEnd: setup.dateEnd, fetchStart: setup.fetchStart, totalInvoices: total } });\n}\nreturn pages.length > 0 ? pages : [{ json: { page: 1, pageSize: PAGE_SIZE, dateStart: setup.dateStart, dateEnd: setup.dateEnd, fetchStart: setup.fetchStart, totalInvoices: 0 } }];"
+   },
+   "id": "n07",
+   "name": "Gen Invoice Pages",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1328,
+    304
+   ]
+  },
+  {
+   "parameters": {
+    "url": "=https://api.siigo.com/v1/invoices?page={{ $json.page }}&page_size={{ $json.pageSize }}&created_start={{ $json.fetchStart }}T00:00:00&created_end={{ $json.dateEnd }}T23:59:59",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "options": {
+     "batching": {
+      "batch": {
+       "batchSize": 3,
+       "batchInterval": 600
+      }
+     }
+    }
+   },
+   "id": "n08",
+   "name": "Get Invoices",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1552,
+    304
+   ],
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 3000
+  },
+  {
+   "parameters": {
+    "jsCode": "const productMap = $('Build Customer Map').first().json.productMap || {};\n\nconst setup      = $('Build Customer Map').first().json;\n\n\n\n// ── Separar input: páginas de facturas vs resumen de notas crédito ─\n\nconst __allInput = $input.all();\n\nconst __ncItem   = __allInput.find(p => p.json._type === 'nc_summary');\n\nconst allNCs     = __ncItem ? (__ncItem.json.ncs || []) : [];\n\n\n\n// ── Facturas del mes activo (en vivo) ─────────────────────────────\n\nconst liveInvoices = [];\n\nfor (const p of __allInput) {\n\n  if (p.json._type === 'nc_summary') continue;\n\n  for (const inv of (p.json.results || [])) liveInvoices.push(inv);\n\n}\n\n\n\n// ── Facturas históricas (archivo permanente hasta cierre de mes) ──\n\nlet histRows = [];\n\ntry {\n\n  const ph = $('Parse Hist').first().json;\n\n  histRows = Array.isArray(ph) ? ph : (ph.rows || ph.data || []);\n\n} catch (e) { histRows = []; }\n\n\n\n// ── Merge + dedup por id (la versión viva pisa la histórica) ──────\n\nconst byId = {};\n\nfor (const inv of histRows)     byId[inv.id] = inv;\n\nfor (const inv of liveInvoices) byId[inv.id] = inv;\n\nlet invoices = Object.values(byId);\n\n\n\n// ── Filtro por rango solicitado (fecha de factura) ────────────────\n\nconst ds = setup.dateStart, de = setup.dateEnd;\n\nconst invoicesFull = invoices.slice(); // set completo (sin filtro de rango) para \"primera compra\"\n\ninvoices = invoices.filter(inv => { const d = String(inv.date || '').slice(0,10); return d >= ds && d <= de; });\n\n\n\nconst META_ANUAL = 1600000000;\n\nconst TODAY = new Date();\n\nconst customerMap = setup.customerMap || {};\n\n\n\n// NIT colombiano\n\nfunction isNIT(identification) {\n\n  const raw = String(identification || '').trim();\n\n  if (/\\d{8,9}-\\d$/.test(raw)) return true;\n\n  const digits = raw.replace(/[^0-9]/g, '');\n\n  if (digits.length !== 9 && digits.length !== 10) return false;\n\n  return /^(800|811|812|813|820|830|832|860|890|891|892|899|900|901|902)/.test(digits);\n\n}\n\nconst B2B_OVERRIDE_IDS = new Set(['1007703532']);\n\nfunction isCompany(inv) {\n\n  const id     = String((inv.customer && inv.customer.identification) || '');\n\n  const digits = id.replace(/[^0-9]/g, '');\n\n  if (B2B_OVERRIDE_IDS.has(digits)) return true;\n\n  const entry = customerMap[digits];\n\n  if (entry && (entry.idType === '31' || entry.personType === 'Company')) return true;\n\n  if (isNIT(id)) return true;\n\n  const name = String((entry && entry.name) || (inv.customer && inv.customer.name) || '').toLowerCase();\n\n  if (/\\b(s\\.?a\\.?s\\.?|ltda\\.?|s\\.?a\\b|corp|inc|group|grupo|distribu|comercial|industria|soluciones|servicios|hospitality|retail|inversiones|supertienda|supermercados)\\b/i.test(name)) return true;\n\n  return false;\n\n}\n\n// Canal por centro de costo (168=B2C, 166=B2B, 315=Exportación); override empresa en 168 -> B2B\n\nfunction channelOf(inv) {\n\n  const cc = Number(inv.cost_center);\n\n  if (cc === 315) return 'export';\n\n  if (cc === 166) return 'b2b';\n\n  if (cc === 168) return isCompany(inv) ? 'b2b' : 'b2c';\n\n  return null; // 170 planta / 172 admin / otros: no son venta\n\n}\n\n\n\n// Subtotal (sin impuestos) por ítem y por factura: precio × cantidad − descuento\n\nfunction itemSubtotal(it) {\n\n  const base = Number(it.price || 0) * Number(it.quantity || 1);\n\n  const disc = (it.discount && it.discount.value) ? Number(it.discount.value) : 0;\n\n  return base - disc;\n\n}\n\n// Facturas en moneda extranjera (exportación EUR/USD): convertir a COP con la tasa del documento\n\nfunction fxOf(doc) { return (doc.currency && doc.currency.exchange_rate) ? Number(doc.currency.exchange_rate) : 1; }\n\nfunction invSubtotal(inv) { return (inv.items || []).reduce((s, it) => s + itemSubtotal(it), 0) * fxOf(inv); }\n\n\n\nfunction daysSince(d) { if (!d) return 0; return Math.floor((TODAY - new Date(d)) / 86400000); }\n\nfunction agingBucket(x) { if (x>180) return '>180'; if (x>120) return '>120'; if (x>90) return '>90'; if (x>31) return '>31'; return 'por_vencer'; }\n\n\n\nconst byCategory = {}, byMonth = {}, byProduct = {}, byCustomer = {};\n\nconst expByMonth = {}, expByProduct = {}, expByCustomer = {};\n\nconst catMonth = {}, prodMonth = {};   // pivots: categoria/producto x mes\n\nconst monthsSet = {};\n\nconst carteraFacturas = [];\n\nlet totalB2C = 0, totalB2B = 0, totalExport = 0, totalImpuestos = 0;\n\n\n\nfor (const inv of invoices) {\n\n  const ch = channelOf(inv);\n\n  if (!ch) continue;                       // ignora planta/admin\n\n  const date  = String(inv.date || '');\n\n  const month = date.slice(0, 7);\n\n  const sub   = invSubtotal(inv);          // ← BASE: subtotal sin IVA\n\n  const custId   = String((inv.customer && inv.customer.identification) || inv.id || 'desconocido');\n\n  const __ce     = customerMap[custId.replace(/[^0-9]/g, '')];\n\n  const custName = (__ce && __ce.name) || (inv.customer && inv.customer.name) || custId;\n\n\n\n  if (month) monthsSet[month] = 1;\n\n\n\n  if (ch === 'export') totalExport += sub;\n\n  else if (ch === 'b2b') totalB2B += sub;\n\n  else totalB2C += sub;\n\n\n\n  // Impuestos (informativo)\n\n  const __fx = fxOf(inv);\n\n  for (const it of (inv.items || [])) totalImpuestos += (it.taxes || []).reduce((s,t)=>s+Number(t.value||0),0) * __fx;\n\n\n\n  // Cartera (proporcional al subtotal): pendiente_sub = balance * sub/total\n\n  const balance = Number(inv.balance || 0);\n\n  if (balance > 0 && (ch === 'b2b' || ch === 'export')) {\n\n    const tot = Number(inv.total || 0);\n\n    const pendSub = tot > 0 ? balance * (sub / tot) : balance;\n\n    const dias = daysSince(date);\n\n    carteraFacturas.push({\n\n      numero: inv.name || '', fecha: date, cliente: custName, nit: custId, canal: ch,\n\n      total: Math.round(sub), pendiente: Math.round(pendSub),\n\n      diasVencido: dias, bucket: agingBucket(dias)\n\n    });\n\n  }\n\n\n\n  // Mensual global\n\n  if (!byMonth[month]) byMonth[month] = { total:0, facturas:0, b2b:0, b2c:0, export:0 };\n\n  byMonth[month].total += sub; byMonth[month].facturas += 1;\n\n  if (ch==='export') byMonth[month].export += sub; else if (ch==='b2b') byMonth[month].b2b += sub; else byMonth[month].b2c += sub;\n\n\n\n  // Cliente global\n\n  if (!byCustomer[custId]) byCustomer[custId] = { identification:custId, name:custName, canal:ch, totalCompras:0, facturas:0, ultimaCompra:'', primeraCompra:'' };\n\n  byCustomer[custId].totalCompras += sub; byCustomer[custId].facturas += 1;\n\n  if (!byCustomer[custId].ultimaCompra  || date > byCustomer[custId].ultimaCompra)  byCustomer[custId].ultimaCompra  = date;\n\n  if (!byCustomer[custId].primeraCompra || date < byCustomer[custId].primeraCompra) byCustomer[custId].primeraCompra = date;\n\n\n\n  // Productos / categorías (global) + exportación aparte\n\n  for (const it of (inv.items || [])) {\n\n    const code = String(it.code || '');\n\n    const prod = productMap[code] || { name: it.description || code, category: 'Sin categoria' };\n\n    const s = itemSubtotal(it) * __fx, q = Number(it.quantity || 1);\n\n\n\n    if (!byCategory[prod.category]) byCategory[prod.category] = { subtotal:0, qty:0, facturas:0 };\n\n    byCategory[prod.category].subtotal += s; byCategory[prod.category].qty += q; byCategory[prod.category].facturas += 1;\n\n\n\n    if (!byProduct[code]) byProduct[code] = { code, name:prod.name, category:prod.category, subtotal:0, qty:0, facturas:0 };\n\n    byProduct[code].subtotal += s; byProduct[code].qty += q; byProduct[code].facturas += 1;\n\n\n\n    // Pivots x mes\n\n    if (month) {\n\n      if (!catMonth[prod.category]) catMonth[prod.category] = {};\n\n      if (!catMonth[prod.category][month]) catMonth[prod.category][month] = { subtotal:0, qty:0 };\n\n      catMonth[prod.category][month].subtotal += s; catMonth[prod.category][month].qty += q;\n\n      if (!prodMonth[code]) prodMonth[code] = { code, name:prod.name, category:prod.category, m:{} };\n\n      if (!prodMonth[code].m[month]) prodMonth[code].m[month] = { subtotal:0, qty:0, facturas:0 };\n\n      prodMonth[code].m[month].subtotal += s; prodMonth[code].m[month].qty += q; prodMonth[code].m[month].facturas += 1;\n\n    }\n\n\n\n    if (ch === 'export') {\n\n      if (!expByProduct[code]) expByProduct[code] = { code, name:prod.name, category:prod.category, subtotal:0, qty:0, facturas:0 };\n\n      expByProduct[code].subtotal += s; expByProduct[code].qty += q; expByProduct[code].facturas += 1;\n\n    }\n\n  }\n\n\n\n  // Exportación: mensual y clientes\n\n  if (ch === 'export') {\n\n    if (!expByMonth[month]) expByMonth[month] = { total:0, facturas:0 };\n\n    expByMonth[month].total += sub; expByMonth[month].facturas += 1;\n\n    if (!expByCustomer[custId]) expByCustomer[custId] = { identification:custId, name:custName, totalCompras:0, facturas:0, ultimaCompra:'', primeraCompra:'' };\n\n    expByCustomer[custId].totalCompras += sub; expByCustomer[custId].facturas += 1;\n\n    if (!expByCustomer[custId].ultimaCompra  || date > expByCustomer[custId].ultimaCompra)  expByCustomer[custId].ultimaCompra  = date;\n\n    if (!expByCustomer[custId].primeraCompra || date < expByCustomer[custId].primeraCompra) expByCustomer[custId].primeraCompra = date;\n\n  }\n\n}\n\n\n\n// ── Netear Notas Crédito del período (totales, meses, productos, pivots) ──\n\nconst ncsInRange = allNCs.filter(nc => {\n\n  const d = String(nc.date || '').slice(0,10);\n\n  return d >= ds && d <= de;\n\n});\n\nfor (const nc of ncsInRange) {\n\n  const ch = channelOf(nc);\n\n  if (!ch) continue;\n\n  const ncFx  = fxOf(nc);\n\n  const ncSub = (nc.items || []).reduce((s, it) => s + itemSubtotal(it), 0) * ncFx;\n\n  if (ch === 'export') totalExport -= ncSub;\n\n  else if (ch === 'b2b') totalB2B -= ncSub;\n\n  else totalB2C -= ncSub;\n\n\n\n  const month = String(nc.date || '').slice(0, 7);\n\n  if (byMonth[month]) {\n\n    byMonth[month].total -= ncSub;\n\n    if (ch === 'export') byMonth[month].export -= ncSub;\n\n    else if (ch === 'b2b') byMonth[month].b2b -= ncSub;\n\n    else byMonth[month].b2c -= ncSub;\n\n  }\n\n\n\n  // Restar por producto / categoría / pivots (igual que el reporte de Siigo)\n\n  for (const it of (nc.items || [])) {\n\n    const code = String(it.code || '');\n\n    const prod = productMap[code] || { name: it.description || code, category: 'Sin categoria' };\n\n    const s = itemSubtotal(it) * ncFx, q = Number(it.quantity || 1);\n\n    if (byCategory[prod.category]) { byCategory[prod.category].subtotal -= s; byCategory[prod.category].qty -= q; }\n\n    if (byProduct[code]) { byProduct[code].subtotal -= s; byProduct[code].qty -= q; }\n\n    if (month && catMonth[prod.category] && catMonth[prod.category][month]) {\n\n      catMonth[prod.category][month].subtotal -= s; catMonth[prod.category][month].qty -= q;\n\n    }\n\n    if (month && prodMonth[code] && prodMonth[code].m[month]) {\n\n      prodMonth[code].m[month].subtotal -= s; prodMonth[code].m[month].qty -= q;\n\n    }\n\n    if (ch === 'export' && expByProduct[code]) { expByProduct[code].subtotal -= s; expByProduct[code].qty -= q; }\n\n  }\n\n\n\n  // Restar del cliente y de exportación mensual\n\n  const ncCed = String((nc.customer && nc.customer.identification) || '');\n\n  if (ncCed && byCustomer[ncCed]) byCustomer[ncCed].totalCompras -= ncSub;\n\n  if (ch === 'export') {\n\n    if (expByMonth[month]) expByMonth[month].total -= ncSub;\n\n    if (ncCed && expByCustomer[ncCed]) expByCustomer[ncCed].totalCompras -= ncSub;\n\n  }\n\n}\n\n\n\n// ── Compras Destacadas (solo B2C, insumo para campañas) ──────────\n\nconst GEN_IDS = new Set(['222222222222', '7777777777777']);\n\nconst esModDest = nm => /^(sel\\s|no aplica)/i.test(nm);\n\nconst b2cInvs = invoices.filter(inv => channelOf(inv) === 'b2c');\n\n\n\n// Cross-sell: se descartan las parejas que incluyan bombones, su propio estuche\n\n// (Caja bom pre, 304) o los chocolates CH / CH DE MESA. Son cruces triviales\n\n// (los bombones se venden surtidos DENTRO de esa caja; los CH son el chocolate\n\n// que va DENTRO de la bebida) y tapaban los cruces realmente accionables.\n\n// Solo afecta a 'parejas'; estos productos siguen contando en el resto.\n\n// Ojo: /^CH(\\s|$)/ y no startsWith('CH'), para no arrastrar CHUNKS.\n\nconst CROSS_SKIP_CODES = new Set(['304']);\n\nconst fueraDeCrossSell = (code, cat) =>\n\n  CROSS_SKIP_CODES.has(String(code)) ||\n\n  String(cat || '').toUpperCase() === 'BOMBONES' ||\n\n  /^CH(\\s|$)/i.test(String(cat || ''));\n\n\n\nconst dProdMes = {}, dProdCli = {}, dPares = {}, dCust = {};\n\nfor (const inv of b2cInvs) {\n\n  const fx  = fxOf(inv);\n\n  const mes = String(inv.date || '').slice(0, 7);\n\n  const dia = String(inv.date || '').slice(0, 10);\n\n  const cedRaw = String((inv.customer && inv.customer.identification) || '').replace(/[^0-9]/g, '');\n\n  const ced = (cedRaw && !GEN_IDS.has(cedRaw)) ? cedRaw : null;\n\n  const ceD = ced ? customerMap[ced] : null;\n\n  const cliName = (ceD && ceD.name) || ced || '';\n\n  const nombresFactura = new Set();\n\n  for (const it of (inv.items || [])) {\n\n    const s = itemSubtotal(it) * fx;\n\n    if (s <= 0) continue;\n\n    const prodD = productMap[String(it.code || '')] || { name: it.description || it.code };\n\n    if (esModDest(prodD.name)) continue;\n\n    const q = Number(it.quantity || 1);\n\n    const codeK = String(it.code || prodD.name);\n\n    if (!dProdMes[codeK]) dProdMes[codeK] = { code: codeK, name: prodD.name, total: 0, meses: {} };\n\n    dProdMes[codeK].total += s;\n\n    if (!dProdMes[codeK].meses[mes]) dProdMes[codeK].meses[mes] = { qty: 0, subtotal: 0 };\n\n    dProdMes[codeK].meses[mes].qty += q; dProdMes[codeK].meses[mes].subtotal += s;\n\n    if (ced) {\n\n      if (!dProdCli[codeK]) dProdCli[codeK] = {};\n\n      if (!dProdCli[codeK][ced]) dProdCli[codeK][ced] = { ced, name: cliName, qty: 0, subtotal: 0 };\n\n      dProdCli[codeK][ced].qty += q; dProdCli[codeK][ced].subtotal += s;\n\n    }\n\n    if (!fueraDeCrossSell(codeK, prodD.category)) nombresFactura.add(prodD.name);\n\n  }\n\n  const arrN = [...nombresFactura].sort();\n\n  for (let i = 0; i < arrN.length; i++)\n\n    for (let j = i + 1; j < arrN.length; j++) {\n\n      const k = arrN[i] + '|||' + arrN[j];\n\n      dPares[k] = (dPares[k] || 0) + 1;\n\n    }\n\n  if (ced) {\n\n    if (!dCust[ced]) dCust[ced] = { ced, name: cliName, total: 0, compras: 0, ultima: '' };\n\n    dCust[ced].total += invSubtotal(inv); dCust[ced].compras += 1;\n\n    if (dia > dCust[ced].ultima) dCust[ced].ultima = dia;\n\n  }\n\n}\n\nconst dTop = Object.values(dProdMes).sort((a, b) => b.total - a.total);\n\nconst dst_productosPorMes = dTop.slice(0, 8).map(p => ({\n\n  code: p.code, name: p.name, total: Math.round(p.total),\n\n  series: Object.entries(p.meses).sort((a, b) => a[0].localeCompare(b[0]))\n\n    .map(e => ({ mes: e[0], qty: Math.round(e[1].qty * 100) / 100, subtotal: Math.round(e[1].subtotal) }))\n\n}));\n\nconst dst_clientesPorProducto = dTop.slice(0, 30).map(p => ({\n\n  code: p.code, name: p.name, total: Math.round(p.total),\n\n  clientes: Object.values(dProdCli[p.code] || {}).sort((a, b) => b.subtotal - a.subtotal).slice(0, 10)\n\n    .map(c => ({ name: c.name, ced: c.ced, qty: Math.round(c.qty * 100) / 100, subtotal: Math.round(c.subtotal) }))\n\n}));\n\nconst dst_parejas = Object.entries(dPares).sort((a, b) => b[1] - a[1]).slice(0, 15)\n\n  .map(e => { const p = e[0].split('|||'); return { a: p[0], b: p[1], veces: e[1] }; });\n\nconst dst_reactivar = Object.values(dCust)\n\n  .filter(c => c.ultima && (TODAY - new Date(c.ultima)) / 86400000 > 60)\n\n  .sort((a, b) => b.total - a.total).slice(0, 30)\n\n  .map(c => ({ name: c.name, ced: c.ced, total: Math.round(c.total), compras: c.compras,\n\n    ultima: c.ultima, diasSin: Math.floor((TODAY - new Date(c.ultima)) / 86400000) }));\n\nconst dPrimera = {};\n\nfor (const inv of invoicesFull) {\n\n  const cf = String((inv.customer && inv.customer.identification) || '').replace(/[^0-9]/g, '');\n\n  if (!cf || GEN_IDS.has(cf)) continue;\n\n  const df = String(inv.date || '').slice(0, 10);\n\n  if (!dPrimera[cf] || df < dPrimera[cf]) dPrimera[cf] = df;\n\n}\n\nconst dNR = {}, dVistos = {};\n\nfor (const inv of b2cInvs) {\n\n  const cf = String((inv.customer && inv.customer.identification) || '').replace(/[^0-9]/g, '');\n\n  if (!cf || GEN_IDS.has(cf)) continue;\n\n  const mesNR = String(inv.date || '').slice(0, 7);\n\n  if (!dVistos[mesNR]) dVistos[mesNR] = {};\n\n  if (dVistos[mesNR][cf]) continue;\n\n  dVistos[mesNR][cf] = true;\n\n  if (!dNR[mesNR]) dNR[mesNR] = { nuevos: 0, recurrentes: 0 };\n\n  if (String(dPrimera[cf] || '').slice(0, 7) === mesNR) dNR[mesNR].nuevos++;\n\n  else dNR[mesNR].recurrentes++;\n\n}\n\nconst dst_nuevosRecurrentes = Object.entries(dNR).sort((a, b) => a[0].localeCompare(b[0]))\n\n  .map(e => ({ mes: e[0], nuevos: e[1].nuevos, recurrentes: e[1].recurrentes }));\n\n\n\nconst totalGeneral = totalB2C + totalB2B + totalExport;\n\n\n\nconst categorias = Object.entries(byCategory).map(([cat,v]) => ({ categoria:cat, subtotal:Math.round(v.subtotal), qty:v.qty, facturas:v.facturas })).sort((a,b)=>b.subtotal-a.subtotal);\n\nconst catTotal = categorias.reduce((s,c)=>s+c.subtotal,0);\n\ncategorias.forEach(c=>{ c.pct = catTotal>0 ? Math.round(c.subtotal/catTotal*1000)/10 : 0; });\n\n\n\nconst meses = Object.entries(byMonth).sort((a,b)=>a[0].localeCompare(b[0])).map(([mes,v])=>({ mes, total:Math.round(v.total), facturas:v.facturas, b2b:Math.round(v.b2b), b2c:Math.round(v.b2c), export:Math.round(v.export) }));\n\n\n\nconst todosProductos = Object.values(byProduct).sort((a,b)=>b.subtotal-a.subtotal).map(p=>({ code:p.code, name:p.name, category:p.category, subtotal:Math.round(p.subtotal), qty:p.qty, facturas:p.facturas }));\n\n\n\nconst carteraResumen = {\n\n  totalDeuda: Math.round(carteraFacturas.reduce((s,c)=>s+c.pendiente,0)),\n\n  masde180: Math.round(carteraFacturas.filter(c=>c.diasVencido>180).reduce((s,c)=>s+c.pendiente,0)),\n\n  masde120: Math.round(carteraFacturas.filter(c=>c.diasVencido>120&&c.diasVencido<=180).reduce((s,c)=>s+c.pendiente,0)),\n\n  masde90:  Math.round(carteraFacturas.filter(c=>c.diasVencido>90&&c.diasVencido<=120).reduce((s,c)=>s+c.pendiente,0)),\n\n  masde31:  Math.round(carteraFacturas.filter(c=>c.diasVencido>31&&c.diasVencido<=90).reduce((s,c)=>s+c.pendiente,0)),\n\n  porVencer:Math.round(carteraFacturas.filter(c=>c.diasVencido<=31).reduce((s,c)=>s+c.pendiente,0)),\n\n};\n\nconst byCli = {};\n\nfor (const c of carteraFacturas) {\n\n  if (!byCli[c.nit]) byCli[c.nit] = { cliente:c.cliente, nit:c.nit, deudaTotal:0, masde180:0, masde120:0, masde90:0, masde31:0, porVencer:0, facturas:0 };\n\n  const b = byCli[c.nit]; b.deudaTotal += c.pendiente; b.facturas += 1;\n\n  if (c.diasVencido>180) b.masde180+=c.pendiente; else if (c.diasVencido>120) b.masde120+=c.pendiente; else if (c.diasVencido>90) b.masde90+=c.pendiente; else if (c.diasVencido>31) b.masde31+=c.pendiente; else b.porVencer+=c.pendiente;\n\n}\n\nconst carteraPorCliente = Object.values(byCli).sort((a,b)=>b.deudaTotal-a.deudaTotal).map(c=>({ ...c, deudaTotal:Math.round(c.deudaTotal), masde180:Math.round(c.masde180), masde120:Math.round(c.masde120), masde90:Math.round(c.masde90), masde31:Math.round(c.masde31), porVencer:Math.round(c.porVencer) }));\n\n\n\nconst clientesB2B = Object.values(byCustomer).filter(c=>c.canal==='b2b').sort((a,b)=>b.totalCompras-a.totalCompras).map(c=>({ ...c, totalCompras:Math.round(c.totalCompras) }));\n\nconst clientesB2C = Object.values(byCustomer).filter(c=>c.canal==='b2c').map(c=>({ ...c, totalCompras:Math.round(c.totalCompras) }));\n\n\n\n// Exportación\n\nconst expMeses = Object.entries(expByMonth).sort((a,b)=>a[0].localeCompare(b[0])).map(([mes,v])=>({ mes, total:Math.round(v.total), facturas:v.facturas }));\n\nconst expProductos = Object.values(expByProduct).sort((a,b)=>b.subtotal-a.subtotal).map(p=>({ code:p.code, name:p.name, category:p.category, subtotal:Math.round(p.subtotal), qty:p.qty, facturas:p.facturas }));\n\nconst expClientes = Object.values(expByCustomer).sort((a,b)=>b.totalCompras-a.totalCompras).map(c=>({ ...c, totalCompras:Math.round(c.totalCompras) }));\n\n\n\nconst __payload = {\n\n  meta: { dateStart:setup.dateStart, dateEnd:setup.dateEnd, totalFacturas:invoices.filter(i=>channelOf(i)).length, totalNCs:ncsInRange.length, generadoEn:new Date().toISOString(), base:'subtotal_neto' },\n\n  resumen: {\n\n    totalGeneral:Math.round(totalGeneral), totalB2C:Math.round(totalB2C), totalB2B:Math.round(totalB2B), totalExport:Math.round(totalExport),\n\n    totalSubtotal:Math.round(totalGeneral), totalImpuestos:Math.round(totalImpuestos),\n\n    cumplimientoPct: totalGeneral>0 ? Math.round(totalGeneral/META_ANUAL*1000)/10 : 0,\n\n    metaAnual:META_ANUAL, diferenciaMeta:Math.round(META_ANUAL-totalGeneral)\n\n  },\n\n  categorias, meses,\n\n  top10Productos: todosProductos.slice(0,10), todosProductos,\n\n  carteraB2B: carteraFacturas.sort((a,b)=>b.pendiente-a.pendiente), carteraResumen, carteraPorCliente,\n\n  clientesB2B, clientesB2C, totalClientesB2B:clientesB2B.length, totalClientesB2C:clientesB2C.length,\n\n  exportacion: {\n\n    total: Math.round(totalExport), facturas: invoices.filter(i=>channelOf(i)==='export').length,\n\n    meses: expMeses, productos: expProductos, top10Productos: expProductos.slice(0,10),\n\n    clientes: expClientes, totalClientes: expClientes.length\n\n  },\n\n  destacadas: {\n\n    productosPorMes: dst_productosPorMes,\n\n    clientesPorProducto: dst_clientesPorProducto,\n\n    parejas: dst_parejas,\n\n    reactivar: dst_reactivar,\n\n    nuevosRecurrentes: dst_nuevosRecurrentes\n\n  },\n\n  pivot: {\n\n    meses: Object.keys(monthsSet).sort(),\n\n    categorias: Object.entries(catMonth).map(([cat, mm]) => {\n\n      const meses = {}; let tSub = 0, tQty = 0;\n\n      for (const [m, v] of Object.entries(mm)) { meses[m] = { subtotal: Math.round(v.subtotal), qty: Math.round(v.qty) }; tSub += v.subtotal; tQty += v.qty; }\n\n      return { categoria: cat, totalSubtotal: Math.round(tSub), totalQty: Math.round(tQty), meses };\n\n    }).sort((a,b)=>b.totalSubtotal-a.totalSubtotal),\n\n    productos: Object.values(prodMonth).map(p => {\n\n      const meses = {}; let tSub = 0, tQty = 0, tFac = 0;\n\n      for (const [m, v] of Object.entries(p.m)) { meses[m] = { subtotal: Math.round(v.subtotal), qty: Math.round(v.qty), facturas: v.facturas||0 }; tSub += v.subtotal; tQty += v.qty; tFac += (v.facturas||0); }\n\n      return { code: p.code, name: p.name, categoria: p.category, totalSubtotal: Math.round(tSub), totalQty: Math.round(tQty), totalFacturas: tFac, meses };\n\n    }).sort((a,b)=>b.totalSubtotal-a.totalSubtotal),\n\n    centros: meses.map(m => ({ mes: m.mes, b2c: m.b2c, b2b: m.b2b, export: m.export, total: m.total }))\n\n  }\n\n};\n\n\n\n// Cache 10 min (evita rate limits en recargas)\n\nconst __sd = $getWorkflowStaticData('global');\n\nconst __q = $('Webhook').first().json.query || {};\n\n__sd.ventasCache = { key:(__q.date_start||'')+'|'+(__q.date_end||''), ts:Date.now(), payload:__payload };\n\nreturn [{ json: __payload }];\n\n"
+   },
+   "id": "n09",
+   "name": "Compute Stats",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1760,
+    304
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ JSON.stringify($json) }}",
+    "options": {
+     "responseHeaders": {
+      "entries": [
+       {
+        "name": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "name": "Access-Control-Allow-Origin",
+        "value": "*"
+       }
+      ]
+     }
+    }
+   },
+   "id": "n10",
+   "name": "Respond",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.1,
+   "position": [
+    1984,
+    304
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "// Passthrough: los mapas ya vienen cacheados de Build Product Map.\n// Se conserva este nodo porque Compute Stats lo referencia por nombre.\nreturn [{ json: $('Build Product Map').first().json }];"
+   },
+   "id": "n14",
+   "name": "Build Customer Map",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1552,
+    544
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "const sd = $getWorkflowStaticData('global');\n// Limpieza de datos legados que inflan staticData\nif (sd.histInvoices) delete sd.histInvoices;\r\nif (sd.liveCache) delete sd.liveCache;   // huerfano de un experimento revertido (inflaba staticData)\nconst q = $input.first().json.query || {};\nconst key = (q.date_start || '') + '|' + (q.date_end || '');\nconst TTL = 60 * 60 * 1000; // 60 minutos (se mantiene caliente con pre-warm)\nconst c = sd.ventasCache;\nif (c && c.key === key && (Date.now() - c.ts) < TTL && c.payload) {\n  return [{ json: { __cached: true, payload: c.payload } }];\n}\nreturn [{ json: { __cached: false, query: q } }];"
+   },
+   "id": "ncache1",
+   "name": "Check Cache",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    -608,
+    304
+   ]
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "strict"
+     },
+     "conditions": [
+      {
+       "leftValue": "={{ $json.__cached }}",
+       "rightValue": true,
+       "operator": {
+        "type": "boolean",
+        "operation": "true",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "nif1",
+   "name": "Cache Fresh?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2,
+   "position": [
+    -448,
+    304
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ JSON.stringify($json.payload) }}",
+    "options": {
+     "responseHeaders": {
+      "entries": [
+       {
+        "name": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "name": "Access-Control-Allow-Origin",
+        "value": "*"
+       }
+      ]
+     }
+    }
+   },
+   "id": "nrc1",
+   "name": "Respond Cached",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.1,
+   "position": [
+    -304,
+    208
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "// Histórico desde Supabase (columna raw = factura Siigo completa).\n// Solo baja el RANGO pedido (antes bajaba las ~10.5k facturas en cada llamada).\nconst SB='https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY='<SUPABASE_SERVICE_ROLE>';\nconst H={ apikey:KEY, Authorization:'Bearer '+KEY };\n\n// Mismo cálculo de rango que el nodo Setup (este nodo corre antes que él)\nconst q = $('Webhook').first().json.query || {};\nconst today = new Date().toISOString().split('T')[0];\nconst year = String(q.year || new Date().getFullYear());\nconst dateStart = q.date_start || (year + '-01-01');\nconst rawEnd = q.date_end || (year + '-12-31');\nconst dateEnd = rawEnd > today ? today : rawEnd;\n\n// 1) Facturas del rango (payload completo)\nconst rows = [];\n{\n  const step = 1000; let from = 0;\n  const url = SB + '/rest/v1/ventas_invoices?select=raw&fecha=gte.' + dateStart + '&fecha=lte.' + dateEnd + '&order=id.asc';\n  while (true) {\n    const res = await this.helpers.httpRequest({ method:'GET', url,\n      headers:{ ...H, 'Range-Unit':'items', 'Range': from + '-' + (from + step - 1) }, json:true });\n    const arr = Array.isArray(res) ? res : [];\n    for (const r of arr) { if (r && r.raw) rows.push(r.raw); }\n    if (arr.length < step) break;\n    from += step; if (from > 100000) break;\n  }\n}\n\n// 2) Primera compra por cédula: cacheada en staticData (no depende del rango pedido).\n//    Solo cambia cuando entran facturas nuevas a Supabase (cierre mensual / backfill).\nconst sd = $getWorkflowStaticData('global');\nconst PRIMERAS_TTL = 6 * 60 * 60 * 1000; // 6 h\nlet primeras = null;\nif (sd.primerasCache && sd.primerasCache.map && (Date.now() - sd.primerasCache.ts) < PRIMERAS_TTL) {\n  primeras = sd.primerasCache.map;\n} else {\n  primeras = {};\n  const step = 1000; let from = 0;\n  const url = SB + '/rest/v1/ventas_invoices?select=ident:raw->customer->>identification,fecha&order=fecha.asc';\n  while (true) {\n    const res = await this.helpers.httpRequest({ method:'GET', url,\n      headers:{ ...H, 'Range-Unit':'items', 'Range': from + '-' + (from + step - 1) }, json:true });\n    const arr = Array.isArray(res) ? res : [];\n    for (const r of arr) {\n      const cf = String((r && r.ident) || '').replace(/[^0-9]/g, '');\n      const df = String((r && r.fecha) || '').slice(0, 10);\n      if (!cf || !df) continue;\n      if (!primeras[cf] || df < primeras[cf]) primeras[cf] = df;\n    }\n    if (arr.length < step) break;\n    from += step; if (from > 100000) break;\n  }\n  sd.primerasCache = { ts: Date.now(), map: primeras };\n}\n\nreturn [{ json: { rows, count: rows.length, primeras, dateStart, dateEnd } }];"
+   },
+   "id": "histparse01",
+   "name": "Parse Hist",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    420,
+    120
+   ]
+  },
+  {
+   "id": "nc01",
+   "name": "Get NC P1",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    224,
+    560
+   ],
+   "parameters": {
+    "method": "GET",
+    "url": "https://api.siigo.com/v1/credit-notes?page=1&page_size=100",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "options": {}
+   }
+  },
+  {
+   "id": "nc02",
+   "name": "Get NC P2",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    448,
+    560
+   ],
+   "parameters": {
+    "method": "GET",
+    "url": "https://api.siigo.com/v1/credit-notes?page=2&page_size=100",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "options": {}
+   }
+  },
+  {
+   "id": "nc03",
+   "name": "Merge NCs",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    672,
+    560
+   ],
+   "parameters": {
+    "jsCode": "// Page 1 viene desde Get NC P1 (referenciado por nombre)\nlet page1 = [];\ntry { page1 = $('Get NC P1').first().json.results || []; } catch(e) {}\n// Page 2 viene como input directo (desde Get NC P2)\nconst page2 = $input.first().json.results || [];\nconst allNCs = [...page1, ...page2];\nreturn [{ json: { _type: 'nc_summary', ncs: allNCs } }];",
+    "mode": "runOnceForAllItems"
+   }
+  },
+  {
+   "id": "nc04",
+   "name": "Wait for NCs",
+   "type": "n8n-nodes-base.merge",
+   "typeVersion": 2.1,
+   "position": [
+    1660,
+    400
+   ],
+   "parameters": {
+    "mode": "append"
+   }
+  },
+  {
+   "id": "fv201",
+   "name": "Get FV2 Count",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    896,
+    560
+   ],
+   "parameters": {
+    "method": "GET",
+    "url": "https://api.siigo.com/v1/invoices?document_id=30537&page=1&page_size=1",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "options": {}
+   }
+  },
+  {
+   "id": "fv202",
+   "name": "Gen FV2 Pages",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1120,
+    560
+   ],
+   "parameters": {
+    "jsCode": "const total = $input.first().json.pagination.total_results || 0;\nconst numPages = Math.max(1, Math.ceil(total / 100));\nconst pages = [];\nfor (let i = 1; i <= numPages; i++) pages.push({ json: { page: i } });\nreturn pages;",
+    "mode": "runOnceForAllItems"
+   }
+  },
+  {
+   "id": "fv203",
+   "name": "Get FV2",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1344,
+    560
+   ],
+   "parameters": {
+    "method": "GET",
+    "url": "=https://api.siigo.com/v1/invoices?document_id=30537&page={{ $json.page }}&page_size=100",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{ $('Auth Siigo').first().json.access_token }}"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "options": {
+     "batching": {
+      "batch": {
+       "batchSize": 1,
+       "batchInterval": 400
+      }
+     }
+    }
+   }
+  },
+  {
+   "id": "fv204",
+   "name": "Merge FV2",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1520,
+    560
+   ],
+   "parameters": {
+    "jsCode": "// Junta todas las páginas FV-2 y reenvía también el resumen de NCs\nconst pages = $input.all();\nconst invs = [];\nfor (const p of pages) {\n  for (const inv of (p.json.results || [])) invs.push(inv);\n}\nconst ncSummary = $('Merge NCs').first().json;\nreturn [{ json: ncSummary }, { json: { results: invs, _source: 'fv2_live' } }];",
+    "mode": "runOnceForAllItems"
+   }
   }
+ ],
+ "connections": {
+  "Webhook": {
+   "main": [
+    [
+     {
+      "node": "Check Cache",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Auth Siigo": {
+   "main": [
+    [
+     {
+      "node": "Parse Hist",
+      "type": "main",
+      "index": 0
+     },
+     {
+      "node": "Get NC P1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Setup": {
+   "main": [
+    [
+     {
+      "node": "Build Product Map",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Build Product Map": {
+   "main": [
+    [
+     {
+      "node": "Build Customer Map",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Get Invoice Count": {
+   "main": [
+    [
+     {
+      "node": "Gen Invoice Pages",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Gen Invoice Pages": {
+   "main": [
+    [
+     {
+      "node": "Get Invoices",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Get Invoices": {
+   "main": [
+    [
+     {
+      "node": "Wait for NCs",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Compute Stats": {
+   "main": [
+    [
+     {
+      "node": "Respond",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Build Customer Map": {
+   "main": [
+    [
+     {
+      "node": "Get Invoice Count",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Check Cache": {
+   "main": [
+    [
+     {
+      "node": "Cache Fresh?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Cache Fresh?": {
+   "main": [
+    [
+     {
+      "node": "Respond Cached",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Auth Siigo",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Parse Hist": {
+   "main": [
+    [
+     {
+      "node": "Setup",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Get NC P1": {
+   "main": [
+    [
+     {
+      "node": "Get NC P2",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Get NC P2": {
+   "main": [
+    [
+     {
+      "node": "Merge NCs",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Merge NCs": {
+   "main": [
+    [
+     {
+      "node": "Get FV2 Count",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Wait for NCs": {
+   "main": [
+    [
+     {
+      "node": "Compute Stats",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Get FV2 Count": {
+   "main": [
+    [
+     {
+      "node": "Gen FV2 Pages",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Gen FV2 Pages": {
+   "main": [
+    [
+     {
+      "node": "Get FV2",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Get FV2": {
+   "main": [
+    [
+     {
+      "node": "Merge FV2",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Merge FV2": {
+   "main": [
+    [
+     {
+      "node": "Wait for NCs",
+      "type": "main",
+      "index": 1
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "saveManualExecutions": false,
+  "callerPolicy": "workflowsFromSameOwner",
+  "availableInMCP": false,
+  "errorWorkflow": "iVi686P2BTWp2nFg"
+ }
 }

@@ -1432,10 +1432,13 @@ let ventasData = null;
 // se renderizan con estos y NO se re-renderizan al cambiar el filtro de fechas.
 let ventasFull = null;
 let fullRendered = false;
-// Histórico completo (desde que existe la operación). Solo lo usa la Tendencia
-// Mensual, que debe mostrar todos los meses siempre, sin importar el filtro.
+// Histórico completo (desde que existe la operación). Lo usan la Tendencia Mensual
+// y las Tablas Dinámicas, que muestran todos los meses siempre, sin importar el filtro.
 const VENTAS_ALLTIME_START = '2024-01-01';
 let ventasAllTime = null;
+// Fuente de datos de las Tablas Dinámicas (pivot): se fija una vez en renderTablas()
+// a ventasAllTime (o ventasFull mientras el histórico completo no haya llegado).
+let pivotSource = null;
 let b2bClientesSort = { col:'totalCompras', dir:'desc' };
 let chartInstances = {};
 
@@ -1445,12 +1448,95 @@ let chartInstances = {};
     document.getElementById('b2bDateTo').value   = now.toISOString().split('T')[0];
 })();
 
-function applyB2BFilter(){ loadB2B(); }
+// ── Filtro rápido (client-side) ──────────────────────────────────────────
+// Si el rango son meses completos y ya tenemos el histórico (ventasAllTime),
+// KPIs/Canal/Categorías/Top10 se recalculan sumando meses en el navegador,
+// sin volver a llamar a get-ventas. Si no (rango de días sueltos, o el
+// histórico aún no cargó), cae al comportamiento de siempre (fetch a n8n).
+// Meta/Cartera/Exportación/Tendencia/Tablas/Clientes B2B NO dependen de este
+// filtro (se resuelven aparte, ver renderB2BAll).
+
+// Devuelve ['YYYY-MM',...] si [fromStr,toStr] es exactamente una racha de
+// meses completos (día 1 al último día del mes, o hasta hoy si es el mes en
+// curso); si no, devuelve null.
+function fullMonthsInRange(fromStr, toStr) {
+    if (!fromStr || !toStr) return null;
+    const from = new Date(fromStr + 'T00:00:00'), to = new Date(toStr + 'T00:00:00');
+    if (isNaN(from) || isNaN(to) || from > to) return null;
+    if (from.getDate() !== 1) return null;
+    const lastDayOfMonth = new Date(to.getFullYear(), to.getMonth() + 1, 0).getDate();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isLastDay = to.getDate() === lastDayOfMonth;
+    const isTodayOfCurrentMonth = (toStr === todayStr);
+    if (!isLastDay && !isTodayOfCurrentMonth) return null;
+    const months = [];
+    let y = from.getFullYear(), m = from.getMonth();
+    const endY = to.getFullYear(), endM = to.getMonth();
+    while (y < endY || (y === endY && m <= endM)) {
+        months.push(y + '-' + String(m + 1).padStart(2, '0'));
+        m++; if (m > 11) { m = 0; y++; }
+    }
+    return months;
+}
+
+// Suma los meses pedidos desde el histórico (ventasAllTime) y arma un objeto
+// con la misma forma que devuelve get-ventas, para los renders filtrables.
+// Nota: totalClientesB2B/C (usados solo en el sub-label "N empresas ·
+// N consumidores" y el badge de nav) quedan con el valor de ventasFull
+// (año en curso) porque no hay desglose de clientes únicos por mes en el
+// histórico — igual que la tabla de Clientes B2B, que ya no se filtra.
+function buildClientSideVentas(months, from, to) {
+    const src = ventasAllTime;
+    const monthSet = new Set(months);
+    let totalGeneral = 0, totalB2C = 0, totalB2B = 0, totalExport = 0, totalFacturas = 0;
+    for (const m of (src.meses || [])) {
+        if (!monthSet.has(m.mes)) continue;
+        totalGeneral += m.total || 0; totalB2C += m.b2c || 0; totalB2B += m.b2b || 0;
+        totalExport += m.export || 0; totalFacturas += m.facturas || 0;
+    }
+    const categorias = (src.pivot.categorias || []).map(c => {
+        let sub = 0, qty = 0;
+        for (const mk of months) { const v = c.meses[mk]; if (v) { sub += v.subtotal; qty += v.qty; } }
+        return { categoria: c.categoria, subtotal: sub, qty, facturas: 0 };
+    }).filter(c => c.subtotal || c.qty);
+    const catTotal = categorias.reduce((s, c) => s + c.subtotal, 0);
+    categorias.forEach(c => { c.pct = catTotal > 0 ? Math.round(c.subtotal / catTotal * 1000) / 10 : 0; });
+    categorias.sort((a, b) => b.subtotal - a.subtotal);
+    const todosProductos = (src.pivot.productos || []).map(p => {
+        let sub = 0, qty = 0, fac = 0;
+        for (const mk of months) { const v = p.meses[mk]; if (v) { sub += v.subtotal; qty += v.qty; fac += (v.facturas || 0); } }
+        return { code: p.code, name: p.name, category: p.categoria, subtotal: sub, qty, facturas: fac };
+    }).filter(p => p.subtotal || p.qty).sort((a, b) => b.subtotal - a.subtotal);
+    const fullYearRef = ventasFull || src;
+    return {
+        meta: { dateStart: from, dateEnd: to, totalFacturas, totalNCs: 0, base: 'subtotal_neto' },
+        resumen: {
+            totalGeneral, totalB2C, totalB2B, totalExport, totalSubtotal: totalGeneral, totalImpuestos: 0,
+            cumplimientoPct: 0, metaAnual: fullYearRef.resumen.metaAnual, diferenciaMeta: 0
+        },
+        categorias, todosProductos, top10Productos: todosProductos.slice(0, 10),
+        totalClientesB2B: fullYearRef.totalClientesB2B, totalClientesB2C: fullYearRef.totalClientesB2C
+    };
+}
+
+function applyB2BFilter(){
+    const from = document.getElementById('b2bDateFrom').value;
+    const to   = document.getElementById('b2bDateTo').value;
+    const months = ventasAllTime ? fullMonthsInRange(from, to) : null;
+    const cubiertos = months && months.every(mk => (ventasAllTime.pivot.meses || []).includes(mk));
+    if (cubiertos) {
+        ventasData = buildClientSideVentas(months, from, to);
+        document.getElementById('b2bPeriodLabel').textContent = fmtDate(from) + ' → ' + fmtDate(to);
+        renderB2BAll();
+        return;
+    }
+    loadB2B();
+}
 function clearB2BFilter(){
     const now=new Date();
     document.getElementById('b2bDateFrom').value=now.getFullYear()+'-01-01';
     document.getElementById('b2bDateTo').value=now.toISOString().split('T')[0];
-    loadB2B();
+    applyB2BFilter();
 }
 
 // Filtro propio de Destacadas: reutiliza el mismo get-ventas (sincroniza el rango B2B)
@@ -1503,15 +1589,16 @@ async function loadB2B() {
     }
 }
 
-// Carga en segundo plano el histórico completo (solo para la Tendencia Mensual).
-// No bloquea el panel: cuando llega, redibuja ese único gráfico.
+// Carga en segundo plano el histórico completo (Tendencia Mensual, Tablas
+// Dinámicas y el filtro rápido lo usan). No bloquea el panel: cuando llega,
+// redibuja lo que ya se haya mostrado con el rango parcial (año en curso).
 async function loadVentasAllTime() {
     if (ventasAllTime) return;
     try {
         const hoy = new Date().toISOString().split('T')[0];
         const res = await fetch(VENTAS_URL + '?date_start=' + VENTAS_ALLTIME_START + '&date_end=' + hoy);
         const data = await res.json();
-        if (data && data.meta) { ventasAllTime = data; renderB2BMensual(); }
+        if (data && data.meta) { ventasAllTime = data; renderB2BMensual(); renderTablas(); }
     } catch(e) { console.warn('histórico completo no disponible, se usa el rango por defecto', e); }
 }
 
@@ -1522,10 +1609,10 @@ function renderB2BAll() {
     renderB2BCanal();
     renderB2BCategorias();
     renderB2BTop10();
-    renderTablas();
-    renderB2BClientes();
     // Secciones sin filtro (meta, avance anual, tendencia mensual, exportación,
-    // cartera): una sola vez. Evita re-render (y re-crear sus charts) al filtrar.
+    // cartera, tablas dinámicas, clientes B2B): una sola vez. Evita re-render
+    // (y re-crear charts) al filtrar; Tablas/Clientes B2B ya tienen sus propios
+    // selectores (meses/búsqueda) y muestran siempre el histórico completo.
     if (!fullRendered) {
         fullRendered = true;
         renderMetaBar();
@@ -1533,6 +1620,8 @@ function renderB2BAll() {
         renderB2BMensual();
         renderExport();
         renderCartera();
+        renderTablas();
+        renderB2BClientes();
     }
 }
 
@@ -1801,15 +1890,18 @@ function pivotItems(dim) {
         { key:'B2B · Empresas',   label:'B2B · Empresas',   extra:'' },
         { key:'🌍 Exportación',    label:'🌍 Exportación',    extra:'' },
     ];
-    const src = (ventasData.pivot && ventasData.pivot[dim]) || [];
+    const src = (pivotSource && pivotSource.pivot && pivotSource.pivot[dim]) || [];
     if (dim==='productos') return src.map(p=>({ key:p.code, label:p.name, extra:p.categoria }));
     return src.map(c=>({ key:c.categoria, label:c.categoria, extra:'' }));
 }
 
 function renderTablas() {
-    if (!ventasData || !ventasData.pivot) return;
+    // Tablas Dinámicas NO se filtra por fechas: muestra siempre el histórico
+    // completo (ya tiene su propio selector de meses con checkboxes).
+    pivotSource = ventasAllTime || ventasFull || ventasData;
+    if (!pivotSource || !pivotSource.pivot) return;
     // Meses (chips)
-    const meses = ventasData.pivot.meses || [];
+    const meses = pivotSource.pivot.meses || [];
     pivotSelectedMonths = new Set(meses);
     document.getElementById('pivotMonths').innerHTML = meses.map(mk=>{
         const [y,mo]=mk.split('-');
@@ -1837,7 +1929,7 @@ function updateTablasSummary(){
     const total = pivotItems(dim).length;
     const selRows = pivotRowSel ? pivotRowSel.size : total;
     const rowsTxt = selRows===total ? 'todas' : (selRows+' de '+total);
-    const allM = (ventasData.pivot.meses||[]).length;
+    const allM = (pivotSource.pivot.meses||[]).length;
     const selM = pivotSelectedMonths ? pivotSelectedMonths.size : allM;
     const mesTxt = selM===allM ? 'todos los meses' : (selM+' meses');
     document.getElementById('tablasFilterSummary').textContent = `${dimLbl} · ${rowsTxt} · ${mesTxt} · valor + cantidad`;
@@ -1874,10 +1966,10 @@ function rowSelAll(on){
 }
 
 function renderPivot() {
-    if (!ventasData || !ventasData.pivot) return;
+    if (!pivotSource || !pivotSource.pivot) return;
     const dim = document.getElementById('pivotDim').value;
     const q = document.getElementById('pivotSearch').value.toLowerCase().trim();
-    const allMonths = ventasData.pivot.meses || [];
+    const allMonths = pivotSource.pivot.meses || [];
     const months = allMonths.filter(m=>pivotSelectedMonths.has(m));
     const hasQty = dim!=='centros';   // centro de costo no tiene cantidad
 
@@ -1890,11 +1982,11 @@ function renderPivot() {
         const defs = [['B2C · Consumidor','b2c'],['B2B · Empresas','b2b'],['🌍 Exportación','export']];
         for (const [label,key] of defs) {
             const meses={}; let tSub=0;
-            for (const c of (ventasData.pivot.centros||[])) { if(!pivotSelectedMonths.has(c.mes)) continue; const v=c[key]||0; meses[c.mes]={sub:v,qty:null}; tSub+=v; }
+            for (const c of (pivotSource.pivot.centros||[])) { if(!pivotSelectedMonths.has(c.mes)) continue; const v=c[key]||0; meses[c.mes]={sub:v,qty:null}; tSub+=v; }
             rows.push({ key:label, label, extra:'', meses, totSub:tSub, totQty:null });
         }
     } else {
-        const src = ventasData.pivot[dim] || [];
+        const src = pivotSource.pivot[dim] || [];
         rows = src.map(item=>{
             const meses={}; let tSub=0, tQty=0;
             for (const mk of months) { const c=item.meses[mk]; const s=c?c.subtotal:0, qy=c?c.qty:0; meses[mk]={sub:s,qty:qy}; tSub+=s; tQty+=qy; }
@@ -2083,7 +2175,8 @@ function renderExport() {
 
 let b2bClientesData = [];
 function renderB2BClientes() {
-    b2bClientesData = ventasData.clientesB2B || [];
+    // Clientes B2B NO se filtra por fechas: siempre el histórico (año en curso).
+    b2bClientesData = (ventasFull || ventasData).clientesB2B || [];
     _renderB2BClientesTable();
 }
 function _renderB2BClientesTable() {
@@ -2093,7 +2186,7 @@ function _renderB2BClientesTable() {
         return typeof av==='number'?(b2bClientesSort.dir==='asc'?av-bv:bv-av):(b2bClientesSort.dir==='asc'?String(av).localeCompare(String(bv),'es'):String(bv).localeCompare(String(av),'es')); });
     document.getElementById('countB2BClientes').textContent = rows.length + ' empresas';
     const tbody = document.getElementById('bodyB2BClientes');
-    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="6">Sin clientes B2B en el período</td></tr>'; return; }
+    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="6">Sin clientes B2B</td></tr>'; return; }
     tbody.innerHTML = rows.map(c=>`<tr>
         <td class="td-name">${esc(c.name)}</td>
         <td style="color:var(--gris);font-size:12px">${esc(c.identification)}</td>
