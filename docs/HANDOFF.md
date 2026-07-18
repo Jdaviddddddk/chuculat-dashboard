@@ -1,5 +1,5 @@
 # Handoff — Chuculat (fidelización + ventas + Supabase)
-_Para continuar en otro chat. Actualizado: 2026-07-16 (sesiones 3 y 4)._
+_Para continuar en otro chat. Actualizado: 2026-07-18 (sesiones 3–6)._
 
 ## Contexto rápido
 Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymarketing.com`, header API `X-N8N-API-KEY`).
@@ -11,8 +11,11 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 
 ## Credenciales / IDs
 - **Supabase**: `https://wavqyesyqqmawjfaztvb.supabase.co`. service_role (SECRETA) en los scripts locales y nodos n8n. SQL Editor: `https://supabase.com/dashboard/project/wavqyesyqqmawjfaztvb/sql/new`
-- **GHL**: locationId `jzrg6bPH71ccLohGddsN`; token `<GHL_PRIVATE_TOKEN — ver memoria local>` (**solo funciona desde la IP del server n8n** → usar workflows temporales como proxy; patrón en `write_ghl.py`; borrarlos al terminar).
+- **GHL**: locationId `jzrg6bPH71ccLohGddsN`. **Dos tokens con scopes distintos** (los tokens SÍ funcionan desde cualquier IP; la nota vieja de "IP-locked" era errónea):
+  - `pit-6827daee…` = **SUPERSET, usar este**: contactos (RW) + campos personalizados + mensajería. Es el unificado en todos los workflows del sistema.
+  - `pit-980a207a…` = SOLO contactos (falla en campos y mensajería). Token de mensajería GWA `pit-b01308b1…` es de OTRA location (solo para enviar SMS).
   - Campos: identificación `4C6TxwNRElYAB1HFkJb4` · saldo `UfFc9GjS1K9az8nactO5` · histórico `ciYvzjlWfz9RcmIlqRkO` · redimidos `jyDAuEv0t1ugBAop1HAQ` · fechas recompra `wdfNkPf305JjwPdTUBwS` · última recompra `4SxhRfKQzstus8dzHsxS` · fecha redención `KK5lI6yJVEB9WhGwdFpa` · detalle redención `xmOqbRfTg5xaE2WCKfzS`
+  - Campos de compras (enriquecimiento): Total Gastado `4XeNF2WH8ENigBGp2p3y` · Cantidad `ZgAmsrhK3c9txQDdamoK` · Última Fecha `awOZU9UMdqsEtOzeohst` · Últimos Productos `5kLgbedHcudIHOb4QCYs` · Producto Favorito `M2v7Jx24UrBCKxdULFp0`
 - **Siigo**: user `<SIIGO_USERNAME — ver memoria local>`, access_key base64 en scripts. Partner-Id `n8nApp`. Factura: `document.id 30537`, `seller 10857`, `payments.id 13848`, `warehouse 30`, domicilio = SKU `672`.
 - **Centros de costo**: 166=B2B, 168=B2C, 315=Exportación, 170=Planta, 172=Admin. **Corte del programa de puntos: `2026-05-11`**.
 - **Sitio de redención** (en GHL): login `<REDACTADO>` / `<REDACTADO>`.
@@ -28,10 +31,14 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 | `GriVDvrNIY6RGDx1` | **Get Premios** (`get-premios`) | catálogo de premios desde Supabase |
 | `GKelHhGiTUYu1QzD` | Get Logs (`get-logs`) | lee `puntos_log`; el nodo `Mapear` mapea campo a campo |
 | `KebzbxEJltA9a86w` | Stats (`get-stats`) | redimidos = campo GHL `jyDAuEv0t1ugBAop1HAQ` |
-| `T5vFnAkNZKPmuzv9` | Woocommerce-Siigo | idempotente; 3 bugs arreglados (ver abajo) |
-| `VQKbig1zk65gk3G5` | Confirmar cita (`payment-confirmation`) | experiencias vía ePayco |
-| `iVi686P2BTWp2nFg` | Error Handler | errorTrigger → SMS |
+| `O1NgZF4VXxdRjSeo` | Enriquecimiento Siigo→GHL (cada 1h) | tags `cat:`/`prod:` + campos de compras + notas 🛒 por cliente B2C |
+| `T5vFnAkNZKPmuzv9` | Woocommerce-Siigo | idempotente; timbra DIAN; enlazado al Error Handler |
+| `VQKbig1zk65gk3G5` | Confirmar cita (`payment-confirmation`) | experiencias vía ePayco; `/contacts/upsert`; timbra DIAN |
+| `iVi686P2BTWp2nFg` | Error Handler | errorTrigger → **SMS por sub-cuenta GWA** (ver abajo) |
+| `Pq20DQX58YMzdls2` | **Reconciliar Supabase** (diario 5am) | borra de `ventas_invoices` las facturas anuladas en Siigo (fantasmas) |
 | `iIGA54Txfw5BfKjN` | TEST Log Activity | insert manual a `puntos_log` |
+
+**Alertas SMS:** el Error Handler está enlazado (`settings.errorWorkflow`) a los críticos: Redimir Puntos, SIIGO-GHL FACTURAS, Dashboard Ventas, Enriquecimiento, Cierre Mensual, **Confirmar cita, Woocommerce, Reconciliar Supabase**. SMS por la **sub-cuenta GWA** (location `fPuvVoCK3e5wQQVtSujb`, número Twilio **+16619908570**, token `pit-b01308b1…`) porque la location Chuculat NO tiene número SMS ni WhatsApp proactivo. Destino: contacto `Vjg9EwykevCwzxbZA4hA` (+573123408459) en GWA.
 
 ## Tablas Supabase
 - **`ventas_invoices`** — 10.470 facturas. **`raw` (jsonb) = factura Siigo completa; es la que usa el dashboard** (las otras columnas son lossy: sin identification/discount). SQL: `backend/supabase_ventas.sql`.
@@ -86,19 +93,47 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 - **Simplificación conocida**: la etiqueta "N empresas · N consumidores" (y el badge de nav junto a B2B) usa el conteo de clientes únicos de `ventasFull` (año en curso), no el del sub-rango exacto filtrado — no hay desglose de clientes únicos por mes en los datos precalculados. Mismo criterio que Clientes B2B, que tampoco se filtra.
 
 
+## HECHO en la sesión 6 (17-18 jul, esta rama — commits `678c9cd`..`73c82bf`)
+
+### Puntos y redención
+- **`puntos_log` reconstruido** desde Siigo: estaba sucio (le faltaban 117 compras y tenía ~8k pts de más del histórico) → se rehízo con 247 sumas canónicas (1 por factura elegible desde el corte, pts=floor(subtotal/1000), invoice_id correcto) + 2 redenciones. Script `reconstruir_puntos.js`.
+- **Redimir Puntos** ahora escribe también **Última Redención** (fecha, campo `KK5lI6yJVEB9WhGwdFpa`) y **Última Redención (detalle)** (texto `xmOqbRfTg5xaE2WCKfzS` = "DD/MM/YYYY · N pts"). Probado end-to-end (contacto Miguel, revertido).
+- **Bug invoice_id** en SIIGO-GHL FACTURAS (`Log: Preparar Entrada`): guardaba el nombre del cliente en vez del № de factura (`invoice.name` era el array del Cliente). Corregido a `$('Factura').first().json.results[0].name` + usa la fecha real de la factura.
+- **Juanita** (1193434596, redimió 131) y **Adriana** (51941843, redimió 164) registradas; fecha de redención = 1 día después de su última compra. Nota: Adriana redimió más de lo que ganó (127) → saldo quedó -37 (decisión explícita de Johan).
+- **Borrados a pedido**: registros de puntos/compras/redención de Jhonnatan Arenas (1000992852) y Camilo Restrepo (1233692073) — puntos_log + campos/tags/notas GHL a 0. NO se tocaron sus facturas en Siigo. (Cuidado: filtrar por **cédula**, no por nombre — "camilo" matchea 6 personas.)
+
+### Facturación (timbrado)
+- **Timbrado automático DIAN** (`stamp:{send:true}`) en Confirmar cita (ambas ramas) y Woocommerce-Siigo. Antes toda factura nacía en `Draft`.
+- **Fix Confirmar cita**: usaba `POST /contacts/` y moría con "duplicated contacts" cuando el contacto existía por tel/email pero sin cédula. Ahora `POST /contacts/upsert`. Recuperado Sergio Guerrero ($250k, FV-2-1189 timbrada).
+
+### Alertas de error por SMS
+- **Error Handler** (`iVi686P2BTWp2nFg`) enlazado a los 8 críticos. Envía SMS por la sub-cuenta GWA (ver tabla de workflows arriba). Probado: entrega `delivered`.
+
+### Encuestas
+- **Nota 1-5** con 3 preguntas (Recomendación/Satisfacción/Servicio, `5 - índice`), gráfica de barras verticales arriba, resto colapsado tras "Ver resumen completo". Se resuelven **por texto de la pregunta, NO por id** (Chuculatología reutiliza ids con otro significado). "No había expectativas previas" = 1.
+
+### Ventas / Destacadas
+- **Cross-sell limpio**: descarta de `parejas` los cruces triviales (categoría BOMBONES, `/^CH(\s|$)/` — no `startsWith` porque CHUNKS también empieza con CH — y código 304 "Caja bom pre").
+- **Etiquetas verde/roja por sección** (pestaña que asoma arriba-derecha): verde "Por fechas" = responde al filtro (`renderB2BFiltered`); rojo "Consolidada" = histórico fijo (bloque `fullRendered` + Tablas). Mapa `FILTER_TAGS`, inyectado en `DOMContentLoaded`.
+
+### Facturas fantasma (desfase de ventas) — CAUSA RAÍZ + ARREGLO DURABLE
+- **Síntoma**: julio salía **+$80.000** vs Siigo. Causa: **FV-2-1158** ($80k) se anuló en Siigo pero su copia quedó en `ventas_invoices` (el cierre solo hace upsert, nunca borra) → el dashboard (Supabase + Siigo vivo, dedup por id) la seguía contando. Fila borrada.
+- **Arreglo durable**: workflow **`Pq20DQX58YMzdls2` "Reconciliar Supabase"** (diario 5am). Ventana 75 días: compara ids Supabase vs Siigo vivo (estándar + pasada `document_id=30537` para exportación) y **borra solo tras confirmar 404 con GET directo a Siigo** (no por ausencia en la lista → no mata exportación). Tope 60 candidatas. Ver [[facturas-fantasma-supabase]] en memoria.
+
+---
+
 ## PENDIENTE
 
 1. **[Johan] Pegar `frontend/redencion.html` en GHL** y hacer **una redención de prueba con pocos puntos**: es el único eslabón sin ejercitar (no lo probé porque descontaría puntos reales). Verificar que `items` llegue a `puntos_log`.
 2. **[Johan] Confirmar tabletas 30g** (366/368): ¿$15.000/105 pts como las cargué, o $24.000/168 como decía el PDF?
 3. **[Johan] SKU a los combos en WooCommerce** (product_id **4120** "Combo para la casa" y **4118** "Combo Amateur"): ya existen en Siigo (730/731/732) pero Woo manda `sku:""` → **cada venta con combo seguirá fallando**. No son bundles (`meta_data:[]`), son productos simples.
-4. **[Johan] Timbrar a mano 4 facturas en `Draft`** (Siigo rechaza timbrarlas por API: `invalid_date` por la fecha retroactiva) — **$356.451**:
+4. **[Johan] Timbrar a mano 3 facturas en `Draft`** (Siigo rechaza timbrarlas por API: `invalid_date` por la fecha retroactiva) — **$305.352**:
    | Factura | Fecha | Cliente | Total |
    |---|---|---|---|
-   | FV-2-1127 | 23-jun | Diego Lopez (1014240198) | $51.499 |
    | FV-2-1157 | 02-jul | Manuel Vicente Tejada (94460233) | $58.920 |
    | FV-2-1159 | 03-jul | juan rodriguez (1024489707) | $75.999 |
    | FV-2-1177 | 09-jul | Aura Edilma Velandia (40046714) | $170.033 |
-   (Las 6 creadas a mano el 16-jul —FV-2-1183..1188— **ya quedaron timbradas** `Accepted` con CUFE.)
+   (FV-2-1127 ya se re-fechó al 17-jul y quedó `Accepted`. Las 6 del 16-jul —FV-2-1183..1188— también.)
 5. **Venta de Silvia sin facturar** ($184.000, "Chocolates" por link de pago ePayco, doc 39569600) — Johan la dejó por fuera.
 5. Barrer `puntos_log` completo contra `ventas_invoices` por si hay más casos tipo Tejada (puntos de facturas que no son cc=168).
 6. (Opcional) `Get FV2` del dashboard baja TODAS las FV-2 en cada llamada y **oscila entre 2,5s y 17,6s** (API de Siigo) — es el mayor cuello de botella restante. Cachearlo requiere cuidado (ver abajo).
@@ -113,7 +148,13 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 - **En el payload de get-ventas: `categorias[]` usa la clave `categoria`, NO `name`** (en `todosProductos[]` sí es `category`).
 - **DNS intermitente** al server → siempre reintentos (2-8 con sleep 3-4s).
 - **Supabase REST**: paginación con `Range: 0-999` + `Range-Unit: items`. Upsert: `?on_conflict=<col>` + `Prefer: resolution=merge-duplicates`.
-- **PUT workflow n8n**: enviar solo `{name,nodes,connections,settings}`.
+- **PUT workflow n8n**: enviar solo `{name,nodes,connections,settings}`, y `settings` **solo** `{executionOrder:'v1'[, errorWorkflow:'<id>']}` — cualquier otra propiedad → 400 "must NOT have additional properties".
+- **Facturas anuladas quedan fantasma en Supabase** (el cierre solo upsertea) e inflan el dashboard. Lo limpia el workflow `Reconciliar Supabase` (diario). Si notas un desfase de ventas vs Siigo, casi seguro es esto — o el caché de 60 min. Cubre solo últimos 75 días; para meses viejos hay que barrer a mano.
+- **En `ventas_invoices`: la columna `id` ES el id de factura Siigo (= `raw.id`).** El dashboard filtra por `raw->>date` (fecha de factura); el cierre fetchea por `created_start/created_end` (fecha de creación) — no confundir.
+- **Filtros de Siigo `?identification=` y `?date_start=` en `/v1/invoices` y `/v1/credit-notes` están ROTOS** (ignoran el filtro y devuelven todo/lo más reciente). Hay que traer y filtrar en código. La serie **FV-2 exportación (CC315) NO sale en el listado estándar** → pasada aparte con `document_id=30537`.
+- **Regex `\w` NO matchea tildes** (la "í" de "calificarías"). Rompió el score de "Servicio" en silencio. Usar clases explícitas o matchear por substring sin acentos.
+- **Los Code node de ESTE n8n SÍ pueden hacer `this.helpers.httpRequest`** (Parse Hist, Build Product Map, Upsert Supabase, Reconciliar lo usan) — no aplica la restricción del task-runner.
+- **GHL: la location Chuculat NO tiene número → no envía SMS ni WhatsApp proactivo** (WhatsApp solo dentro de la ventana de 24h). Las alertas van por la sub-cuenta GWA. **`?identification=` en search de contactos: usar filtro por campo `customFields.4C6TxwNRElYAB1HFkJb4`.**
 
 ## Archivos locales (`C:\Users\johan\Documents\Claude\Botcito`)
 - `redencion-carrito.html` — sitio de redención con carrito (copia en el repo).
