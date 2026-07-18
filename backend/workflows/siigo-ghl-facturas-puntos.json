@@ -108,7 +108,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const valorCompra = $input.first().json.subtotal_calculado;\nconst puntosGanados = Math.floor(valorCompra / 1000);\n\nreturn [{\n  json: {\n    ...$json,\n    puntosGanados\n  }\n}];"
+        "jsCode": "const valorCompra = $input.first().json.subtotal_calculado;\nconst puntosGanados = Math.ceil(valorCompra / 1000);\n\nreturn [{\n  json: {\n    ...$json,\n    puntosGanados\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

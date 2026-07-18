@@ -1,0 +1,85 @@
+{
+  "name": "CHUCULAT | Reconciliar Supabase",
+  "nodes": [
+    {
+      "id": "sch",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 5,
+              "daysInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "auth",
+      "name": "Auth Siigo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.siigo.com/auth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"username\":\"<SIIGO_USERNAME>\",\"access_key\":\"<SIIGO_ACCESS_KEY>\"}",
+        "options": {}
+      }
+    },
+    {
+      "id": "rec",
+      "name": "Reconciliar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const token = $('Auth Siigo').first().json.access_token;\nconst SH = { Authorization:'Bearer '+token, 'Partner-Id':'n8nApp' };\nconst SB = 'https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY = '<JWT_REDACTED>';\nconst H = { apikey:KEY, Authorization:'Bearer '+KEY };\nconst http = (o) => this.helpers.httpRequest(o);\n\nconst hoy = new Date();\nconst desde = new Date(hoy.getTime() - 75*86400000).toISOString().slice(0,10);\nconst hasta = hoy.toISOString().slice(0,10);\n\n// 1. IDs en Supabase dentro de la ventana (por fecha de factura)\nconst sbIds = [];\nlet off = 0;\nwhile (true) {\n  const r = await http({ method:'GET', json:true, headers:H,\n    url: SB + '/rest/v1/ventas_invoices?select=id&raw->>date=gte.' + desde + '&raw->>date=lte.' + hasta + '&limit=1000&offset=' + off });\n  const arr = Array.isArray(r) ? r : [];\n  for (const x of arr) sbIds.push(x.id);\n  if (arr.length < 1000) break;\n  off += 1000;\n}\n\n// 2. IDs vivos en Siigo (est�ndar + serie FV-2 exportaci�n)\nconst live = new Set();\nasync function fetchLive(extra) {\n  const first = await http({ method:'GET', json:true, headers:SH,\n    url: 'https://api.siigo.com/v1/invoices?date_start=' + desde + '&date_end=' + hasta + extra + '&page=1&page_size=100' });\n  const tot = (first.pagination||{}).total_results || 0;\n  const pages = Math.ceil(tot/100);\n  for (const i of (first.results||[])) live.add(i.id);\n  for (let p=2; p<=pages; p++) {\n    const r = await http({ method:'GET', json:true, headers:SH,\n      url: 'https://api.siigo.com/v1/invoices?date_start=' + desde + '&date_end=' + hasta + extra + '&page=' + p + '&page_size=100' });\n    for (const i of (r.results||[])) live.add(i.id);\n  }\n}\nawait fetchLive('');\nawait fetchLive('&document_id=30537');\n\n// 3. Candidatas: en Supabase pero no en la lista viva\nconst candidatas = sbIds.filter(id => !live.has(id));\n\n// Cap de seguridad\nif (candidatas.length > 60) {\n  return [{ json: { alerta:'DEMASIADAS CANDIDATAS ('+candidatas.length+') - no se borr� nada', ventana:desde+'..'+hasta, sbCount:sbIds.length, liveCount:live.size } }];\n}\n\n// 4. Verificar cada candidata con GET directo ? borrar SOLO si 404\nconst borradas = [];\nconst conservadas = [];\nfor (const id of candidatas) {\n  let existe = true; // fail-safe: solo se pone false ante un 404 confirmado\n  try {\n    await http({ method:'GET', json:true, headers:SH, url:'https://api.siigo.com/v1/invoices/' + id });\n  } catch (e) {\n    const code = e.httpCode || e.statusCode || (e.cause && e.cause.statusCode) || 0;\n    if (String(code) === '404' || /\\b404\\b/.test(String(e.message||''))) existe = false;\n  }\n  if (!existe) {\n    await http({ method:'DELETE', json:true, headers:Object.assign({}, H, { Prefer:'return=minimal' }),\n      url: SB + '/rest/v1/ventas_invoices?id=eq.' + id });\n    borradas.push(id);\n  } else {\n    conservadas.push(id);\n  }\n}\n\nreturn [{ json: {\n  ventana: desde + '..' + hasta,\n  supabase: sbIds.length, vivas: live.size,\n  candidatas: candidatas.length,\n  borradas: borradas.length, idsBorradas: borradas,\n  conservadas: conservadas.length\n} }];"
+      }
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Auth Siigo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Siigo": {
+      "main": [
+        [
+          {
+            "node": "Reconciliar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
