@@ -121,32 +121,11 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://services.leadconnectorhq.com/contacts/search",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Version",
-              "value": "2023-02-21"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer <GHL_PRIVATE_TOKEN>"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"locationId\": \"jzrg6bPH71ccLohGddsN\",\n  \"pageLimit\": 10,\n  \"page\": 1,\n  \"filters\": [\n    {\n      \"field\": \"customFields.4C6TxwNRElYAB1HFkJb4\",\n      \"operator\": \"eq\",\n      \"value\": \"{{ $json.identification }}\"\n    }\n  ]\n}",
-        "options": {
-          "redirect": {
-            "redirect": {}
-          }
-        }
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Cascada de detección de contacto: cédula → teléfono → email.\n// Devuelve { total, contacts:[uno], matchedBy } igual que /contacts/search.\nconst j = $json;\nconst TOKEN = '<GHL_PRIVATE_TOKEN>';\nconst LOC = 'jzrg6bPH71ccLohGddsN';\nconst CED_FIELD = '4C6TxwNRElYAB1HFkJb4';\nconst H = { Authorization: 'Bearer ' + TOKEN, Version: '2021-07-28', 'Content-Type': 'application/json' };\nconst norm = t => String(t || '').replace(/[^0-9]/g, '').replace(/^57(?=\\d{10}$)/, '');\nconst search = (body) => this.helpers.httpRequest({ method:'POST', url:'https://services.leadconnectorhq.com/contacts/search', headers:H, body, json:true });\n\nconst ident = String(j.identification || '').trim();\nconst tel   = norm((j.phones || [])[0] && (j.phones || [])[0].number);\nconst email = String(((j.contacts || [])[0] || {}).email || '').trim().toLowerCase();\n\nlet found = null, matchedBy = '';\n// 1) por cédula (campo personalizado)\nif (ident) {\n  const r = await search({ locationId:LOC, pageLimit:10, page:1, filters:[{ field:'customFields.'+CED_FIELD, operator:'eq', value:ident }] });\n  found = (r.contacts || [])[0] || null; if (found) matchedBy = 'identificacion';\n}\n// 2) por teléfono (contains + verificación exacta)\nif (!found && tel && tel.length >= 7) {\n  const r = await search({ locationId:LOC, pageLimit:10, page:1, filters:[{ field:'phone', operator:'contains', value:tel }] });\n  found = (r.contacts || []).find(c => norm(c.phone) === tel) || null; if (found) matchedBy = 'telefono';\n}\n// 3) por email (eq + verificación exacta)\nif (!found && email) {\n  const r = await search({ locationId:LOC, pageLimit:10, page:1, filters:[{ field:'email', operator:'eq', value:email }] });\n  found = (r.contacts || []).find(c => String(c.email||'').trim().toLowerCase() === email) || null; if (found) matchedBy = 'email';\n}\nreturn { json: { total: found ? 1 : 0, contacts: found ? [found] : [], matchedBy } };"
       },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         1840,
         1488
@@ -274,7 +253,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"phone\": \"{{ $json.phone }}\",\n  \"email\": \"{{ $json.email }}\",\n  \"name\": \"{{ $json.name }}\",\n  \"customFields\": [\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": {{ $json.totalPuntos }}\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": {{ $json.puntosHistory }}\n    },\n    {\n      \"id\": \"wdfNkPf305JjwPdTUBwS\",\n      \"field_value\": \"{{ $json.newHistorial }}\"\n    },\n    {\n      \"id\": \"4SxhRfKQzstus8dzHsxS\",\n  \"field_value\": \"{{ $json.fechaUltimaRecompra }}\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"phone\": \"{{ $json.phone }}\",\n  \"email\": \"{{ $json.email }}\",\n  \"name\": \"{{ $json.name }}\",\n  \"customFields\": [\n    {\n      \"id\": \"4C6TxwNRElYAB1HFkJb4\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.identification }}\"\n    },\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": {{ $json.totalPuntos }}\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": {{ $json.puntosHistory }}\n    },\n    {\n      \"id\": \"wdfNkPf305JjwPdTUBwS\",\n      \"field_value\": \"{{ $json.newHistorial }}\"\n    },\n    {\n      \"id\": \"4SxhRfKQzstus8dzHsxS\",\n  \"field_value\": \"{{ $json.fechaUltimaRecompra }}\"\n    }\n  ]\n}",
         "options": {
           "redirect": {
             "redirect": {}
@@ -321,8 +300,8 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        1184,
-        944
+        1040,
+        992
       ],
       "id": "8279cc0f-569b-4333-b4ae-4ec480610f50",
       "name": "Read/Write Files from Disk",
@@ -387,8 +366,8 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        2336,
-        1216
+        2320,
+        1184
       ],
       "id": "3131a49b-3354-4166-8e2a-fc638c3e0913",
       "name": "Loop Over Items"
@@ -589,8 +568,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1024,
-        912
+        976,
+        800
       ]
     }
   ],
