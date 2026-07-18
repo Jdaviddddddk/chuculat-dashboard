@@ -346,6 +346,25 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 .dash-section.collapsed > .section-title::before { transform:rotate(-90deg); }
 .dash-section.collapsed > *:not(.section-title) { display:none !important; }
 .dash-section.collapsed { padding-bottom:14px; }
+/* Etiqueta de filtro (pestaña que asoma por detrás, arriba a la derecha) */
+.dash-section.tagged { position: relative; }
+.filter-ribbon {
+    position: absolute; top: -13px; right: 14px; z-index: 1;
+    font-size: 10px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase;
+    padding: 5px 12px 9px; border-radius: 7px 7px 7px 0; color: #fff;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+    box-shadow: 0 4px 9px rgba(63,32,33,.20); pointer-events: none;
+}
+.filter-ribbon.green { background: linear-gradient(135deg, #6DBF33 0%, #4A8A1F 100%); }
+.filter-ribbon.red   { background: linear-gradient(135deg, #EC6197 0%, #C62828 100%); }
+/* pliegue inferior-izquierdo: da el efecto de que sale desde atrás de la tarjeta */
+.filter-ribbon::before {
+    content: ''; position: absolute; left: 0; bottom: -6px;
+    border-width: 0 7px 6px 0; border-style: solid; border-color: transparent;
+}
+.filter-ribbon.green::before { border-right-color: #35630f; }
+.filter-ribbon.red::before   { border-right-color: #8c1a1a; }
+@media (max-width: 560px) { .filter-ribbon { font-size: 9px; padding: 4px 9px 8px; right: 8px; } }
 
 /* ── Grupos de secciones (panel Ventas) ── */
 .sec-group { margin-bottom:10px; }
@@ -1635,6 +1654,31 @@ function initVentasGroups(){
         if(localStorage.getItem('chuculat.group.' + g.id) === '1') g.classList.add('collapsed');
     });
 }
+
+// ── Etiquetas de filtro por sección (verde = responde al filtro de fechas;
+//    rojo = consolidada, muestra siempre el histórico completo) ──────────────
+// Verde: lo que renderiza renderB2BFiltered() · Rojo: lo que va en el bloque
+// fullRendered de renderB2BAll() + Tablas Dinámicas.
+const FILTER_TAGS = {
+    'sec-b2b-resumen':'green', 'sec-b2b-canal':'green', 'sec-b2b-cats':'green', 'sec-b2b-top10':'green',
+    'sec-b2b-progreso':'red', 'sec-b2b-metacc':'red', 'sec-b2b-meta':'red', 'sec-b2b-mensual':'red',
+    'sec-b2b-export':'red', 'sec-b2b-cartera':'red', 'sec-b2b-clientes':'red'
+};
+function applyFilterTags(){
+    const put = (sec, tipo) => {
+        if(!sec || sec.querySelector(':scope > .filter-ribbon')) return;
+        sec.classList.add('tagged');
+        const r = document.createElement('span');
+        r.className = 'filter-ribbon ' + tipo;
+        if(tipo === 'green'){ r.textContent = '📅 Por fechas'; r.title = 'Las fechas aplican para filtro "Por fechas"'; }
+        else { r.textContent = '🗄️ Consolidada'; r.title = 'Las fechas no aplican para filtro "Consolidada"'; }
+        sec.appendChild(r);
+    };
+    for(const [id, tipo] of Object.entries(FILTER_TAGS)) put(document.getElementById(id), tipo);
+    // Tablas Dinámicas (panelTablas, sección sin id) → consolidada
+    put(document.querySelector('#panelTablas .dash-section'), 'red');
+}
+document.addEventListener('DOMContentLoaded', applyFilterTags);
 
 // ── Filtro rápido (client-side) ──────────────────────────────────────────
 // Si el rango son meses completos y ya tenemos el histórico (ventasAllTime),
