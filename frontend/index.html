@@ -421,7 +421,6 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         <a class="nav-item" href="#sec-b2b-top10"    onclick="b2bNav(this)"><span class="nav-icon">🏆</span> Ranking</a>
         <a class="nav-item" href="#sec-b2b-export"   onclick="b2bNav(this)"><span class="nav-icon">🌍</span> Exportación <span class="nav-badge" id="navBadgeExport">0</span></a>
         <a class="nav-item" href="#sec-b2b-cartera"  onclick="b2bNav(this)"><span class="nav-icon">📋</span> Cartera <span class="nav-badge" id="navBadgeCartera">0</span></a>
-        <a class="nav-item" href="#sec-b2b-canal"    onclick="b2bNav(this)"><span class="nav-icon">🔀</span> Canal</a>
         <a class="nav-item" href="#sec-b2b-clientes" onclick="b2bNav(this)"><span class="nav-icon">🏢</span> Clientes <span class="nav-badge" id="navBadgeB2B">0</span></a>
     </nav>
 </header>
@@ -767,9 +766,9 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         </div>
     </div><!-- /grp-productos -->
 
-    <!-- ═══ GRUPO: Exportación, cartera y canal ═══ -->
+    <!-- ═══ GRUPO: Exportación y cartera ═══ -->
     <div class="sec-group collapsible-group" id="grp-export">
-        <button class="grp-head" onclick="toggleGroup('grp-export')"><span>🌍 Exportación, cartera y canal</span> <span class="grp-chev">▾</span></button>
+        <button class="grp-head" onclick="toggleGroup('grp-export')"><span>🌍 Exportación y cartera</span> <span class="grp-chev">▾</span></button>
         <div class="grp-body">
 
     <!-- Exportación -->
@@ -834,17 +833,6 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                     <th>Facturas</th>
                 </tr></thead><tbody id="bodyCartera"></tbody></table>
             </div>
-        </div>
-    </section>
-
-    <!-- Ventas por Canal -->
-    <section class="dash-section" id="sec-b2b-canal">
-        <div class="section-title">🔀 Ventas por Canal <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
-        <div class="canal-grid">
-            <div class="canal-card b2c-canal"><div class="canal-label">B2C · Consumidor</div><div class="canal-value" id="canalB2CVal">—</div><div class="canal-pct" id="canalB2CPct">—</div></div>
-            <div class="canal-card b2b-canal"><div class="canal-label">B2B · Empresas</div><div class="canal-value" id="canalB2BVal">—</div><div class="canal-pct" id="canalB2BPct">—</div></div>
-            <div class="canal-card exp-canal"><div class="canal-label">🌍 Exportación</div><div class="canal-value" id="canalExpVal">—</div><div class="canal-pct" id="canalExpPct">—</div></div>
-            <div class="canal-card fac-canal"><div class="canal-label">Facturas Procesadas</div><div class="canal-value" id="canalFacturas">—</div><div class="canal-pct" id="canalFacturasSub">—</div></div>
         </div>
     </section>
 
@@ -1636,7 +1624,6 @@ async function filterVentasFloat(from, to){
 function renderB2BFiltered(){
     if(!ventasData) return;
     renderB2BKPIs();
-    renderB2BCanal();
     renderB2BCategorias();
     renderB2BTop10();
     renderExportClientes(((ventasData.exportacion)||{}).clientes || []);
@@ -1663,7 +1650,7 @@ function initVentasGroups(){
 // Verde: lo que renderiza renderB2BFiltered() · Rojo: lo que va en el bloque
 // fullRendered de renderB2BAll() + Tablas Dinámicas.
 const FILTER_TAGS = {
-    'sec-b2b-resumen':'green', 'sec-b2b-canal':'green', 'sec-b2b-cats':'green', 'sec-b2b-top10':'green',
+    'sec-b2b-resumen':'green', 'sec-b2b-cats':'green', 'sec-b2b-top10':'green',
     'sec-b2b-progreso':'red', 'sec-b2b-metacc':'red', 'sec-b2b-meta':'red', 'sec-b2b-mensual':'red',
     'sec-b2b-export':'red', 'sec-b2b-cartera':'red', 'sec-b2b-clientes':'red'
 };
@@ -1841,7 +1828,6 @@ function renderB2BAll() {
     if (!ventasData) return;
     // Secciones que SÍ responden al filtro de fechas
     renderB2BKPIs();
-    renderB2BCanal();
     renderB2BCategorias();
     renderB2BTop10();
     // Secciones sin filtro (meta, avance anual, tendencia mensual, exportación,
@@ -2411,6 +2397,8 @@ function renderB2BKPIs() {
     document.getElementById('b2bKpiB2CSub').textContent  = Math.round(r.totalB2C/tot*100)+'% del total';
     document.getElementById('b2bKpiB2BSub').textContent  = Math.round(r.totalB2B/tot*100)+'% del total';
     document.getElementById('b2bKpiExportSub').textContent = Math.round((r.totalExport||0)/tot*100)+'% del total';
+    // Venía de renderB2BCanal (sección eliminada); el badge de Clientes B2B sigue vivo.
+    document.getElementById('navBadgeB2B').textContent = ventasData.totalClientesB2B;
 }
 
 // Barra de avance anual: NO depende del filtro de fechas (usa el rango por defecto)
@@ -2420,20 +2408,6 @@ function renderMetaBar() {
     document.getElementById('metaBarFill').style.width  = pct + '%';
     document.getElementById('metaBarPct').textContent   = r.cumplimientoPct + '%';
     document.getElementById('metaBarInfo').textContent  = fmtCOP(r.totalGeneral) + ' de ' + fmtCOP(r.metaAnual);
-}
-
-function renderB2BCanal() {
-    const r = ventasData.resumen;
-    const total = r.totalGeneral || 1;
-    document.getElementById('canalB2CVal').textContent     = fmtCOP(r.totalB2C);
-    document.getElementById('canalB2CPct').textContent     = Math.round(r.totalB2C/total*100) + '% del total';
-    document.getElementById('canalB2BVal').textContent     = fmtCOP(r.totalB2B);
-    document.getElementById('canalB2BPct').textContent     = Math.round(r.totalB2B/total*100) + '% del total';
-    document.getElementById('canalExpVal').textContent     = fmtCOP(r.totalExport || 0);
-    document.getElementById('canalExpPct').textContent     = Math.round((r.totalExport||0)/total*100) + '% del total';
-    document.getElementById('canalFacturas').textContent   = ventasData.meta.totalFacturas;
-    document.getElementById('canalFacturasSub').textContent= ventasData.totalClientesB2B + ' empresas · ' + ventasData.totalClientesB2C + ' consumidores';
-    document.getElementById('navBadgeB2B').textContent     = ventasData.totalClientesB2B;
 }
 
 function destroyChart(id) { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
