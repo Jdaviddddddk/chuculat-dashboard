@@ -1,554 +1,1537 @@
 {
-  "name": "CHUCULAT | Woocommerce - Siigo",
-  "nodes": [
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "woocommerce-order",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
-      "position": [
-        -128,
-        0
-      ],
-      "id": "278bade0-ba32-499f-bfa3-8d484a1bbb19",
-      "name": "Webhook",
-      "webhookId": "086b413c-7fab-4537-96c9-3fb5a6f99359"
+ "updatedAt": "2026-07-21T17:26:38.704Z",
+ "createdAt": "2026-05-07T16:01:27.950Z",
+ "id": "T5vFnAkNZKPmuzv9",
+ "name": "CHUCULAT | Woocommerce - Siigo",
+ "description": null,
+ "active": true,
+ "isArchived": false,
+ "nodes": [
+  {
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "woocommerce-order",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2.1,
+   "position": [
+    -128,
+    0
+   ],
+   "id": "278bade0-ba32-499f-bfa3-8d484a1bbb19",
+   "name": "Webhook",
+   "webhookId": "086b413c-7fab-4537-96c9-3fb5a6f99359"
+  },
+  {
+   "parameters": {
+    "url": "https://api.siigo.com/v1/customers",
+    "sendQuery": true,
+    "queryParameters": {
+     "parameters": [
+      {
+       "name": "identification",
+       "value": "={{ $json.identificacion }}"
+      }
+     ]
     },
-    {
-      "parameters": {
-        "url": "https://api.siigo.com/v1/customers",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "identification",
-              "value": "={{ $json.identificacion }}"
-            }
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
+      },
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    448,
+    0
+   ],
+   "id": "9be33150-782a-4ea5-9cbe-bcbd4983d56c",
+   "name": "HTTP Request1"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/auth",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "{\n  \"username\": \"facturacioncacaobasico@gmail.com\",\n  \"access_key\": \"__SIIGO_ACCESS_KEY__\"\n}",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    64,
+    0
+   ],
+   "id": "e50cd798-fa15-45de-bec6-fcec28fb5dfd",
+   "name": "Get Siigo Token"
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "strict",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "56d0687c-a4e3-4a5b-95e8-59eff493b18c",
+       "leftValue": "={{ $('HTTP Request1').item.json.results.length }}",
+       "rightValue": 0,
+       "operator": {
+        "type": "number",
+        "operation": "gt"
+       }
+      },
+      {
+       "id": "8fd6752f-6630-4354-824a-1364a74e45bc",
+       "leftValue": "={{ $('HTTP Request1').item.json.results.length }}",
+       "rightValue": 2,
+       "operator": {
+        "type": "number",
+        "operation": "lt"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    848,
+    -112
+   ],
+   "id": "e4d95daf-4321-4fa0-a835-70d7d5584386",
+   "name": "If"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/v1/customers",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
+      },
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"type\": \"Customer\",\n  \"person_type\": \"Person\",\n  \"id_type\": \"13\",\n  \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\",\n  \"name\": [\n    \"{{ $('Webhook').item.json.body.billing.first_name }}\",\n    \"{{ $('Webhook').item.json.body.billing.last_name }}\"\n  ],\n  \"branch_office\": 0,\n  \"active\": true,\n  \"vat_responsible\": false,\n  \"fiscal_responsibilities\": [\n    {\n      \"code\": \"R-99-PN\"\n    }\n  ],\n  \"address\": {\n    \"address\": \"{{ $('Webhook').item.json.body.shipping?.address_1 || $('Webhook').item.json.body.billing?.address_1 || 'Bogota' }}\",\n\"city\": {\n      \"country_code\": \"Co\",\n      \"state_code\": \"11\",\n      \"city_code\": \"11001\"\n    }\n  },\n  \"phones\": [\n    {\n      \"number\": \"{{ ($('Webhook').item.json.body.shipping?.phone || $('Webhook').item.json.body.billing?.phone || '').replace(/[^0-9]/g,'').replace(/^57(?=\\d{10}$)/,'') }}\"\n    }\n  ],\n  \"contacts\": [\n    {\n      \"first_name\": \"{{ $('Webhook').item.json.body.billing.first_name }}\",\n      \"last_name\": \"{{ $('Webhook').item.json.body.billing.last_name }}\",\n      \"email\": \"{{ $('Webhook').item.json.body.billing.email }}\",\n      \"phone\": { \"number\": \"{{ ($('Webhook').item.json.body.shipping?.phone || $('Webhook').item.json.body.billing?.phone || '').replace(/[^0-9]/g,'').replace(/^57(?=\\d{10}$)/,'') }}\" }\n    }\n  ]\n}",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    1296,
+    112
+   ],
+   "id": "d9fc7c43-4006-4a79-abaa-32ba0482b2e4",
+   "name": "HTTP Request"
+  },
+  {
+   "parameters": {
+    "url": "https://api.siigo.com/v1/cost-centers",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
+      },
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    800,
+    -528
+   ],
+   "id": "821ce1aa-addf-4702-8260-220c935f8df4",
+   "name": "HTTP Request3"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/v1/invoices",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
+      },
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    1536,
+    112
+   ],
+   "id": "f781cef6-27c4-4be8-927e-a89ea0e983e6",
+   "name": "HTTP Request4"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/v1/invoices",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
+      },
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('HTTP Request1').item.json.results[0].identification }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    1280,
+    -240
+   ],
+   "id": "12214172-d4f5-483b-995d-6f4c75360e68",
+   "name": "Crear Factura"
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "strict",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "036ca51d-57b0-469f-8c6d-61c99d8b3d27",
+       "leftValue": "={{ $('Webhook').item.json.body.status }}",
+       "rightValue": "completed",
+       "operator": {
+        "type": "string",
+        "operation": "equals"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    624,
+    0
+   ],
+   "id": "34d13874-b371-41d2-819c-30be636f04ad",
+   "name": "If1"
+  },
+  {
+   "parameters": {
+    "jsCode": "// Obtiene el array meta_data\nconst metaData = $('Webhook').first().json.body.meta_data || [];\n\n// Busca el objeto cuya key sea \"identificacion\"\nconst identificacion = metaData.find(\n  item => item.key?.toLowerCase() === '_billing_identification'\n);\n\n// Devuelve solo el valor\nreturn [\n  {\n    json: {\n      identificacion: identificacion?.value || null\n    }\n  }\n];"
+   },
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    256,
+    0
+   ],
+   "id": "85381d9b-27ca-4c13-9671-2af96bc754ad",
+   "name": "Code in JavaScript"
+  },
+  {
+   "parameters": {
+    "fileSelector": "/root/.n8n-files/woo_processed_orders.json",
+    "options": {}
+   },
+   "id": "idem-read",
+   "name": "Leer Procesados",
+   "type": "n8n-nodes-base.readWriteFile",
+   "typeVersion": 1,
+   "position": [
+    380,
+    120
+   ],
+   "onError": "continueRegularOutput"
+  },
+  {
+   "parameters": {
+    "jsCode": "let processed=[];\ntry{const b=await this.helpers.getBinaryDataBuffer(0,'data');processed=JSON.parse(b.toString());if(!Array.isArray(processed))processed=[];}catch(e){processed=[];}\nconst orderId=String(($('Webhook').first().json.body.id)??'');\nif(!orderId)return [{json:{skip:true,reason:'sin order id'}}];\nif(processed.includes(orderId))return [{json:{skip:true,orderId}}];\nprocessed.push(orderId);\nreturn [{json:{skip:false,orderId,str:JSON.stringify(processed)}}];"
+   },
+   "id": "idem-mark",
+   "name": "Marcar Orden",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    580,
+    120
+   ]
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "typeValidation": "strict",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "idem-c1",
+       "leftValue": "={{ $json.skip }}",
+       "rightValue": false,
+       "operator": {
+        "type": "boolean",
+        "operation": "false",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "idem-if",
+   "name": "Nueva Orden?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    780,
+    120
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "toText",
+    "sourceProperty": "str",
+    "options": {}
+   },
+   "id": "idem-conv",
+   "name": "Conv Procesados",
+   "type": "n8n-nodes-base.convertToFile",
+   "typeVersion": 1,
+   "position": [
+    980,
+    60
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "write",
+    "fileName": "/root/.n8n-files/woo_processed_orders.json",
+    "dataPropertyName": "data",
+    "options": {}
+   },
+   "id": "idem-save",
+   "name": "Guardar Procesados",
+   "type": "n8n-nodes-base.readWriteFile",
+   "typeVersion": 1,
+   "position": [
+    1180,
+    60
+   ]
+  }
+ ],
+ "connections": {
+  "Webhook": {
+   "main": [
+    [
+     {
+      "node": "Get Siigo Token",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Get Siigo Token": {
+   "main": [
+    [
+     {
+      "node": "Code in JavaScript",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HTTP Request1": {
+   "main": [
+    [
+     {
+      "node": "If1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "If": {
+   "main": [
+    [
+     {
+      "node": "Crear Factura",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "HTTP Request",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HTTP Request3": {
+   "main": [
+    []
+   ]
+  },
+  "HTTP Request": {
+   "main": [
+    [
+     {
+      "node": "HTTP Request4",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "If1": {
+   "main": [
+    [
+     {
+      "node": "Leer Procesados",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Code in JavaScript": {
+   "main": [
+    [
+     {
+      "node": "HTTP Request1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Leer Procesados": {
+   "main": [
+    [
+     {
+      "node": "Marcar Orden",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Marcar Orden": {
+   "main": [
+    [
+     {
+      "node": "Nueva Orden?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Nueva Orden?": {
+   "main": [
+    [
+     {
+      "node": "Conv Procesados",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    []
+   ]
+  },
+  "Conv Procesados": {
+   "main": [
+    [
+     {
+      "node": "Guardar Procesados",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Guardar Procesados": {
+   "main": [
+    [
+     {
+      "node": "If",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "binaryMode": "separate",
+  "availableInMCP": false,
+  "callerPolicy": "workflowsFromSameOwner",
+  "errorWorkflow": "iVi686P2BTWp2nFg"
+ },
+ "staticData": null,
+ "meta": null,
+ "pinData": {
+  "Webhook": [
+   {
+    "json": {
+     "headers": {
+      "connection": "upgrade",
+      "host": "app.rioagencymarketing.com",
+      "content-length": "5773",
+      "user-agent": "WooCommerce/10.5.2 Hookshot (WordPress/6.9.4)",
+      "accept": "*/*",
+      "accept-encoding": "deflate, gzip, br",
+      "content-type": "application/json",
+      "x-wc-webhook-source": "https://chuculat.com/",
+      "x-wc-webhook-topic": "order.updated",
+      "x-wc-webhook-resource": "order",
+      "x-wc-webhook-event": "updated",
+      "x-wc-webhook-signature": "D+3AdxcPlJ3R50YTN/oOioA1r7ILQo22Zt/JDXreCmo=",
+      "x-wc-webhook-id": "1",
+      "x-wc-webhook-delivery-id": "72a7503a2813e4fd26ff915895f2594b"
+     },
+     "params": {},
+     "query": {},
+     "body": {
+      "id": 4053,
+      "parent_id": 0,
+      "status": "completed",
+      "currency": "COP",
+      "version": "10.5.2",
+      "prices_include_tax": false,
+      "date_created": "2026-05-14T11:34:30",
+      "date_modified": "2026-05-14T11:35:18",
+      "discount_total": "0",
+      "discount_tax": "0",
+      "shipping_total": "6499",
+      "shipping_tax": "0",
+      "cart_tax": "0",
+      "total": "19999",
+      "total_tax": "0",
+      "customer_id": 1,
+      "order_key": "wc_order_PfJlCQfNLZqGs",
+      "billing": {
+       "first_name": "Kenia",
+       "last_name": "Martinez",
+       "company": "",
+       "address_1": "carrera 10 a #69-23",
+       "address_2": "",
+       "city": "BOGOTÁ, D.C.",
+       "state": "BOG",
+       "postcode": "",
+       "country": "CO",
+       "email": "kenymart30@gmail.com",
+       "phone": "3102916097"
+      },
+      "shipping": {
+       "first_name": "Kenia",
+       "last_name": "Martinez",
+       "company": "",
+       "address_1": "carrera 10 a #69-23",
+       "address_2": "",
+       "city": "BOGOTÁ, D.C.",
+       "state": "BOG",
+       "postcode": "11001000",
+       "country": "CO",
+       "phone": ""
+      },
+      "payment_method": "epayco",
+      "payment_method_title": "Paga con Tarjetas de crédito,debito,efectivo y más",
+      "transaction_id": "366508751",
+      "customer_ip_address": "201.244.224.101",
+      "customer_user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/131.0.0.0",
+      "created_via": "checkout",
+      "customer_note": "",
+      "date_completed": "2026-05-14T11:35:18",
+      "date_paid": "2026-05-14T11:35:01",
+      "cart_hash": "4a7a99b96c46797fc50a261149dff9e6",
+      "number": "4053",
+      "meta_data": [
+       {
+        "id": 2876,
+        "key": "_billing_identification",
+        "value": "52771346"
+       },
+       {
+        "id": 2906,
+        "key": "_pys_purchase_event_fired",
+        "value": "1"
+       },
+       {
+        "id": 2892,
+        "key": "_wc_order_attribution_device_type",
+        "value": "Desktop"
+       },
+       {
+        "id": 2884,
+        "key": "_wc_order_attribution_referrer",
+        "value": "https://www.google.com/"
+       },
+       {
+        "id": 2890,
+        "key": "_wc_order_attribution_session_count",
+        "value": "3"
+       },
+       {
+        "id": 2887,
+        "key": "_wc_order_attribution_session_entry",
+        "value": "https://chuculat.com/?srsltid=AfmBOoo_KzTQPIHHvzmiWvzKqF9wwUrSyPqorDCdMAx1fNYGWRSX9x5E"
+       },
+       {
+        "id": 2889,
+        "key": "_wc_order_attribution_session_pages",
+        "value": "29"
+       },
+       {
+        "id": 2888,
+        "key": "_wc_order_attribution_session_start_time",
+        "value": "2026-05-14 16:06:50"
+       },
+       {
+        "id": 2883,
+        "key": "_wc_order_attribution_source_type",
+        "value": "organic"
+       },
+       {
+        "id": 2891,
+        "key": "_wc_order_attribution_user_agent",
+        "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/131.0.0.0"
+       },
+       {
+        "id": 2886,
+        "key": "_wc_order_attribution_utm_medium",
+        "value": "organic"
+       },
+       {
+        "id": 2885,
+        "key": "_wc_order_attribution_utm_source",
+        "value": "google"
+       },
+       {
+        "id": 2905,
+        "key": "autorizacion",
+        "value": "000000"
+       },
+       {
+        "id": 2882,
+        "key": "billing_identification",
+        "value": "52771346"
+       },
+       {
+        "id": 2900,
+        "key": "epayco_meta_data",
+        "value": "366508751"
+       },
+       {
+        "id": 2903,
+        "key": "fecha",
+        "value": "2026-05-14 11:34:58"
+       },
+       {
+        "id": 2904,
+        "key": "franquicia",
+        "value": "VS"
+       },
+       {
+        "id": 2877,
+        "key": "is_vat_exempt",
+        "value": "no"
+       },
+       {
+        "id": 2902,
+        "key": "modo",
+        "value": "pruebas"
+       },
+       {
+        "id": 2897,
+        "key": "original_quotation_request",
+        "value": {
+         "packages": [
+          {
+           "weight": 1,
+           "length": 1,
+           "height": 1,
+           "width": 1
+          }
+         ],
+         "description": "BOX_ON_THE_FLY",
+         "contentValue": 13500,
+         "origin": {
+          "daneCode": "11001000",
+          "address": "Cra. 10a # 69-23"
+         },
+         "destination": {
+          "daneCode": "11001000",
+          "address": "carrera 10 a #69-23"
+         }
+        }
+       },
+       {
+        "id": 2896,
+        "key": "packaging_details",
+        "value": {
+         "box": {
+          "height": 1,
+          "width": 1,
+          "length": 1,
+          "weight": 1,
+          "name": "BOX_ON_THE_FLY",
+          "code": "box_on_the_fly"
+         }
+        }
+       },
+       {
+        "id": 2880,
+        "key": "pys_enrich_data",
+        "value": {
+         "pys_landing": "https://chuculat.com/",
+         "pys_source": "google.com",
+         "pys_utm": "utm_source:undefined|utm_medium:undefined|utm_campaign:undefined|utm_term:undefined|utm_content:undefined",
+         "pys_utm_id": "fbadid:undefined|gadid:undefined|padid:undefined|bingid:undefined",
+         "last_pys_landing": "https://chuculat.com/",
+         "last_pys_source": "google.com",
+         "last_pys_utm": "utm_source:undefined|utm_medium:undefined|utm_campaign:undefined|utm_term:undefined|utm_content:undefined",
+         "last_pys_utm_id": "fbadid:undefined|gadid:undefined|padid:undefined|bingid:undefined",
+         "pys_browser_time": "11-12|Thursday|May"
+        }
+       },
+       {
+        "id": 2881,
+        "key": "pys_fb_cookie",
+        "value": {
+         "fbc": null,
+         "fbp": "fb.1.1778774810258.6180009952"
+        }
+       },
+       {
+        "id": 2894,
+        "key": "rates",
+        "value": {
+         "idRate": "22253842",
+         "carrier": "COORDINADORA",
+         "quotation_start": "2026-05-14 16:34:30",
+         "quotation_end": "2026-05-14 16:34:30"
+        }
+       },
+       {
+        "id": 2901,
+        "key": "refPayco",
+        "value": "366508751"
+       },
+       {
+        "id": 2895,
+        "key": "shipping_box",
+        "value": {
+         "code": "box_on_the_fly"
+        }
+       }
+      ],
+      "line_items": [
+       {
+        "id": 287,
+        "name": "Cacao Tostado Caramelizado – Semillas Crujientes (50 g)",
+        "product_id": 3051,
+        "variation_id": 0,
+        "quantity": 1,
+        "tax_class": "",
+        "subtotal": "13500",
+        "subtotal_tax": "0",
+        "total": "13500",
+        "total_tax": "0",
+        "taxes": [],
+        "meta_data": [],
+        "sku": "330",
+        "global_unique_id": "",
+        "price": 13500,
+        "image": {
+         "id": "3052",
+         "src": "https://chuculat.com/wp-content/uploads/ele-custom-shapes/Sin-titulo-1Cacao-Tostado-Caramelizado-–-Semillas-Crujientes-web-768x768-1.jpg"
+        },
+        "parent_name": null
+       }
+      ],
+      "tax_lines": [],
+      "shipping_lines": [
+       {
+        "id": 288,
+        "method_title": "Normal (2 días)",
+        "method_id": "22253842",
+        "instance_id": "27",
+        "total": "6499",
+        "total_tax": "0",
+        "taxes": [],
+        "tax_status": "taxable",
+        "meta_data": []
+       }
+      ],
+      "fee_lines": [],
+      "coupon_lines": [],
+      "refunds": [],
+      "payment_url": "https://chuculat.com/checkout/order-pay/4053/?pay_for_order=true&key=wc_order_PfJlCQfNLZqGs",
+      "is_editable": false,
+      "needs_payment": false,
+      "needs_processing": true,
+      "date_created_gmt": "2026-05-14T16:34:30",
+      "date_modified_gmt": "2026-05-14T16:35:18",
+      "date_completed_gmt": "2026-05-14T16:35:18",
+      "date_paid_gmt": "2026-05-14T16:35:01",
+      "currency_symbol": "$",
+      "_links": {
+       "self": [
+        {
+         "href": "https://chuculat.com/wp-json/wc/v3/orders/4053",
+         "targetHints": {
+          "allow": [
+           "GET",
+           "POST",
+           "PUT",
+           "PATCH",
+           "DELETE"
           ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        448,
-        0
-      ],
-      "id": "9be33150-782a-4ea5-9cbe-bcbd4983d56c",
-      "name": "HTTP Request1"
+         }
+        }
+       ],
+       "collection": [
+        {
+         "href": "https://chuculat.com/wp-json/wc/v3/orders"
+        }
+       ],
+       "email_templates": [
+        {
+         "embeddable": true,
+         "href": "https://chuculat.com/wp-json/wc/v3/orders/4053/actions/email_templates"
+        }
+       ],
+       "customer": [
+        {
+         "href": "https://chuculat.com/wp-json/wc/v3/customers/1"
+        }
+       ]
+      }
+     },
+     "webhookUrl": "https://app.rioagencymarketing.com/webhook/woocommerce-order",
+     "executionMode": "production"
     },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.siigo.com/auth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{\n  \"username\": \"<SIIGO_USERNAME>\",\n  \"access_key\": \"<SIIGO_ACCESS_KEY>\"\n}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        64,
-        0
-      ],
-      "id": "e50cd798-fa15-45de-bec6-fcec28fb5dfd",
-      "name": "Get Siigo Token"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "56d0687c-a4e3-4a5b-95e8-59eff493b18c",
-              "leftValue": "={{ $('HTTP Request1').item.json.results.length }}",
-              "rightValue": 0,
-              "operator": {
-                "type": "number",
-                "operation": "gt"
-              }
-            },
-            {
-              "id": "8fd6752f-6630-4354-824a-1364a74e45bc",
-              "leftValue": "={{ $('HTTP Request1').item.json.results.length }}",
-              "rightValue": 2,
-              "operator": {
-                "type": "number",
-                "operation": "lt"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        848,
-        -112
-      ],
-      "id": "e4d95daf-4321-4fa0-a835-70d7d5584386",
-      "name": "If"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.siigo.com/v1/customers",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"type\": \"Customer\",\n  \"person_type\": \"Person\",\n  \"id_type\": \"13\",\n  \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\",\n  \"name\": [\n    \"{{ $('Webhook').item.json.body.billing.first_name }}\",\n    \"{{ $('Webhook').item.json.body.billing.last_name }}\"\n  ],\n  \"branch_office\": 0,\n  \"active\": true,\n  \"vat_responsible\": false,\n  \"fiscal_responsibilities\": [\n    {\n      \"code\": \"R-99-PN\"\n    }\n  ],\n  \"address\": {\n    \"address\": \"{{ $('Webhook').item.json.body.shipping?.address_1 || $('Webhook').item.json.body.billing?.address_1 || 'Bogota' }}\",\n\"city\": {\n      \"country_code\": \"Co\",\n      \"state_code\": \"11\",\n      \"city_code\": \"11001\"\n    }\n  },\n  \"phones\": [\n    {\n      \"number\": \"{{ ($('Webhook').item.json.body.shipping?.phone || $('Webhook').item.json.body.billing?.phone || '').replace(/[^0-9]/g,'').replace(/^57(?=\\d{10}$)/,'') }}\"\n    }\n  ],\n  \"contacts\": [\n    {\n      \"first_name\": \"{{ $('Webhook').item.json.body.billing.first_name }}\",\n      \"last_name\": \"{{ $('Webhook').item.json.body.billing.last_name }}\",\n      \"email\": \"{{ $('Webhook').item.json.body.billing.email }}\",\n      \"phone\": { \"number\": \"{{ ($('Webhook').item.json.body.shipping?.phone || $('Webhook').item.json.body.billing?.phone || '').replace(/[^0-9]/g,'').replace(/^57(?=\\d{10}$)/,'') }}\" }\n    }\n  ]\n}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        1296,
-        112
-      ],
-      "id": "d9fc7c43-4006-4a79-abaa-32ba0482b2e4",
-      "name": "HTTP Request"
-    },
-    {
-      "parameters": {
-        "url": "https://api.siigo.com/v1/cost-centers",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        800,
-        -528
-      ],
-      "id": "821ce1aa-addf-4702-8260-220c935f8df4",
-      "name": "HTTP Request3"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.siigo.com/v1/invoices",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n\n  \"customer\": {\n    \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\"\n  },\n\n  \"seller\": 10857,\n\n  \"cost_center\": 168,\n\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ Number($('Webhook').item.json.body.line_items.reduce((sum, item) => sum + Number(item.total), 0)) }}\n    }\n  ],\n\n  \"items\": {{ JSON.stringify(\n    $('Webhook').item.json.body.line_items.map(item => ({\n      code: item.sku,\n      description: item.name,\n      quantity: item.quantity,\n      price: Number(item.price)\n    }))\n  ) }}\n}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        1536,
-        112
-      ],
-      "id": "f781cef6-27c4-4be8-927e-a89ea0e983e6",
-      "name": "HTTP Request4"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.siigo.com/v1/invoices",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('HTTP Request1').item.json.results[0].identification }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        1280,
-        -240
-      ],
-      "id": "12214172-d4f5-483b-995d-6f4c75360e68",
-      "name": "Crear Factura"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "036ca51d-57b0-469f-8c6d-61c99d8b3d27",
-              "leftValue": "={{ $('Webhook').item.json.body.status }}",
-              "rightValue": "completed",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        624,
-        0
-      ],
-      "id": "34d13874-b371-41d2-819c-30be636f04ad",
-      "name": "If1"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Obtiene el array meta_data\nconst metaData = $('Webhook').first().json.body.meta_data || [];\n\n// Busca el objeto cuya key sea \"identificacion\"\nconst identificacion = metaData.find(\n  item => item.key?.toLowerCase() === '_billing_identification'\n);\n\n// Devuelve solo el valor\nreturn [\n  {\n    json: {\n      identificacion: identificacion?.value || null\n    }\n  }\n];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        256,
-        0
-      ],
-      "id": "85381d9b-27ca-4c13-9671-2af96bc754ad",
-      "name": "Code in JavaScript"
-    },
-    {
-      "parameters": {
-        "fileSelector": "/root/.n8n-files/woo_processed_orders.json",
-        "options": {}
-      },
-      "id": "idem-read",
-      "name": "Leer Procesados",
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1,
-      "position": [
-        380,
-        120
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "let processed=[];\ntry{const b=await this.helpers.getBinaryDataBuffer(0,'data');processed=JSON.parse(b.toString());if(!Array.isArray(processed))processed=[];}catch(e){processed=[];}\nconst orderId=String(($('Webhook').first().json.body.id)??'');\nif(!orderId)return [{json:{skip:true,reason:'sin order id'}}];\nif(processed.includes(orderId))return [{json:{skip:true,orderId}}];\nprocessed.push(orderId);\nreturn [{json:{skip:false,orderId,str:JSON.stringify(processed)}}];"
-      },
-      "id": "idem-mark",
-      "name": "Marcar Orden",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        580,
-        120
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "idem-c1",
-              "leftValue": "={{ $json.skip }}",
-              "rightValue": false,
-              "operator": {
-                "type": "boolean",
-                "operation": "false",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "idem-if",
-      "name": "Nueva Orden?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        780,
-        120
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "toText",
-        "sourceProperty": "str",
-        "options": {}
-      },
-      "id": "idem-conv",
-      "name": "Conv Procesados",
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1,
-      "position": [
-        980,
-        60
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "write",
-        "fileName": "/root/.n8n-files/woo_processed_orders.json",
-        "dataPropertyName": "data",
-        "options": {}
-      },
-      "id": "idem-save",
-      "name": "Guardar Procesados",
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1,
-      "position": [
-        1180,
-        60
-      ]
+    "pairedItem": {
+     "item": 0
     }
+   }
+  ]
+ },
+ "versionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
+ "activeVersionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
+ "versionCounter": 480,
+ "triggerCount": 1,
+ "shared": [
+  {
+   "updatedAt": "2026-05-07T16:01:27.957Z",
+   "createdAt": "2026-05-07T16:01:27.957Z",
+   "role": "workflow:owner",
+   "workflowId": "T5vFnAkNZKPmuzv9",
+   "projectId": "ofTSkXVMRv5OZd5g",
+   "project": {
+    "updatedAt": "2026-05-06T01:08:19.070Z",
+    "createdAt": "2026-05-06T00:41:47.251Z",
+    "id": "ofTSkXVMRv5OZd5g",
+    "name": "Jhonnatan Arenas <riomarketingyeventos@gmail.com>",
+    "type": "personal",
+    "icon": null,
+    "description": null,
+    "creatorId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   }
+  }
+ ],
+ "tags": [
+  {
+   "updatedAt": "2026-06-03T14:19:14.480Z",
+   "createdAt": "2026-06-03T14:19:14.480Z",
+   "id": "jw5QOoS6phIhWi9P",
+   "name": "Chuculat"
+  }
+ ],
+ "activeVersion": {
+  "updatedAt": "2026-07-21T17:26:38.719Z",
+  "createdAt": "2026-07-21T17:26:38.719Z",
+  "versionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
+  "workflowId": "T5vFnAkNZKPmuzv9",
+  "nodes": [
+   {
+    "parameters": {
+     "httpMethod": "POST",
+     "path": "woocommerce-order",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.webhook",
+    "typeVersion": 2.1,
+    "position": [
+     -128,
+     0
+    ],
+    "id": "278bade0-ba32-499f-bfa3-8d484a1bbb19",
+    "name": "Webhook",
+    "webhookId": "086b413c-7fab-4537-96c9-3fb5a6f99359"
+   },
+   {
+    "parameters": {
+     "url": "https://api.siigo.com/v1/customers",
+     "sendQuery": true,
+     "queryParameters": {
+      "parameters": [
+       {
+        "name": "identification",
+        "value": "={{ $json.identificacion }}"
+       }
+      ]
+     },
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "Authorization",
+        "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
+       },
+       {
+        "name": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "name": "Partner-Id",
+        "value": "n8nApp"
+       }
+      ]
+     },
+     "options": {}
+    },
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     448,
+     0
+    ],
+    "id": "9be33150-782a-4ea5-9cbe-bcbd4983d56c",
+    "name": "HTTP Request1"
+   },
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "https://api.siigo.com/auth",
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "Content-Type",
+        "value": "application/json"
+       }
+      ]
+     },
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "{\n  \"username\": \"facturacioncacaobasico@gmail.com\",\n  \"access_key\": \"__SIIGO_ACCESS_KEY__\"\n}",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     64,
+     0
+    ],
+    "id": "e50cd798-fa15-45de-bec6-fcec28fb5dfd",
+    "name": "Get Siigo Token"
+   },
+   {
+    "parameters": {
+     "conditions": {
+      "options": {
+       "caseSensitive": true,
+       "leftValue": "",
+       "typeValidation": "strict",
+       "version": 3
+      },
+      "conditions": [
+       {
+        "id": "56d0687c-a4e3-4a5b-95e8-59eff493b18c",
+        "leftValue": "={{ $('HTTP Request1').item.json.results.length }}",
+        "rightValue": 0,
+        "operator": {
+         "type": "number",
+         "operation": "gt"
+        }
+       },
+       {
+        "id": "8fd6752f-6630-4354-824a-1364a74e45bc",
+        "leftValue": "={{ $('HTTP Request1').item.json.results.length }}",
+        "rightValue": 2,
+        "operator": {
+         "type": "number",
+         "operation": "lt"
+        }
+       }
+      ],
+      "combinator": "and"
+     },
+     "options": {}
+    },
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.3,
+    "position": [
+     848,
+     -112
+    ],
+    "id": "e4d95daf-4321-4fa0-a835-70d7d5584386",
+    "name": "If"
+   },
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "https://api.siigo.com/v1/customers",
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "Authorization",
+        "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
+       },
+       {
+        "name": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "name": "Partner-Id",
+        "value": "n8nApp"
+       }
+      ]
+     },
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "={\n  \"type\": \"Customer\",\n  \"person_type\": \"Person\",\n  \"id_type\": \"13\",\n  \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\",\n  \"name\": [\n    \"{{ $('Webhook').item.json.body.billing.first_name }}\",\n    \"{{ $('Webhook').item.json.body.billing.last_name }}\"\n  ],\n  \"branch_office\": 0,\n  \"active\": true,\n  \"vat_responsible\": false,\n  \"fiscal_responsibilities\": [\n    {\n      \"code\": \"R-99-PN\"\n    }\n  ],\n  \"address\": {\n    \"address\": \"{{ $('Webhook').item.json.body.shipping?.address_1 || $('Webhook').item.json.body.billing?.address_1 || 'Bogota' }}\",\n\"city\": {\n      \"country_code\": \"Co\",\n      \"state_code\": \"11\",\n      \"city_code\": \"11001\"\n    }\n  },\n  \"phones\": [\n    {\n      \"number\": \"{{ ($('Webhook').item.json.body.shipping?.phone || $('Webhook').item.json.body.billing?.phone || '').replace(/[^0-9]/g,'').replace(/^57(?=\\d{10}$)/,'') }}\"\n    }\n  ],\n  \"contacts\": [\n    {\n      \"first_name\": \"{{ $('Webhook').item.json.body.billing.first_name }}\",\n      \"last_name\": \"{{ $('Webhook').item.json.body.billing.last_name }}\",\n      \"email\": \"{{ $('Webhook').item.json.body.billing.email }}\",\n      \"phone\": { \"number\": \"{{ ($('Webhook').item.json.body.shipping?.phone || $('Webhook').item.json.body.billing?.phone || '').replace(/[^0-9]/g,'').replace(/^57(?=\\d{10}$)/,'') }}\" }\n    }\n  ]\n}",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     1296,
+     112
+    ],
+    "id": "d9fc7c43-4006-4a79-abaa-32ba0482b2e4",
+    "name": "HTTP Request"
+   },
+   {
+    "parameters": {
+     "url": "https://api.siigo.com/v1/cost-centers",
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "Authorization",
+        "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
+       },
+       {
+        "name": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "name": "Partner-Id",
+        "value": "n8nApp"
+       }
+      ]
+     },
+     "options": {}
+    },
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     800,
+     -528
+    ],
+    "id": "821ce1aa-addf-4702-8260-220c935f8df4",
+    "name": "HTTP Request3"
+   },
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "https://api.siigo.com/v1/invoices",
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "Authorization",
+        "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
+       },
+       {
+        "name": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "name": "Partner-Id",
+        "value": "n8nApp"
+       }
+      ]
+     },
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     1536,
+     112
+    ],
+    "id": "f781cef6-27c4-4be8-927e-a89ea0e983e6",
+    "name": "HTTP Request4"
+   },
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "https://api.siigo.com/v1/invoices",
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "Authorization",
+        "value": "=Bearer {{$node[\"Get Siigo Token\"].json[\"access_token\"]}}"
+       },
+       {
+        "name": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "name": "Partner-Id",
+        "value": "n8nApp"
+       }
+      ]
+     },
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('HTTP Request1').item.json.results[0].identification }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     1280,
+     -240
+    ],
+    "id": "12214172-d4f5-483b-995d-6f4c75360e68",
+    "name": "Crear Factura"
+   },
+   {
+    "parameters": {
+     "conditions": {
+      "options": {
+       "caseSensitive": true,
+       "leftValue": "",
+       "typeValidation": "strict",
+       "version": 3
+      },
+      "conditions": [
+       {
+        "id": "036ca51d-57b0-469f-8c6d-61c99d8b3d27",
+        "leftValue": "={{ $('Webhook').item.json.body.status }}",
+        "rightValue": "completed",
+        "operator": {
+         "type": "string",
+         "operation": "equals"
+        }
+       }
+      ],
+      "combinator": "and"
+     },
+     "options": {}
+    },
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.3,
+    "position": [
+     624,
+     0
+    ],
+    "id": "34d13874-b371-41d2-819c-30be636f04ad",
+    "name": "If1"
+   },
+   {
+    "parameters": {
+     "jsCode": "// Obtiene el array meta_data\nconst metaData = $('Webhook').first().json.body.meta_data || [];\n\n// Busca el objeto cuya key sea \"identificacion\"\nconst identificacion = metaData.find(\n  item => item.key?.toLowerCase() === '_billing_identification'\n);\n\n// Devuelve solo el valor\nreturn [\n  {\n    json: {\n      identificacion: identificacion?.value || null\n    }\n  }\n];"
+    },
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     256,
+     0
+    ],
+    "id": "85381d9b-27ca-4c13-9671-2af96bc754ad",
+    "name": "Code in JavaScript"
+   },
+   {
+    "parameters": {
+     "fileSelector": "/root/.n8n-files/woo_processed_orders.json",
+     "options": {}
+    },
+    "id": "idem-read",
+    "name": "Leer Procesados",
+    "type": "n8n-nodes-base.readWriteFile",
+    "typeVersion": 1,
+    "position": [
+     380,
+     120
+    ],
+    "onError": "continueRegularOutput"
+   },
+   {
+    "parameters": {
+     "jsCode": "let processed=[];\ntry{const b=await this.helpers.getBinaryDataBuffer(0,'data');processed=JSON.parse(b.toString());if(!Array.isArray(processed))processed=[];}catch(e){processed=[];}\nconst orderId=String(($('Webhook').first().json.body.id)??'');\nif(!orderId)return [{json:{skip:true,reason:'sin order id'}}];\nif(processed.includes(orderId))return [{json:{skip:true,orderId}}];\nprocessed.push(orderId);\nreturn [{json:{skip:false,orderId,str:JSON.stringify(processed)}}];"
+    },
+    "id": "idem-mark",
+    "name": "Marcar Orden",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     580,
+     120
+    ]
+   },
+   {
+    "parameters": {
+     "conditions": {
+      "options": {
+       "caseSensitive": true,
+       "typeValidation": "strict",
+       "version": 3
+      },
+      "conditions": [
+       {
+        "id": "idem-c1",
+        "leftValue": "={{ $json.skip }}",
+        "rightValue": false,
+        "operator": {
+         "type": "boolean",
+         "operation": "false",
+         "singleValue": true
+        }
+       }
+      ],
+      "combinator": "and"
+     },
+     "options": {}
+    },
+    "id": "idem-if",
+    "name": "Nueva Orden?",
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.3,
+    "position": [
+     780,
+     120
+    ]
+   },
+   {
+    "parameters": {
+     "operation": "toText",
+     "sourceProperty": "str",
+     "options": {}
+    },
+    "id": "idem-conv",
+    "name": "Conv Procesados",
+    "type": "n8n-nodes-base.convertToFile",
+    "typeVersion": 1,
+    "position": [
+     980,
+     60
+    ]
+   },
+   {
+    "parameters": {
+     "operation": "write",
+     "fileName": "/root/.n8n-files/woo_processed_orders.json",
+     "dataPropertyName": "data",
+     "options": {}
+    },
+    "id": "idem-save",
+    "name": "Guardar Procesados",
+    "type": "n8n-nodes-base.readWriteFile",
+    "typeVersion": 1,
+    "position": [
+     1180,
+     60
+    ]
+   }
   ],
   "connections": {
-    "Webhook": {
-      "main": [
-        [
-          {
-            "node": "Get Siigo Token",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Siigo Token": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HTTP Request1": {
-      "main": [
-        [
-          {
-            "node": "If1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If": {
-      "main": [
-        [
-          {
-            "node": "Crear Factura",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "HTTP Request",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HTTP Request3": {
-      "main": [
-        []
-      ]
-    },
-    "HTTP Request": {
-      "main": [
-        [
-          {
-            "node": "HTTP Request4",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If1": {
-      "main": [
-        [
-          {
-            "node": "Leer Procesados",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript": {
-      "main": [
-        [
-          {
-            "node": "HTTP Request1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Leer Procesados": {
-      "main": [
-        [
-          {
-            "node": "Marcar Orden",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Marcar Orden": {
-      "main": [
-        [
-          {
-            "node": "Nueva Orden?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Nueva Orden?": {
-      "main": [
-        [
-          {
-            "node": "Conv Procesados",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "Conv Procesados": {
-      "main": [
-        [
-          {
-            "node": "Guardar Procesados",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Guardar Procesados": {
-      "main": [
-        [
-          {
-            "node": "If",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+   "Webhook": {
+    "main": [
+     [
+      {
+       "node": "Get Siigo Token",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Get Siigo Token": {
+    "main": [
+     [
+      {
+       "node": "Code in JavaScript",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HTTP Request1": {
+    "main": [
+     [
+      {
+       "node": "If1",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "If": {
+    "main": [
+     [
+      {
+       "node": "Crear Factura",
+       "type": "main",
+       "index": 0
+      }
+     ],
+     [
+      {
+       "node": "HTTP Request",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HTTP Request3": {
+    "main": [
+     []
+    ]
+   },
+   "HTTP Request": {
+    "main": [
+     [
+      {
+       "node": "HTTP Request4",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "If1": {
+    "main": [
+     [
+      {
+       "node": "Leer Procesados",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Code in JavaScript": {
+    "main": [
+     [
+      {
+       "node": "HTTP Request1",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Leer Procesados": {
+    "main": [
+     [
+      {
+       "node": "Marcar Orden",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Marcar Orden": {
+    "main": [
+     [
+      {
+       "node": "Nueva Orden?",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Nueva Orden?": {
+    "main": [
+     [
+      {
+       "node": "Conv Procesados",
+       "type": "main",
+       "index": 0
+      }
+     ],
+     []
+    ]
+   },
+   "Conv Procesados": {
+    "main": [
+     [
+      {
+       "node": "Guardar Procesados",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Guardar Procesados": {
+    "main": [
+     [
+      {
+       "node": "If",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   }
   },
-  "settings": {
-    "executionOrder": "v1"
-  }
+  "authors": "Jhonnatan Arenas",
+  "name": null,
+  "description": null,
+  "autosaved": false,
+  "workflowPublishHistory": [
+   {
+    "createdAt": "2026-07-21T17:26:39.726Z",
+    "id": 1052,
+    "workflowId": "T5vFnAkNZKPmuzv9",
+    "versionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
+    "event": "activated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   },
+   {
+    "createdAt": "2026-07-21T17:26:40.270Z",
+    "id": 1054,
+    "workflowId": "T5vFnAkNZKPmuzv9",
+    "versionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
+    "event": "activated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   },
+   {
+    "createdAt": "2026-07-21T17:26:39.335Z",
+    "id": 1051,
+    "workflowId": "T5vFnAkNZKPmuzv9",
+    "versionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
+    "event": "deactivated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   },
+   {
+    "createdAt": "2026-07-21T17:26:40.233Z",
+    "id": 1053,
+    "workflowId": "T5vFnAkNZKPmuzv9",
+    "versionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
+    "event": "deactivated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   }
+  ]
+ }
 }
