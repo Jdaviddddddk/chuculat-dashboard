@@ -1,0 +1,430 @@
+{
+ "updatedAt": "2026-07-21T16:18:50.173Z",
+ "createdAt": "2026-07-21T16:06:17.157Z",
+ "id": "1OioSrAEK6Loun2n",
+ "name": "CHUCULAT | Cartera",
+ "description": null,
+ "active": true,
+ "isArchived": false,
+ "nodes": [
+  {
+   "id": "sch",
+   "name": "Schedule",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.2,
+   "position": [
+    0,
+    0
+   ],
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "hours",
+       "hoursInterval": 6
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "auth",
+   "name": "Auth Siigo",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    220,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/auth",
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "{\"username\":\"facturacioncacaobasico@gmail.com\",\"access_key\":\"__SIIGO_ACCESS_KEY__\"}",
+    "options": {}
+   }
+  },
+  {
+   "id": "ref",
+   "name": "Refrescar Cartera",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    440,
+    0
+   ],
+   "parameters": {
+    "jsCode": "// Refresca public.cartera con TODAS las facturas de Siigo que tengan saldo > 0.\n// La cartera NO es por periodo: es la foto de lo que se debe HOY (incluye deuda vieja).\n// Se hace en workflow programado porque barrer ~10.6k facturas toma minutos.\nconst token = $('Auth Siigo').first().json.access_token;\nconst SH  = { Authorization: 'Bearer ' + token, 'Partner-Id': 'n8nApp' };\nconst SB  = 'https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY = '__SUPABASE_SERVICE_ROLE__';\nconst H   = { apikey: KEY, Authorization: 'Bearer ' + KEY };\nconst http = (o) => this.helpers.httpRequest(o);\n\nasync function fetchAll(extra) {\n  const first = await http({ method:'GET', json:true, headers:SH,\n    url: 'https://api.siigo.com/v1/invoices?page=1&page_size=1' + extra });\n  const tot = (first.pagination && first.pagination.total_results) || 0;\n  const out = [];\n  for (let pg = 1; pg <= Math.floor(tot / 100) + 1; pg++) {\n    const r = await http({ method:'GET', json:true, headers:SH,\n      url: 'https://api.siigo.com/v1/invoices?page=' + pg + '&page_size=100' + extra });\n    for (const x of (r.results || [])) out.push(x);\n  }\n  return out;\n}\n\n// La serie FV-2 de exportacion NO sale en el listado estandar -> pasada aparte.\nconst a = await fetchAll('');\nconst b = await fetchAll('&document_id=30537');\nconst map = {};\nfor (const i of a.concat(b)) map[i.id] = i;\nconst all = Object.values(map);\n\n// El listado de facturas NO trae customer.name (solo identification) -> catalogo aparte.\nconst custMap = {};\n{\n  const f = await http({ method:'GET', json:true, headers:SH,\n    url: 'https://api.siigo.com/v1/customers?page=1&page_size=1' });\n  const tot = (f.pagination && f.pagination.total_results) || 0;\n  for (let pg = 1; pg <= Math.floor(tot / 100) + 1; pg++) {\n    const r = await http({ method:'GET', json:true, headers:SH,\n      url: 'https://api.siigo.com/v1/customers?page=' + pg + '&page_size=100' });\n    for (const c of (r.results || [])) {\n      const id = String(c.identification || '').replace(/[^0-9]/g, '');\n      const nm = Array.isArray(c.name) ? c.name.filter(Boolean).join(' ') : String(c.name || '');\n      // Preferir el nombre real; el commercial_name suele venir como \"No aplica\".\n      let com = (c.commercial_name || '').trim();\n      if (/^(no aplica|n\\/a|na|ninguno|-)$/i.test(com)) com = '';\n      if (id) custMap[id] = nm || com || id;\n    }\n  }\n}\n\nfunction isNIT(raw) {\n  const s = String(raw || '').trim();\n  if (/^[0-9]{8,9}-[0-9]$/.test(s)) return true;\n  const d = s.replace(/[^0-9]/g, '');\n  return (d.length === 9 || d.length === 10) &&\n         /^(800|811|812|813|820|830|832|860|890|891|892|899|900|901|902)/.test(d);\n}\nconst KW = /(s\\.?a\\.?s\\.?|ltda\\.?|factura|corp|inc|empresa|group|grupo|distribu|comercial|industria|soluciones|servicios)/i;\nfunction nameOf(c) { const n = c && c.name; return Array.isArray(n) ? n.join(' ') : String(n || ''); }\nfunction canalOf(inv) {\n  const cc = Number(inv.cost_center);\n  if (cc === 315) return 'export';\n  if (cc === 166) return 'b2b';\n  if (cc === 168) { const cu = inv.customer || {}; return (isNIT(cu.identification) || KW.test(nameOf(cu))) ? 'b2b' : 'b2c'; }\n  return 'otro';   // planta / admin: igual entran, la cartera es toda la plata por cobrar\n}\nconst HOY = new Date();\nconst dias = (d) => Math.floor((HOY - new Date(d)) / 86400000);\nconst bucket = (x) => x > 180 ? '>180' : x > 120 ? '>120' : x > 90 ? '>90' : x > 31 ? '>31' : 'por_vencer';\n\nconst rows = [];\nfor (const inv of all) {\n  const bal = Number(inv.balance || 0);\n  if (!(bal > 0)) continue;\n  const cur = inv.currency || {};\n  const fx  = Number(cur.exchange_rate || 1);\n  const tot = Number(inv.total || 0);\n  // TRAMPA SIIGO: en moneda extranjera el `total` viene en la moneda original, pero el\n  // `balance` a veces viene en COP y a veces en la moneda original. Si el balance cabe\n  // dentro del total, esta en moneda original -> convertir. Si lo excede, ya es COP.\n  // (Multiplicar a ciegas por la tasa era el bug que inflaba la cartera a $4.253 millones.)\n  const saldo    = (fx !== 1 && bal <= tot) ? bal * fx : bal;\n  const totalCop = fx !== 1 ? tot * fx : tot;\n  const d  = dias(inv.date);\n  const cu = inv.customer || {};\n  rows.push({\n    numero: inv.name || inv.id,\n    inv_id: inv.id,\n    fecha: String(inv.date || '').slice(0, 10),\n    cliente: custMap[String(cu.identification || '').replace(/[^0-9]/g, '')] ||\n             nameOf(cu) || String(cu.identification || ''),\n    nit: String(cu.identification || ''),\n    canal: canalOf(inv),\n    moneda: cur.code || 'COP',\n    total_cop: Math.round(totalCop * 100) / 100,\n    saldo_cop: Math.round(saldo * 100) / 100,\n    dias: d,\n    bucket: bucket(d)\n  });\n}\n\n// Reemplazo total: la cartera es un estado, no un historico acumulable.\nawait http({ method:'DELETE', headers: Object.assign({}, H, { Prefer:'return=minimal' }),\n  url: SB + '/rest/v1/cartera?numero=neq.__ninguno__' });\nfor (let i = 0; i < rows.length; i += 200) {\n  await http({ method:'POST', json:true,\n    headers: Object.assign({}, H, { 'Content-Type':'application/json', Prefer:'return=minimal' }),\n    url: SB + '/rest/v1/cartera', body: rows.slice(i, i + 200) });\n}\nconst total = rows.reduce((s, r) => s + r.saldo_cop, 0);\nreturn [{ json: { ok:true, facturas: rows.length, total_cartera: Math.round(total),\n                  revisadas: all.length, actualizado: new Date().toISOString() } }];\n"
+   }
+  },
+  {
+   "id": "wh",
+   "name": "Webhook get-cartera",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    0,
+    220
+   ],
+   "webhookId": "523316d9-8af0-4e1b-84c5-6f3c91c676af",
+   "parameters": {
+    "path": "get-cartera",
+    "options": {},
+    "responseMode": "responseNode"
+   }
+  },
+  {
+   "id": "srv",
+   "name": "Leer Cartera",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    220,
+    220
+   ],
+   "parameters": {
+    "jsCode": "// Sirve la cartera ya calculada (tabla public.cartera) al dashboard.\n// Rapido: solo lee Supabase, no toca Siigo.\nconst SB  = 'https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY = '__SUPABASE_SERVICE_ROLE__';\nconst H   = { apikey: KEY, Authorization: 'Bearer ' + KEY };\nconst http = (o) => this.helpers.httpRequest(o);\n\nconst rows = await http({ method:'GET', json:true, headers:H,\n  url: SB + '/rest/v1/cartera?select=*&order=saldo_cop.desc&limit=5000' });\nconst facturas = Array.isArray(rows) ? rows : [];\n\nconst num = (x) => Number(x || 0);\nconst sumBucket = (b) => facturas.filter(f => f.bucket === b).reduce((s, f) => s + num(f.saldo_cop), 0);\n\nconst resumen = {\n  totalDeuda: Math.round(facturas.reduce((s, f) => s + num(f.saldo_cop), 0)),\n  facturas: facturas.length,\n  masde180:  Math.round(sumBucket('>180')),\n  masde120:  Math.round(sumBucket('>120')),\n  masde90:   Math.round(sumBucket('>90')),\n  masde31:   Math.round(sumBucket('>31')),\n  porVencer: Math.round(sumBucket('por_vencer'))\n};\n\n// Agrupado por cliente (lo que pinta la tabla de aging)\nconst byCli = {};\nfor (const f of facturas) {\n  const k = f.nit || f.cliente || '?';\n  if (!byCli[k]) byCli[k] = { cliente: f.cliente, nit: f.nit, canal: f.canal, facturas: 0,\n                              deudaTotal: 0, masde180: 0, masde120: 0, masde90: 0, masde31: 0, porVencer: 0 };\n  const c = byCli[k];\n  c.facturas += 1;\n  c.deudaTotal += num(f.saldo_cop);\n  if (f.bucket === '>180') c.masde180 += num(f.saldo_cop);\n  else if (f.bucket === '>120') c.masde120 += num(f.saldo_cop);\n  else if (f.bucket === '>90') c.masde90 += num(f.saldo_cop);\n  else if (f.bucket === '>31') c.masde31 += num(f.saldo_cop);\n  else c.porVencer += num(f.saldo_cop);\n}\nconst porCliente = Object.values(byCli)\n  .map(c => ({ ...c, deudaTotal: Math.round(c.deudaTotal), masde180: Math.round(c.masde180),\n               masde120: Math.round(c.masde120), masde90: Math.round(c.masde90),\n               masde31: Math.round(c.masde31), porVencer: Math.round(c.porVencer) }))\n  .sort((a, b) => b.deudaTotal - a.deudaTotal);\n\nconst actualizado = facturas.length\n  ? facturas.map(f => f.actualizado_en).sort().slice(-1)[0]\n  : null;\n\nreturn [{ json: { resumen, porCliente, facturas, actualizado_en: actualizado,\n                  base: 'saldo real con IVA, en COP, todas las facturas abiertas (sin filtro de fecha)' } }];\n"
+   }
+  },
+  {
+   "id": "resp",
+   "name": "Responder",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.1,
+   "position": [
+    440,
+    220
+   ],
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ JSON.stringify($json) }}",
+    "options": {}
+   }
+  },
+  {
+   "id": "whref",
+   "name": "Webhook refrescar",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    0,
+    -200
+   ],
+   "webhookId": "2b5b2fbc-a3a8-4f56-ba0a-46bdee4148ed",
+   "parameters": {
+    "path": "refrescar-cartera",
+    "options": {},
+    "responseMode": "onReceived"
+   }
+  }
+ ],
+ "connections": {
+  "Schedule": {
+   "main": [
+    [
+     {
+      "node": "Auth Siigo",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Auth Siigo": {
+   "main": [
+    [
+     {
+      "node": "Refrescar Cartera",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Webhook get-cartera": {
+   "main": [
+    [
+     {
+      "node": "Leer Cartera",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Leer Cartera": {
+   "main": [
+    [
+     {
+      "node": "Responder",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Webhook refrescar": {
+   "main": [
+    [
+     {
+      "node": "Auth Siigo",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "errorWorkflow": "iVi686P2BTWp2nFg",
+  "callerPolicy": "workflowsFromSameOwner",
+  "availableInMCP": false
+ },
+ "staticData": {
+  "node:Schedule": {
+   "recurrenceRules": []
+  }
+ },
+ "meta": null,
+ "pinData": null,
+ "versionId": "7f831903-ab9d-4013-8a60-a098b79de942",
+ "activeVersionId": "7f831903-ab9d-4013-8a60-a098b79de942",
+ "versionCounter": 15,
+ "triggerCount": 3,
+ "shared": [
+  {
+   "updatedAt": "2026-07-21T16:06:17.174Z",
+   "createdAt": "2026-07-21T16:06:17.174Z",
+   "role": "workflow:owner",
+   "workflowId": "1OioSrAEK6Loun2n",
+   "projectId": "ofTSkXVMRv5OZd5g",
+   "project": {
+    "updatedAt": "2026-05-06T01:08:19.070Z",
+    "createdAt": "2026-05-06T00:41:47.251Z",
+    "id": "ofTSkXVMRv5OZd5g",
+    "name": "Jhonnatan Arenas <riomarketingyeventos@gmail.com>",
+    "type": "personal",
+    "icon": null,
+    "description": null,
+    "creatorId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   }
+  }
+ ],
+ "tags": [],
+ "activeVersion": {
+  "updatedAt": "2026-07-21T16:18:50.179Z",
+  "createdAt": "2026-07-21T16:18:50.179Z",
+  "versionId": "7f831903-ab9d-4013-8a60-a098b79de942",
+  "workflowId": "1OioSrAEK6Loun2n",
+  "nodes": [
+   {
+    "id": "sch",
+    "name": "Schedule",
+    "type": "n8n-nodes-base.scheduleTrigger",
+    "typeVersion": 1.2,
+    "position": [
+     0,
+     0
+    ],
+    "parameters": {
+     "rule": {
+      "interval": [
+       {
+        "field": "hours",
+        "hoursInterval": 6
+       }
+      ]
+     }
+    }
+   },
+   {
+    "id": "auth",
+    "name": "Auth Siigo",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.2,
+    "position": [
+     220,
+     0
+    ],
+    "parameters": {
+     "method": "POST",
+     "url": "https://api.siigo.com/auth",
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "{\"username\":\"facturacioncacaobasico@gmail.com\",\"access_key\":\"__SIIGO_ACCESS_KEY__\"}",
+     "options": {}
+    }
+   },
+   {
+    "id": "ref",
+    "name": "Refrescar Cartera",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     440,
+     0
+    ],
+    "parameters": {
+     "jsCode": "// Refresca public.cartera con TODAS las facturas de Siigo que tengan saldo > 0.\n// La cartera NO es por periodo: es la foto de lo que se debe HOY (incluye deuda vieja).\n// Se hace en workflow programado porque barrer ~10.6k facturas toma minutos.\nconst token = $('Auth Siigo').first().json.access_token;\nconst SH  = { Authorization: 'Bearer ' + token, 'Partner-Id': 'n8nApp' };\nconst SB  = 'https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY = '__SUPABASE_SERVICE_ROLE__';\nconst H   = { apikey: KEY, Authorization: 'Bearer ' + KEY };\nconst http = (o) => this.helpers.httpRequest(o);\n\nasync function fetchAll(extra) {\n  const first = await http({ method:'GET', json:true, headers:SH,\n    url: 'https://api.siigo.com/v1/invoices?page=1&page_size=1' + extra });\n  const tot = (first.pagination && first.pagination.total_results) || 0;\n  const out = [];\n  for (let pg = 1; pg <= Math.floor(tot / 100) + 1; pg++) {\n    const r = await http({ method:'GET', json:true, headers:SH,\n      url: 'https://api.siigo.com/v1/invoices?page=' + pg + '&page_size=100' + extra });\n    for (const x of (r.results || [])) out.push(x);\n  }\n  return out;\n}\n\n// La serie FV-2 de exportacion NO sale en el listado estandar -> pasada aparte.\nconst a = await fetchAll('');\nconst b = await fetchAll('&document_id=30537');\nconst map = {};\nfor (const i of a.concat(b)) map[i.id] = i;\nconst all = Object.values(map);\n\n// El listado de facturas NO trae customer.name (solo identification) -> catalogo aparte.\nconst custMap = {};\n{\n  const f = await http({ method:'GET', json:true, headers:SH,\n    url: 'https://api.siigo.com/v1/customers?page=1&page_size=1' });\n  const tot = (f.pagination && f.pagination.total_results) || 0;\n  for (let pg = 1; pg <= Math.floor(tot / 100) + 1; pg++) {\n    const r = await http({ method:'GET', json:true, headers:SH,\n      url: 'https://api.siigo.com/v1/customers?page=' + pg + '&page_size=100' });\n    for (const c of (r.results || [])) {\n      const id = String(c.identification || '').replace(/[^0-9]/g, '');\n      const nm = Array.isArray(c.name) ? c.name.filter(Boolean).join(' ') : String(c.name || '');\n      // Preferir el nombre real; el commercial_name suele venir como \"No aplica\".\n      let com = (c.commercial_name || '').trim();\n      if (/^(no aplica|n\\/a|na|ninguno|-)$/i.test(com)) com = '';\n      if (id) custMap[id] = nm || com || id;\n    }\n  }\n}\n\nfunction isNIT(raw) {\n  const s = String(raw || '').trim();\n  if (/^[0-9]{8,9}-[0-9]$/.test(s)) return true;\n  const d = s.replace(/[^0-9]/g, '');\n  return (d.length === 9 || d.length === 10) &&\n         /^(800|811|812|813|820|830|832|860|890|891|892|899|900|901|902)/.test(d);\n}\nconst KW = /(s\\.?a\\.?s\\.?|ltda\\.?|factura|corp|inc|empresa|group|grupo|distribu|comercial|industria|soluciones|servicios)/i;\nfunction nameOf(c) { const n = c && c.name; return Array.isArray(n) ? n.join(' ') : String(n || ''); }\nfunction canalOf(inv) {\n  const cc = Number(inv.cost_center);\n  if (cc === 315) return 'export';\n  if (cc === 166) return 'b2b';\n  if (cc === 168) { const cu = inv.customer || {}; return (isNIT(cu.identification) || KW.test(nameOf(cu))) ? 'b2b' : 'b2c'; }\n  return 'otro';   // planta / admin: igual entran, la cartera es toda la plata por cobrar\n}\nconst HOY = new Date();\nconst dias = (d) => Math.floor((HOY - new Date(d)) / 86400000);\nconst bucket = (x) => x > 180 ? '>180' : x > 120 ? '>120' : x > 90 ? '>90' : x > 31 ? '>31' : 'por_vencer';\n\nconst rows = [];\nfor (const inv of all) {\n  const bal = Number(inv.balance || 0);\n  if (!(bal > 0)) continue;\n  const cur = inv.currency || {};\n  const fx  = Number(cur.exchange_rate || 1);\n  const tot = Number(inv.total || 0);\n  // TRAMPA SIIGO: en moneda extranjera el `total` viene en la moneda original, pero el\n  // `balance` a veces viene en COP y a veces en la moneda original. Si el balance cabe\n  // dentro del total, esta en moneda original -> convertir. Si lo excede, ya es COP.\n  // (Multiplicar a ciegas por la tasa era el bug que inflaba la cartera a $4.253 millones.)\n  const saldo    = (fx !== 1 && bal <= tot) ? bal * fx : bal;\n  const totalCop = fx !== 1 ? tot * fx : tot;\n  const d  = dias(inv.date);\n  const cu = inv.customer || {};\n  rows.push({\n    numero: inv.name || inv.id,\n    inv_id: inv.id,\n    fecha: String(inv.date || '').slice(0, 10),\n    cliente: custMap[String(cu.identification || '').replace(/[^0-9]/g, '')] ||\n             nameOf(cu) || String(cu.identification || ''),\n    nit: String(cu.identification || ''),\n    canal: canalOf(inv),\n    moneda: cur.code || 'COP',\n    total_cop: Math.round(totalCop * 100) / 100,\n    saldo_cop: Math.round(saldo * 100) / 100,\n    dias: d,\n    bucket: bucket(d)\n  });\n}\n\n// Reemplazo total: la cartera es un estado, no un historico acumulable.\nawait http({ method:'DELETE', headers: Object.assign({}, H, { Prefer:'return=minimal' }),\n  url: SB + '/rest/v1/cartera?numero=neq.__ninguno__' });\nfor (let i = 0; i < rows.length; i += 200) {\n  await http({ method:'POST', json:true,\n    headers: Object.assign({}, H, { 'Content-Type':'application/json', Prefer:'return=minimal' }),\n    url: SB + '/rest/v1/cartera', body: rows.slice(i, i + 200) });\n}\nconst total = rows.reduce((s, r) => s + r.saldo_cop, 0);\nreturn [{ json: { ok:true, facturas: rows.length, total_cartera: Math.round(total),\n                  revisadas: all.length, actualizado: new Date().toISOString() } }];\n"
+    }
+   },
+   {
+    "id": "wh",
+    "name": "Webhook get-cartera",
+    "type": "n8n-nodes-base.webhook",
+    "typeVersion": 2,
+    "position": [
+     0,
+     220
+    ],
+    "webhookId": "523316d9-8af0-4e1b-84c5-6f3c91c676af",
+    "parameters": {
+     "path": "get-cartera",
+     "options": {},
+     "responseMode": "responseNode"
+    }
+   },
+   {
+    "id": "srv",
+    "name": "Leer Cartera",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     220,
+     220
+    ],
+    "parameters": {
+     "jsCode": "// Sirve la cartera ya calculada (tabla public.cartera) al dashboard.\n// Rapido: solo lee Supabase, no toca Siigo.\nconst SB  = 'https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY = '__SUPABASE_SERVICE_ROLE__';\nconst H   = { apikey: KEY, Authorization: 'Bearer ' + KEY };\nconst http = (o) => this.helpers.httpRequest(o);\n\nconst rows = await http({ method:'GET', json:true, headers:H,\n  url: SB + '/rest/v1/cartera?select=*&order=saldo_cop.desc&limit=5000' });\nconst facturas = Array.isArray(rows) ? rows : [];\n\nconst num = (x) => Number(x || 0);\nconst sumBucket = (b) => facturas.filter(f => f.bucket === b).reduce((s, f) => s + num(f.saldo_cop), 0);\n\nconst resumen = {\n  totalDeuda: Math.round(facturas.reduce((s, f) => s + num(f.saldo_cop), 0)),\n  facturas: facturas.length,\n  masde180:  Math.round(sumBucket('>180')),\n  masde120:  Math.round(sumBucket('>120')),\n  masde90:   Math.round(sumBucket('>90')),\n  masde31:   Math.round(sumBucket('>31')),\n  porVencer: Math.round(sumBucket('por_vencer'))\n};\n\n// Agrupado por cliente (lo que pinta la tabla de aging)\nconst byCli = {};\nfor (const f of facturas) {\n  const k = f.nit || f.cliente || '?';\n  if (!byCli[k]) byCli[k] = { cliente: f.cliente, nit: f.nit, canal: f.canal, facturas: 0,\n                              deudaTotal: 0, masde180: 0, masde120: 0, masde90: 0, masde31: 0, porVencer: 0 };\n  const c = byCli[k];\n  c.facturas += 1;\n  c.deudaTotal += num(f.saldo_cop);\n  if (f.bucket === '>180') c.masde180 += num(f.saldo_cop);\n  else if (f.bucket === '>120') c.masde120 += num(f.saldo_cop);\n  else if (f.bucket === '>90') c.masde90 += num(f.saldo_cop);\n  else if (f.bucket === '>31') c.masde31 += num(f.saldo_cop);\n  else c.porVencer += num(f.saldo_cop);\n}\nconst porCliente = Object.values(byCli)\n  .map(c => ({ ...c, deudaTotal: Math.round(c.deudaTotal), masde180: Math.round(c.masde180),\n               masde120: Math.round(c.masde120), masde90: Math.round(c.masde90),\n               masde31: Math.round(c.masde31), porVencer: Math.round(c.porVencer) }))\n  .sort((a, b) => b.deudaTotal - a.deudaTotal);\n\nconst actualizado = facturas.length\n  ? facturas.map(f => f.actualizado_en).sort().slice(-1)[0]\n  : null;\n\nreturn [{ json: { resumen, porCliente, facturas, actualizado_en: actualizado,\n                  base: 'saldo real con IVA, en COP, todas las facturas abiertas (sin filtro de fecha)' } }];\n"
+    }
+   },
+   {
+    "id": "resp",
+    "name": "Responder",
+    "type": "n8n-nodes-base.respondToWebhook",
+    "typeVersion": 1.1,
+    "position": [
+     440,
+     220
+    ],
+    "parameters": {
+     "respondWith": "json",
+     "responseBody": "={{ JSON.stringify($json) }}",
+     "options": {}
+    }
+   },
+   {
+    "id": "whref",
+    "name": "Webhook refrescar",
+    "type": "n8n-nodes-base.webhook",
+    "typeVersion": 2,
+    "position": [
+     0,
+     -200
+    ],
+    "webhookId": "2b5b2fbc-a3a8-4f56-ba0a-46bdee4148ed",
+    "parameters": {
+     "path": "refrescar-cartera",
+     "options": {},
+     "responseMode": "onReceived"
+    }
+   }
+  ],
+  "connections": {
+   "Schedule": {
+    "main": [
+     [
+      {
+       "node": "Auth Siigo",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Auth Siigo": {
+    "main": [
+     [
+      {
+       "node": "Refrescar Cartera",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Webhook get-cartera": {
+    "main": [
+     [
+      {
+       "node": "Leer Cartera",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Leer Cartera": {
+    "main": [
+     [
+      {
+       "node": "Responder",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Webhook refrescar": {
+    "main": [
+     [
+      {
+       "node": "Auth Siigo",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   }
+  },
+  "authors": "Jhonnatan Arenas",
+  "name": null,
+  "description": null,
+  "autosaved": false,
+  "workflowPublishHistory": [
+   {
+    "createdAt": "2026-07-21T16:18:50.323Z",
+    "id": 1020,
+    "workflowId": "1OioSrAEK6Loun2n",
+    "versionId": "7f831903-ab9d-4013-8a60-a098b79de942",
+    "event": "activated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   },
+   {
+    "createdAt": "2026-07-21T16:18:50.868Z",
+    "id": 1022,
+    "workflowId": "1OioSrAEK6Loun2n",
+    "versionId": "7f831903-ab9d-4013-8a60-a098b79de942",
+    "event": "activated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   },
+   {
+    "createdAt": "2026-07-21T16:18:50.279Z",
+    "id": 1019,
+    "workflowId": "1OioSrAEK6Loun2n",
+    "versionId": "7f831903-ab9d-4013-8a60-a098b79de942",
+    "event": "deactivated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   },
+   {
+    "createdAt": "2026-07-21T16:18:50.807Z",
+    "id": 1021,
+    "workflowId": "1OioSrAEK6Loun2n",
+    "versionId": "7f831903-ab9d-4013-8a60-a098b79de942",
+    "event": "deactivated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   }
+  ]
+ }
+}

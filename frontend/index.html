@@ -806,10 +806,12 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 
     <!-- Cartera B2B -->
     <section class="dash-section" id="sec-b2b-cartera">
-        <div class="section-title">📋 Cartera · Cuentas por Cobrar <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· subtotal sin IVA</small></div>
+        <div class="section-title">📋 Cartera · Cuentas por Cobrar <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· saldo real CON IVA</small></div>
+        <p class="section-note">💰 A diferencia del resto del panel, aquí los montos son la <strong>deuda real con IVA</strong> (lo que efectivamente hay que cobrar), y se incluyen <strong>todas las facturas abiertas sin importar la fecha</strong> — igual que el reporte de Siigo. <span id="carteraActualizado" style="color:var(--gris)"></span></p>
         <div class="aging-grid">
             <div class="aging-card a-total"><div class="aging-label">Total Cartera</div><div class="aging-value" id="agingTotal">—</div><div class="aging-pct">Pendiente total</div></div>
             <div class="aging-card a-180"><div class="aging-label">&gt;180 días</div><div class="aging-value" id="aging180">—</div><div class="aging-pct" id="aging180Pct">—</div></div>
+            <div class="aging-card a-180"><div class="aging-label">&gt;120 días</div><div class="aging-value" id="aging120">—</div><div class="aging-pct" id="aging120Pct">—</div></div>
             <div class="aging-card a-90"><div class="aging-label">&gt;90 días</div><div class="aging-value" id="aging90">—</div><div class="aging-pct" id="aging90Pct">—</div></div>
             <div class="aging-card a-31"><div class="aging-label">&gt;31 días</div><div class="aging-value" id="aging31">—</div><div class="aging-pct" id="aging31Pct">—</div></div>
             <div class="aging-card a-pv"><div class="aging-label">Por Vencer</div><div class="aging-value" id="agingPV">—</div><div class="aging-pct" id="agingPVPct">—</div></div>
@@ -825,6 +827,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                 <table><thead><tr>
                     <th>Cliente</th><th>NIT</th><th>Deuda Total</th>
                     <th style="color:#b71c1c">&gt;180d</th>
+                    <th style="color:#c0392b">&gt;120d</th>
                     <th style="color:var(--naranja)">&gt;90d</th>
                     <th style="color:#f9a825">&gt;31d</th>
                     <th style="color:var(--verde)">Por Vencer</th>
@@ -2574,24 +2577,48 @@ function _renderB2BClientesTable() {
 }
 function sortB2BClientes(col){ b2bClientesSort.dir=b2bClientesSort.col===col?(b2bClientesSort.dir==='asc'?'desc':'asc'):'desc'; b2bClientesSort.col=col; _renderB2BClientesTable(); }
 
+// ── CARTERA ───────────────────────────────────────────────────────────────
+// NO sale de get-ventas. Viene de su propio endpoint (tabla `cartera` en Supabase,
+// refrescada cada 6h desde Siigo por el workflow "CHUCULAT | Cartera"), porque:
+//   · la cartera es la foto de TODO lo abierto hoy, no de un periodo;
+//   · el `balance` guardado en ventas_invoices es una foto vieja (si pagan, no se
+//     actualiza) y por eso la cartera salía inflada;
+//   · barrer las ~10.6k facturas de Siigo toma minutos: no cabe en un request.
+// Base: saldo REAL con IVA, en COP (el resto del panel va sin IVA).
+const CARTERA_URL = 'https://app.rioagencymarketing.com/webhook/get-cartera';
 let carteraData = [];
-function renderCartera() {
-    // Cartera NO se filtra por fechas: siempre sobre el rango por defecto
-    const VD = ventasFull || ventasData;
-    carteraData = VD.carteraPorCliente || [];
+async function renderCartera() {
+    let d = null;
+    try {
+        d = await (await fetch(CARTERA_URL)).json();
+    } catch(e) { console.error('cartera:', e); }
+    if (!d || !d.resumen) {
+        document.getElementById('bodyCartera').innerHTML =
+            '<tr class="empty-row"><td colspan="9">❌ No se pudo cargar la cartera.</td></tr>';
+        return;
+    }
+    carteraData = d.porCliente || [];
     document.getElementById('navBadgeCartera').textContent = carteraData.length;
-    const cr = VD.carteraResumen || {};
+    const cr = d.resumen;
     const total = cr.totalDeuda || 0;
     const pct = v => total > 0 ? Math.round(v / total * 100) + '% del total' : '—';
     document.getElementById('agingTotal').textContent = fmtCOP(total);
     document.getElementById('aging180').textContent   = fmtCOP(cr.masde180 || 0);
     document.getElementById('aging180Pct').textContent= pct(cr.masde180 || 0);
+    document.getElementById('aging120').textContent   = fmtCOP(cr.masde120 || 0);
+    document.getElementById('aging120Pct').textContent= pct(cr.masde120 || 0);
     document.getElementById('aging90').textContent    = fmtCOP(cr.masde90 || 0);
     document.getElementById('aging90Pct').textContent = pct(cr.masde90 || 0);
     document.getElementById('aging31').textContent    = fmtCOP(cr.masde31 || 0);
     document.getElementById('aging31Pct').textContent = pct(cr.masde31 || 0);
     document.getElementById('agingPV').textContent    = fmtCOP(cr.porVencer || 0);
     document.getElementById('agingPVPct').textContent = pct(cr.porVencer || 0);
+    const act = document.getElementById('carteraActualizado');
+    if (act && d.actualizado_en) {
+        const f = new Date(d.actualizado_en);
+        act.textContent = '· ' + (cr.facturas||0) + ' facturas abiertas · actualizado ' +
+            f.toLocaleString('es-CO', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+    }
     _renderCarteraTable();
 }
 function _renderCarteraTable() {
@@ -2599,12 +2626,13 @@ function _renderCarteraTable() {
     const rows = carteraData.filter(c=>!q||(c.cliente+' '+c.nit).toLowerCase().includes(q));
     document.getElementById('countCartera').textContent = rows.length + ' clientes';
     const tbody = document.getElementById('bodyCartera');
-    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="8">✅ Sin cartera pendiente en el período</td></tr>'; return; }
+    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="9">✅ Sin cartera pendiente</td></tr>'; return; }
     tbody.innerHTML = rows.map(c=>`<tr>
         <td class="td-name">${esc(c.cliente)}</td>
         <td style="font-size:12px;color:var(--gris)">${esc(c.nit)}</td>
         <td class="td-pts azul">${fmtCOP(c.deudaTotal)}</td>
         <td class="td-pts" style="color:#b71c1c">${c.masde180 > 0 ? fmtCOP(c.masde180) : '<span style="color:var(--gris)">—</span>'}</td>
+        <td class="td-pts" style="color:#c0392b">${c.masde120 > 0 ? fmtCOP(c.masde120) : '<span style="color:var(--gris)">—</span>'}</td>
         <td class="td-pts" style="color:var(--naranja)">${c.masde90 > 0 ? fmtCOP(c.masde90) : '<span style="color:var(--gris)">—</span>'}</td>
         <td class="td-pts" style="color:#f9a825">${c.masde31 > 0 ? fmtCOP(c.masde31) : '<span style="color:var(--gris)">—</span>'}</td>
         <td class="td-pts verde">${c.porVencer > 0 ? fmtCOP(c.porVencer) : '<span style="color:var(--gris)">—</span>'}</td>
