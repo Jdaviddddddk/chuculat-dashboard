@@ -1,85 +1,302 @@
 {
-  "name": "CHUCULAT | Reconciliar Supabase",
-  "nodes": [
-    {
-      "id": "sch",
-      "name": "Schedule",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        0,
-        0
-      ],
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "days",
-              "triggerAtHour": 5,
-              "daysInterval": 1
-            }
-          ]
-        }
+ "updatedAt": "2026-07-21T16:38:28.812Z",
+ "createdAt": "2026-07-18T05:25:53.976Z",
+ "id": "Pq20DQX58YMzdls2",
+ "name": "CHUCULAT | Reconciliar Supabase",
+ "description": null,
+ "active": true,
+ "isArchived": false,
+ "nodes": [
+  {
+   "id": "sch",
+   "name": "Schedule",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.2,
+   "position": [
+    0,
+    0
+   ],
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "days",
+       "triggerAtHour": 5,
+       "daysInterval": 1
       }
-    },
-    {
-      "id": "auth",
-      "name": "Auth Siigo",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        220,
-        0
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.siigo.com/auth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{\"username\":\"<SIIGO_USERNAME>\",\"access_key\":\"<SIIGO_ACCESS_KEY>\"}",
-        "options": {}
-      }
-    },
-    {
-      "id": "rec",
-      "name": "Reconciliar",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        440,
-        0
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const token = $('Auth Siigo').first().json.access_token;\nconst SH = { Authorization:'Bearer '+token, 'Partner-Id':'n8nApp' };\nconst SB = 'https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY = '<JWT_REDACTED>';\nconst H = { apikey:KEY, Authorization:'Bearer '+KEY };\nconst http = (o) => this.helpers.httpRequest(o);\n\nconst hoy = new Date();\nconst desde = new Date(hoy.getTime() - 75*86400000).toISOString().slice(0,10);\nconst hasta = hoy.toISOString().slice(0,10);\n\n// 1. IDs en Supabase dentro de la ventana (por fecha de factura)\nconst sbIds = [];\nlet off = 0;\nwhile (true) {\n  const r = await http({ method:'GET', json:true, headers:H,\n    url: SB + '/rest/v1/ventas_invoices?select=id&raw->>date=gte.' + desde + '&raw->>date=lte.' + hasta + '&limit=1000&offset=' + off });\n  const arr = Array.isArray(r) ? r : [];\n  for (const x of arr) sbIds.push(x.id);\n  if (arr.length < 1000) break;\n  off += 1000;\n}\n\n// 2. IDs vivos en Siigo (est�ndar + serie FV-2 exportaci�n)\nconst live = new Set();\nasync function fetchLive(extra) {\n  const first = await http({ method:'GET', json:true, headers:SH,\n    url: 'https://api.siigo.com/v1/invoices?date_start=' + desde + '&date_end=' + hasta + extra + '&page=1&page_size=100' });\n  const tot = (first.pagination||{}).total_results || 0;\n  const pages = Math.ceil(tot/100);\n  for (const i of (first.results||[])) live.add(i.id);\n  for (let p=2; p<=pages; p++) {\n    const r = await http({ method:'GET', json:true, headers:SH,\n      url: 'https://api.siigo.com/v1/invoices?date_start=' + desde + '&date_end=' + hasta + extra + '&page=' + p + '&page_size=100' });\n    for (const i of (r.results||[])) live.add(i.id);\n  }\n}\nawait fetchLive('');\nawait fetchLive('&document_id=30537');\n\n// 3. Candidatas: en Supabase pero no en la lista viva\nconst candidatas = sbIds.filter(id => !live.has(id));\n\n// Cap de seguridad\nif (candidatas.length > 60) {\n  return [{ json: { alerta:'DEMASIADAS CANDIDATAS ('+candidatas.length+') - no se borr� nada', ventana:desde+'..'+hasta, sbCount:sbIds.length, liveCount:live.size } }];\n}\n\n// 4. Verificar cada candidata con GET directo ? borrar SOLO si 404\nconst borradas = [];\nconst conservadas = [];\nfor (const id of candidatas) {\n  let existe = true; // fail-safe: solo se pone false ante un 404 confirmado\n  try {\n    await http({ method:'GET', json:true, headers:SH, url:'https://api.siigo.com/v1/invoices/' + id });\n  } catch (e) {\n    const code = e.httpCode || e.statusCode || (e.cause && e.cause.statusCode) || 0;\n    if (String(code) === '404' || /\\b404\\b/.test(String(e.message||''))) existe = false;\n  }\n  if (!existe) {\n    await http({ method:'DELETE', json:true, headers:Object.assign({}, H, { Prefer:'return=minimal' }),\n      url: SB + '/rest/v1/ventas_invoices?id=eq.' + id });\n    borradas.push(id);\n  } else {\n    conservadas.push(id);\n  }\n}\n\nreturn [{ json: {\n  ventana: desde + '..' + hasta,\n  supabase: sbIds.length, vivas: live.size,\n  candidatas: candidatas.length,\n  borradas: borradas.length, idsBorradas: borradas,\n  conservadas: conservadas.length\n} }];"
-      }
+     ]
     }
+   }
+  },
+  {
+   "id": "auth",
+   "name": "Auth Siigo",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    220,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/auth",
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "{\"username\":\"facturacioncacaobasico@gmail.com\",\"access_key\":\"__SIIGO_ACCESS_KEY__\"}",
+    "options": {}
+   }
+  },
+  {
+   "id": "rec",
+   "name": "Reconciliar",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    440,
+    0
+   ],
+   "parameters": {
+    "mode": "runOnceForAllItems",
+    "jsCode": "const token = $('Auth Siigo').first().json.access_token;\nconst SH = { Authorization:'Bearer '+token, 'Partner-Id':'n8nApp' };\nconst SB = 'https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY = '__SUPABASE_SERVICE_ROLE__';\nconst H = { apikey:KEY, Authorization:'Bearer '+KEY };\nconst http = (o) => this.helpers.httpRequest(o);\n\n// Envoltura que NUNCA lanza: devuelve {ok,status,data}. Antes un 404 (o cualquier\n// hipo de Siigo) fuera del try tumbaba la ejecucion entera.\nasync function safe(o, tries) {\n  tries = tries || 3;\n  let last = 0, msg = '';\n  for (let i = 0; i < tries; i++) {\n    try {\n      return { ok:true, status:200, data: await http(o) };\n    } catch (e) {\n      msg = String((e && e.message) || e);\n      const m = /\\b(\\d{3})\\b/.exec(msg);\n      last = Number((e && (e.httpCode || e.statusCode)) || (e && e.cause && e.cause.statusCode) || (m && m[1]) || 0);\n      if (last === 404) return { ok:false, status:404, error:msg };   // definitivo, no reintentar\n      if (i === tries - 1) return { ok:false, status:last, error:msg };\n      await new Promise(r => setTimeout(r, 2000 * (i + 1)));\n    }\n  }\n  return { ok:false, status:last, error:msg };\n}\n\nconst hoy = new Date();\nconst desde = new Date(hoy.getTime() - 75*86400000).toISOString().slice(0,10);\nconst hasta = hoy.toISOString().slice(0,10);\n\n// 1. IDs en Supabase dentro de la ventana (por fecha de factura)\nconst sbIds = [];\nlet off = 0;\nwhile (true) {\n  const r = await safe({ method:'GET', json:true, headers:H,\n    url: SB + '/rest/v1/ventas_invoices?select=id&raw->>date=gte.' + desde + '&raw->>date=lte.' + hasta + '&limit=1000&offset=' + off });\n  if (!r.ok) return [{ json:{ alerta:'no se pudo leer Supabase ('+r.status+') - no se borro nada', error:r.error } }];\n  const arr = Array.isArray(r.data) ? r.data : [];\n  for (const x of arr) sbIds.push(x.id);\n  if (arr.length < 1000) break;\n  off += 1000;\n}\n\n// 2. IDs vivos en Siigo (estandar + serie FV-2 exportacion).\n//    Siigo tarda entre 2s y 18s por pagina y son ~30 paginas: en serie se pasaba\n//    de los 300s del Code node. Se piden de a 5 en paralelo.\nconst live = new Set();\nlet paginasFallidas = 0;\nconst CONC = 5;\n\nasync function fetchLive(extra) {\n  const url = (p) => 'https://api.siigo.com/v1/invoices?date_start=' + desde + '&date_end=' + hasta +\n                     extra + '&page=' + p + '&page_size=100';\n  const first = await safe({ method:'GET', json:true, headers:SH, url: url(1) });\n  if (!first.ok) { paginasFallidas++; return; }\n  const tot = ((first.data || {}).pagination || {}).total_results || 0;\n  for (const i of ((first.data || {}).results || [])) live.add(i.id);\n  const pages = [];\n  for (let p = 2; p <= Math.ceil(tot / 100); p++) pages.push(p);\n  for (let i = 0; i < pages.length; i += CONC) {\n    const res = await Promise.all(pages.slice(i, i + CONC)\n      .map(p => safe({ method:'GET', json:true, headers:SH, url: url(p) })));\n    for (const r of res) {\n      if (!r.ok) { paginasFallidas++; continue; }\n      for (const x of ((r.data || {}).results || [])) live.add(x.id);\n    }\n  }\n}\nawait fetchLive('');\nawait fetchLive('&document_id=30537');\n\n// FAIL-SAFE: si no pudimos leer el listado completo, una factura viva podria\n// parecer fantasma. Mejor no borrar nada que borrar una factura buena.\nif (paginasFallidas > 0) {\n  return [{ json:{ alerta:'fallaron '+paginasFallidas+' paginas de Siigo - no se borro nada',\n                   ventana:desde+'..'+hasta, supabase:sbIds.length, vivas:live.size } }];\n}\n\n// 3. Candidatas: en Supabase pero no en la lista viva\nconst candidatas = sbIds.filter(id => !live.has(id));\n\n// Cap de seguridad\nif (candidatas.length > 60) {\n  return [{ json:{ alerta:'DEMASIADAS CANDIDATAS ('+candidatas.length+') - no se borro nada',\n                   ventana:desde+'..'+hasta, supabase:sbIds.length, vivas:live.size } }];\n}\n\n// 4. Verificar cada candidata con GET directo -> borrar SOLO si 404 confirmado\nconst borradas = [];\nconst conservadas = [];\nconst sinVerificar = [];\nfor (let i = 0; i < candidatas.length; i += CONC) {\n  const lote = candidatas.slice(i, i + CONC);\n  const res = await Promise.all(lote.map(id =>\n    safe({ method:'GET', json:true, headers:SH, url:'https://api.siigo.com/v1/invoices/' + id })));\n  for (let k = 0; k < lote.length; k++) {\n    const id = lote[k], r = res[k];\n    if (r.ok) { conservadas.push(id); continue; }\n    if (r.status !== 404) { sinVerificar.push(id); continue; }  // duda -> no se toca\n    const del = await safe({ method:'DELETE', json:true,\n      headers: Object.assign({}, H, { Prefer:'return=minimal' }),\n      url: SB + '/rest/v1/ventas_invoices?id=eq.' + id });\n    if (del.ok) borradas.push(id); else sinVerificar.push(id);\n  }\n}\n\nreturn [{ json: {\n  ventana: desde + '..' + hasta,\n  supabase: sbIds.length, vivas: live.size,\n  candidatas: candidatas.length,\n  borradas: borradas.length, idsBorradas: borradas,\n  conservadas: conservadas.length,\n  sinVerificar: sinVerificar.length, idsSinVerificar: sinVerificar\n} }];\n"
+   }
+  },
+  {
+   "id": "whrec",
+   "name": "Webhook reconciliar",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    0,
+    -200
+   ],
+   "webhookId": "ef26889a-c6fd-4a1e-a83d-b9e01223ca0b",
+   "parameters": {
+    "path": "reconciliar-ahora",
+    "options": {},
+    "responseMode": "onReceived"
+   }
+  }
+ ],
+ "connections": {
+  "Schedule": {
+   "main": [
+    [
+     {
+      "node": "Auth Siigo",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Auth Siigo": {
+   "main": [
+    [
+     {
+      "node": "Reconciliar",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Webhook reconciliar": {
+   "main": [
+    [
+     {
+      "node": "Auth Siigo",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "errorWorkflow": "iVi686P2BTWp2nFg",
+  "callerPolicy": "workflowsFromSameOwner",
+  "availableInMCP": false
+ },
+ "staticData": {
+  "node:Schedule": {
+   "recurrenceRules": []
+  }
+ },
+ "meta": null,
+ "pinData": null,
+ "versionId": "20e2bc73-a417-47a7-88c7-aa1a47f3030c",
+ "activeVersionId": "20e2bc73-a417-47a7-88c7-aa1a47f3030c",
+ "versionCounter": 15,
+ "triggerCount": 2,
+ "shared": [
+  {
+   "updatedAt": "2026-07-18T05:25:53.991Z",
+   "createdAt": "2026-07-18T05:25:53.991Z",
+   "role": "workflow:owner",
+   "workflowId": "Pq20DQX58YMzdls2",
+   "projectId": "ofTSkXVMRv5OZd5g",
+   "project": {
+    "updatedAt": "2026-05-06T01:08:19.070Z",
+    "createdAt": "2026-05-06T00:41:47.251Z",
+    "id": "ofTSkXVMRv5OZd5g",
+    "name": "Jhonnatan Arenas <riomarketingyeventos@gmail.com>",
+    "type": "personal",
+    "icon": null,
+    "description": null,
+    "creatorId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   }
+  }
+ ],
+ "tags": [],
+ "activeVersion": {
+  "updatedAt": "2026-07-21T16:38:28.816Z",
+  "createdAt": "2026-07-21T16:38:28.816Z",
+  "versionId": "20e2bc73-a417-47a7-88c7-aa1a47f3030c",
+  "workflowId": "Pq20DQX58YMzdls2",
+  "nodes": [
+   {
+    "id": "sch",
+    "name": "Schedule",
+    "type": "n8n-nodes-base.scheduleTrigger",
+    "typeVersion": 1.2,
+    "position": [
+     0,
+     0
+    ],
+    "parameters": {
+     "rule": {
+      "interval": [
+       {
+        "field": "days",
+        "triggerAtHour": 5,
+        "daysInterval": 1
+       }
+      ]
+     }
+    }
+   },
+   {
+    "id": "auth",
+    "name": "Auth Siigo",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.2,
+    "position": [
+     220,
+     0
+    ],
+    "parameters": {
+     "method": "POST",
+     "url": "https://api.siigo.com/auth",
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "{\"username\":\"facturacioncacaobasico@gmail.com\",\"access_key\":\"__SIIGO_ACCESS_KEY__\"}",
+     "options": {}
+    }
+   },
+   {
+    "id": "rec",
+    "name": "Reconciliar",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     440,
+     0
+    ],
+    "parameters": {
+     "mode": "runOnceForAllItems",
+     "jsCode": "const token = $('Auth Siigo').first().json.access_token;\nconst SH = { Authorization:'Bearer '+token, 'Partner-Id':'n8nApp' };\nconst SB = 'https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY = '__SUPABASE_SERVICE_ROLE__';\nconst H = { apikey:KEY, Authorization:'Bearer '+KEY };\nconst http = (o) => this.helpers.httpRequest(o);\n\n// Envoltura que NUNCA lanza: devuelve {ok,status,data}. Antes un 404 (o cualquier\n// hipo de Siigo) fuera del try tumbaba la ejecucion entera.\nasync function safe(o, tries) {\n  tries = tries || 3;\n  let last = 0, msg = '';\n  for (let i = 0; i < tries; i++) {\n    try {\n      return { ok:true, status:200, data: await http(o) };\n    } catch (e) {\n      msg = String((e && e.message) || e);\n      const m = /\\b(\\d{3})\\b/.exec(msg);\n      last = Number((e && (e.httpCode || e.statusCode)) || (e && e.cause && e.cause.statusCode) || (m && m[1]) || 0);\n      if (last === 404) return { ok:false, status:404, error:msg };   // definitivo, no reintentar\n      if (i === tries - 1) return { ok:false, status:last, error:msg };\n      await new Promise(r => setTimeout(r, 2000 * (i + 1)));\n    }\n  }\n  return { ok:false, status:last, error:msg };\n}\n\nconst hoy = new Date();\nconst desde = new Date(hoy.getTime() - 75*86400000).toISOString().slice(0,10);\nconst hasta = hoy.toISOString().slice(0,10);\n\n// 1. IDs en Supabase dentro de la ventana (por fecha de factura)\nconst sbIds = [];\nlet off = 0;\nwhile (true) {\n  const r = await safe({ method:'GET', json:true, headers:H,\n    url: SB + '/rest/v1/ventas_invoices?select=id&raw->>date=gte.' + desde + '&raw->>date=lte.' + hasta + '&limit=1000&offset=' + off });\n  if (!r.ok) return [{ json:{ alerta:'no se pudo leer Supabase ('+r.status+') - no se borro nada', error:r.error } }];\n  const arr = Array.isArray(r.data) ? r.data : [];\n  for (const x of arr) sbIds.push(x.id);\n  if (arr.length < 1000) break;\n  off += 1000;\n}\n\n// 2. IDs vivos en Siigo (estandar + serie FV-2 exportacion).\n//    Siigo tarda entre 2s y 18s por pagina y son ~30 paginas: en serie se pasaba\n//    de los 300s del Code node. Se piden de a 5 en paralelo.\nconst live = new Set();\nlet paginasFallidas = 0;\nconst CONC = 5;\n\nasync function fetchLive(extra) {\n  const url = (p) => 'https://api.siigo.com/v1/invoices?date_start=' + desde + '&date_end=' + hasta +\n                     extra + '&page=' + p + '&page_size=100';\n  const first = await safe({ method:'GET', json:true, headers:SH, url: url(1) });\n  if (!first.ok) { paginasFallidas++; return; }\n  const tot = ((first.data || {}).pagination || {}).total_results || 0;\n  for (const i of ((first.data || {}).results || [])) live.add(i.id);\n  const pages = [];\n  for (let p = 2; p <= Math.ceil(tot / 100); p++) pages.push(p);\n  for (let i = 0; i < pages.length; i += CONC) {\n    const res = await Promise.all(pages.slice(i, i + CONC)\n      .map(p => safe({ method:'GET', json:true, headers:SH, url: url(p) })));\n    for (const r of res) {\n      if (!r.ok) { paginasFallidas++; continue; }\n      for (const x of ((r.data || {}).results || [])) live.add(x.id);\n    }\n  }\n}\nawait fetchLive('');\nawait fetchLive('&document_id=30537');\n\n// FAIL-SAFE: si no pudimos leer el listado completo, una factura viva podria\n// parecer fantasma. Mejor no borrar nada que borrar una factura buena.\nif (paginasFallidas > 0) {\n  return [{ json:{ alerta:'fallaron '+paginasFallidas+' paginas de Siigo - no se borro nada',\n                   ventana:desde+'..'+hasta, supabase:sbIds.length, vivas:live.size } }];\n}\n\n// 3. Candidatas: en Supabase pero no en la lista viva\nconst candidatas = sbIds.filter(id => !live.has(id));\n\n// Cap de seguridad\nif (candidatas.length > 60) {\n  return [{ json:{ alerta:'DEMASIADAS CANDIDATAS ('+candidatas.length+') - no se borro nada',\n                   ventana:desde+'..'+hasta, supabase:sbIds.length, vivas:live.size } }];\n}\n\n// 4. Verificar cada candidata con GET directo -> borrar SOLO si 404 confirmado\nconst borradas = [];\nconst conservadas = [];\nconst sinVerificar = [];\nfor (let i = 0; i < candidatas.length; i += CONC) {\n  const lote = candidatas.slice(i, i + CONC);\n  const res = await Promise.all(lote.map(id =>\n    safe({ method:'GET', json:true, headers:SH, url:'https://api.siigo.com/v1/invoices/' + id })));\n  for (let k = 0; k < lote.length; k++) {\n    const id = lote[k], r = res[k];\n    if (r.ok) { conservadas.push(id); continue; }\n    if (r.status !== 404) { sinVerificar.push(id); continue; }  // duda -> no se toca\n    const del = await safe({ method:'DELETE', json:true,\n      headers: Object.assign({}, H, { Prefer:'return=minimal' }),\n      url: SB + '/rest/v1/ventas_invoices?id=eq.' + id });\n    if (del.ok) borradas.push(id); else sinVerificar.push(id);\n  }\n}\n\nreturn [{ json: {\n  ventana: desde + '..' + hasta,\n  supabase: sbIds.length, vivas: live.size,\n  candidatas: candidatas.length,\n  borradas: borradas.length, idsBorradas: borradas,\n  conservadas: conservadas.length,\n  sinVerificar: sinVerificar.length, idsSinVerificar: sinVerificar\n} }];\n"
+    }
+   },
+   {
+    "id": "whrec",
+    "name": "Webhook reconciliar",
+    "type": "n8n-nodes-base.webhook",
+    "typeVersion": 2,
+    "position": [
+     0,
+     -200
+    ],
+    "webhookId": "ef26889a-c6fd-4a1e-a83d-b9e01223ca0b",
+    "parameters": {
+     "path": "reconciliar-ahora",
+     "options": {},
+     "responseMode": "onReceived"
+    }
+   }
   ],
   "connections": {
-    "Schedule": {
-      "main": [
-        [
-          {
-            "node": "Auth Siigo",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Auth Siigo": {
-      "main": [
-        [
-          {
-            "node": "Reconciliar",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+   "Schedule": {
+    "main": [
+     [
+      {
+       "node": "Auth Siigo",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Auth Siigo": {
+    "main": [
+     [
+      {
+       "node": "Reconciliar",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Webhook reconciliar": {
+    "main": [
+     [
+      {
+       "node": "Auth Siigo",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   }
   },
-  "settings": {
-    "executionOrder": "v1"
-  }
+  "authors": "Jhonnatan Arenas",
+  "name": null,
+  "description": null,
+  "autosaved": false,
+  "workflowPublishHistory": [
+   {
+    "createdAt": "2026-07-21T16:38:28.931Z",
+    "id": 1048,
+    "workflowId": "Pq20DQX58YMzdls2",
+    "versionId": "20e2bc73-a417-47a7-88c7-aa1a47f3030c",
+    "event": "activated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   },
+   {
+    "createdAt": "2026-07-21T16:38:29.356Z",
+    "id": 1050,
+    "workflowId": "Pq20DQX58YMzdls2",
+    "versionId": "20e2bc73-a417-47a7-88c7-aa1a47f3030c",
+    "event": "activated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   },
+   {
+    "createdAt": "2026-07-21T16:38:28.883Z",
+    "id": 1047,
+    "workflowId": "Pq20DQX58YMzdls2",
+    "versionId": "20e2bc73-a417-47a7-88c7-aa1a47f3030c",
+    "event": "deactivated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   },
+   {
+    "createdAt": "2026-07-21T16:38:29.299Z",
+    "id": 1049,
+    "workflowId": "Pq20DQX58YMzdls2",
+    "versionId": "20e2bc73-a417-47a7-88c7-aa1a47f3030c",
+    "event": "deactivated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   }
+  ]
+ }
 }
