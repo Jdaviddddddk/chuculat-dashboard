@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-07-21T17:26:38.704Z",
+ "updatedAt": "2026-07-21T21:16:43.148Z",
  "createdAt": "2026-05-07T16:01:27.950Z",
  "id": "T5vFnAkNZKPmuzv9",
  "name": "CHUCULAT | Woocommerce - Siigo",
@@ -221,7 +221,7 @@
     },
     "sendBody": true,
     "specifyBody": "json",
-    "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
+    "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total),\n        warehouse: 30\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
     "options": {}
    },
    "type": "n8n-nodes-base.httpRequest",
@@ -256,7 +256,7 @@
     },
     "sendBody": true,
     "specifyBody": "json",
-    "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('HTTP Request1').item.json.results[0].identification }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
+    "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('HTTP Request1').item.json.results[0].identification }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total),\n        warehouse: 30\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
     "options": {}
    },
    "type": "n8n-nodes-base.httpRequest",
@@ -911,9 +911,9 @@
    }
   ]
  },
- "versionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
- "activeVersionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
- "versionCounter": 480,
+ "versionId": "b6aa9f12-9cfd-4f79-aacc-ca408d12fe2d",
+ "activeVersionId": "b6aa9f12-9cfd-4f79-aacc-ca408d12fe2d",
+ "versionCounter": 485,
  "triggerCount": 1,
  "shared": [
   {
@@ -943,9 +943,9 @@
   }
  ],
  "activeVersion": {
-  "updatedAt": "2026-07-21T17:26:38.719Z",
-  "createdAt": "2026-07-21T17:26:38.719Z",
-  "versionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
+  "updatedAt": "2026-07-21T21:16:43.154Z",
+  "createdAt": "2026-07-21T21:16:43.154Z",
+  "versionId": "b6aa9f12-9cfd-4f79-aacc-ca408d12fe2d",
   "workflowId": "T5vFnAkNZKPmuzv9",
   "nodes": [
    {
@@ -1162,7 +1162,7 @@
      },
      "sendBody": true,
      "specifyBody": "json",
-     "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
+     "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total),\n        warehouse: 30\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
      "options": {}
     },
     "type": "n8n-nodes-base.httpRequest",
@@ -1197,7 +1197,7 @@
      },
      "sendBody": true,
      "specifyBody": "json",
-     "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('HTTP Request1').item.json.results[0].identification }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
+     "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('HTTP Request1').item.json.results[0].identification }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total),\n        warehouse: 30\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
      "options": {}
     },
     "type": "n8n-nodes-base.httpRequest",
@@ -1501,34 +1501,34 @@
   "autosaved": false,
   "workflowPublishHistory": [
    {
-    "createdAt": "2026-07-21T17:26:39.726Z",
-    "id": 1052,
+    "createdAt": "2026-07-21T21:16:43.344Z",
+    "id": 1056,
     "workflowId": "T5vFnAkNZKPmuzv9",
-    "versionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
+    "versionId": "b6aa9f12-9cfd-4f79-aacc-ca408d12fe2d",
     "event": "activated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    },
    {
-    "createdAt": "2026-07-21T17:26:40.270Z",
-    "id": 1054,
+    "createdAt": "2026-07-21T21:16:43.910Z",
+    "id": 1058,
     "workflowId": "T5vFnAkNZKPmuzv9",
-    "versionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
+    "versionId": "b6aa9f12-9cfd-4f79-aacc-ca408d12fe2d",
     "event": "activated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    },
    {
-    "createdAt": "2026-07-21T17:26:39.335Z",
-    "id": 1051,
+    "createdAt": "2026-07-21T21:16:43.291Z",
+    "id": 1055,
     "workflowId": "T5vFnAkNZKPmuzv9",
-    "versionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
+    "versionId": "b6aa9f12-9cfd-4f79-aacc-ca408d12fe2d",
     "event": "deactivated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    },
    {
-    "createdAt": "2026-07-21T17:26:40.233Z",
-    "id": 1053,
+    "createdAt": "2026-07-21T21:16:43.853Z",
+    "id": 1057,
     "workflowId": "T5vFnAkNZKPmuzv9",
-    "versionId": "7c6dbfb9-2497-43d2-a46b-71ca04ec3aba",
+    "versionId": "b6aa9f12-9cfd-4f79-aacc-ca408d12fe2d",
     "event": "deactivated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    }
