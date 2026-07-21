@@ -1,5 +1,5 @@
 # Handoff — Chuculat (fidelización + ventas + Supabase)
-_Para continuar en otro chat. Actualizado: 2026-07-18 (sesiones 3–6)._
+_Para continuar en otro chat. Actualizado: 2026-07-21 (sesiones 3–7)._
 
 ## Contexto rápido
 Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymarketing.com`, header API `X-N8N-API-KEY`).
@@ -35,7 +35,9 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 | `T5vFnAkNZKPmuzv9` | Woocommerce-Siigo | idempotente; timbra DIAN; enlazado al Error Handler |
 | `VQKbig1zk65gk3G5` | Confirmar cita (`payment-confirmation`) | experiencias vía ePayco; `/contacts/upsert`; timbra DIAN |
 | `iVi686P2BTWp2nFg` | Error Handler | errorTrigger → **SMS por sub-cuenta GWA** (ver abajo) |
-| `Pq20DQX58YMzdls2` | **Reconciliar Supabase** (diario 5am) | borra de `ventas_invoices` las facturas anuladas en Siigo (fantasmas) |
+| `Pq20DQX58YMzdls2` | **Reconciliar Supabase** (diario 5am) | borra de `ventas_invoices` las facturas anuladas en Siigo (fantasmas). Webhook manual: `/webhook/reconciliar-ahora` |
+| `1OioSrAEK6Loun2n` | **Cartera** (cada 6h) | barre Siigo, llena la tabla `cartera` y la sirve en `/webhook/get-cartera`. Refresco manual: `/webhook/refrescar-cartera` |
+| `XYo0ijLoVGksTyDx` | **Ventas Cross** (`get-ventas-cross`) | proxy de las RPC de `ventas_items` para las Tablas Dinámicas con cruce |
 | `iIGA54Txfw5BfKjN` | TEST Log Activity | insert manual a `puntos_log` |
 
 **Alertas SMS:** el Error Handler está enlazado (`settings.errorWorkflow`) a los críticos: Redimir Puntos, SIIGO-GHL FACTURAS, Dashboard Ventas, Enriquecimiento, Cierre Mensual, **Confirmar cita, Woocommerce, Reconciliar Supabase**. SMS por la **sub-cuenta GWA** (location `fPuvVoCK3e5wQQVtSujb`, número Twilio **+16619908570**, token `pit-b01308b1…`) porque la location Chuculat NO tiene número SMS ni WhatsApp proactivo. Destino: contacto `Vjg9EwykevCwzxbZA4hA` (+573123408459) en GWA.
@@ -45,6 +47,8 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 - **`puntos_log`** — logs de puntos. **`items` (jsonb)** = detalle de redención `[{sku,nombre,puntos,precio_cop,qty}]`.
 - **`productos_categorias`** — 218 productos, 23 categorías propias. SQL: `backend/supabase_productos_categorias.sql`.
 - **`premios_puntos`** — 60 premios (sku, nombre, precio_cop, puntos, imagen). SQL: `backend/supabase_premios.sql`.
+- **`ventas_items`** — 45.816 ítems aplanados (inv_id, fecha, canal, categoria, code, producto, subtotal, qty) + RPC `ventas_opciones()` y `ventas_pivot()`. Alimenta las **Tablas Dinámicas con cruce**. SQL: `backend/supabase_ventas_items.sql`. **Es un backfill de una sola vez**: se re-arma corriendo `flatten_items.py` + `backfill_items.py`.
+- **`cartera`** — foto viva de las facturas con saldo (numero, fecha, cliente, nit, canal, moneda, total_cop, **saldo_cop = CON IVA**, dias, bucket) + RPC `cartera_resumen()`. La llena el workflow Cartera. SQL: `backend/supabase_cartera.sql`.
 
 ---
 
@@ -122,27 +126,79 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 
 ---
 
+## HECHO en la sesión 7 (21-jul-2026 — commits `082c737`..`6861565`)
+
+### Tablas Dinámicas con filtros CRUZADOS (`082c737`)
+- El `pivot` viejo traía cada dimensión pre-agregada por separado → **no se podían cruzar**. Se aplanó todo a **`ventas_items`** (45.816 ítems) + 2 RPC en Postgres (`ventas_opciones` para la cascada, `ventas_pivot` para el cruce) + proxy n8n **`get-ventas-cross`** (mantiene la service_role del lado del servidor).
+- Frontend: 3 filtros que **se acotan entre sí** (Centro → Categoría → Producto), selector "Ver por (filas)" y checkboxes de meses. Celda = valor + cantidad.
+- **BUG de categorías (mismo día):** `ventas_items.categoria` se había llenado con el `account_group` de **Siigo**, no con la taxonomía propia de Johan → las Tablas mostraban "Producto Empacado / Bases y Subrecetas…" en vez de SEL/TABLETAS/BOMBONES. Se remapeó la columna desde `productos_categorias` (los 208 codes están todos ahí → **23 categorías propias**) y se corrigió la causa raíz en `flatten_items.py`.
+
+### Panel Ventas rediseñado (`5ecb06c`, `e9d2c41`, `95da83b`, `1f30173`)
+- **Orden nuevo** (de general a específico) y agrupado en **4 grupos**: `grp-general` FIJO arriba (Progreso · Resumen · Meta por Centro) y 3 desplegables — `grp-metas` (Cumplimiento + Tendencia), `grp-productos` (Categorías + Ranking + Clientes B2B), `grp-export` (Exportación + Cartera). Estado por grupo en `localStorage['chuculat.group.'+id]`.
+- **Filtro de fecha flotante** (botón abajo-derecha, visible en Ventas y Destacadas). Reemplaza las barras fijas; los inputs canónicos (`b2bDateFrom/To`, `destDateFrom/To`) quedaron **ocultos dentro de `#floatFilter`**. Recarga solo lo filtrable (`renderB2BFiltered` + clientes de exportación), **preserva el scroll** y no oculta el contenido.
+- **Meta por Centro pasó a MENSUAL**: meta del mes ajustada × 60/20/20 vs el real del mes, **con fila TOTAL** al final.
+- **Cumplimiento mes a mes**: columna "Desglose por centro" (B2C · B2B · Export del real de cada mes).
+- **Comparativo vs año anterior** bajo la barra de meta: acumulado del año vs mismo periodo de 2025. ⚠️ Las ventas 2025 van **fijas** en `VENTAS_ANIO_PREV` (fuente: PDF oficial, total $967.434.175) porque **el histórico del dashboard NO tiene ene–jun 2025** (todo en $0; arranca en jul-2025 incompleto y solo cuadra desde sep). Reglas de Johan: **solo meses cerrados** y **% = diferencia / año ACTUAL** (no la fórmula contable estándar; se le advirtió). Verificado: ene–jun 2025 $439.134.970 vs 2026 $486.891.834 = **+9,81%**.
+- `fmtCOP` **redondea al mostrar** (las sumas siguen con decimales). Se eliminó la sección **"Ventas por Canal"** (duplicaba el Resumen); la línea que actualiza `navBadgeB2B` se rescató a `renderB2BKPIs`.
+- **Destacadas**: al buscar un cliente, ahora hay un **selector** para elegir uno entre las coincidencias en vez de sumarlas todas.
+
+### Puntos: floor → ceil
+`Math.floor(valorCompra/1000)` → **`Math.ceil`** en `Code in JavaScript1` de `b3NqLczq5MzJ3dmb` (25.560 → 26 pts). **Solo hacia adelante**: no se recalculó lo ya otorgado (el `puntos_log` reconstruido en la sesión 6 usó `floor`, así que histórico y nuevo conviven con reglas distintas — decisión explícita de Johan).
+
+### CARTERA rehecha (`7b779ad`, `6861565`) — mostraba $4.253 MILLONES
+- **Bug raíz:** en facturas en EUR, Siigo devuelve el `total` en la moneda original pero el **`balance` SIEMPRE en COP**. La fórmula vieja (`balance × sub/total`, con `sub` ya multiplicado por la tasa) volvía a multiplicar por la tasa: **FV-2-928** pasaba de ~$966.899 a **$4.217.027.041** (99% del error).
+- Otros 3 defectos: prorrateaba a subtotal (**sin IVA**), solo miraba el **rango de fechas** filtrado (ocultaba $13,1M de deuda de 2025) y excluía planta/admin.
+- **Decisión de Johan:** saldo real **CON IVA**, **todas** las facturas abiertas sin filtro de fecha, mismo alcance que Siigo (sin filtrar centro de costo).
+- **Arquitectura nueva:** tabla `cartera` + workflow `1OioSrAEK6Loun2n` (cada 6h) + `get-cartera`. Se sacó de `get-ventas` porque el `balance` guardado en `ventas_invoices.raw` es una **foto vieja** (si el cliente paga, nunca se actualiza) y barrer 10.6k facturas no cabe en un request.
+- Se agregó el bucket **>120d** al frontend, que faltaba y dejaba $4,18M invisibles.
+- **Segunda corrección (`6861565`):** mi primer arreglo usó una heurística falsa ("si el balance cabe en el total está en moneda original") que le sumaba **$3,1M de más** a FV-2-974 (saldo real: 720 pesos). **Regla definitiva: el saldo NUNCA se convierte.** Total final **$50.435.018**, que cuadra **al peso** con la suma cruda de balances de Siigo (43 facturas de 10.691).
+
+### Los 5 errores del Error Handler (`57981e2`)
+- **🔴 `skuMap` CORRUPTO en Confirmar cita:** las llaves tenían un **`?` literal** (`"Wonka por un D?a"`) desde antes de la sesión 6 → **las dos experiencias con tilde NUNCA pudieron facturarse** (solo servían Cacao Maestro y Camino del chocolate). Encima ePayco manda a veces el texto en **mojibake**. Fix: llaves con escapes `í` (ASCII puro) + `repararMojibake()` + match sin tildes/mayúsculas. Probado 10/10.
+- **Recuperada FV-2-1193** (Mariana Carolina, CC 1000179575, $250.000, Wonka por un Día ×2, DIAN Accepted).
+- **Reintentos**: los nodos HTTP de Siigo de Enriquecimiento y Dashboard Ventas no tenían `retryOnFail` → se agregó (4 intentos, 4s). *(A los POST de facturas NO se les puso, a propósito: reintentar un POST no idempotente duplica facturas.)*
+- **Reconciliar Supabase**: moría por **timeout a los 300s** (paginaba ~30 páginas en serie) → **paralelizado de a 5: 17,8s**. El 404 sin capturar se resolvió pasando todas las llamadas por `safe()` (nunca lanza) + **fail-safe: si falla alguna página NO borra nada**.
+
+### WooCommerce → Siigo (`5e52b10`, `b4f6b47`)
+- El flujo tiene **DOS nodos que crean factura** y solo uno estaba completo. `HTTP Request4` (**cliente nuevo**) creaba la factura **sin `stamp`** (nacía en Draft, nunca iba a la DIAN), **sin la línea de domicilio** (código 672 → no se cobraba el envío), **sin warehouse** y con el pago = suma de ítems en vez de `body.total`. Se copió el cuerpo de la rama buena.
+- La **línea de domicilio no llevaba bodega** en ninguna de las dos ramas (29 de 56 facturas FV-2 con ítems sin bodega) → se agregó `warehouse: 30` (**"PRINCIPAL VENTAS"**; las otras son ALMACENAMIENTO 31, Cacao Factory 32, D Y G 33).
+
+---
+
 ## PENDIENTE
 
 1. **[Johan] Pegar `frontend/redencion.html` en GHL** y hacer **una redención de prueba con pocos puntos**: es el único eslabón sin ejercitar (no lo probé porque descontaría puntos reales). Verificar que `items` llegue a `puntos_log`.
 2. **[Johan] Confirmar tabletas 30g** (366/368): ¿$15.000/105 pts como las cargué, o $24.000/168 como decía el PDF?
 3. **[Johan] SKU a los combos en WooCommerce** (product_id **4120** "Combo para la casa" y **4118** "Combo Amateur"): ya existen en Siigo (730/731/732) pero Woo manda `sku:""` → **cada venta con combo seguirá fallando**. No son bundles (`meta_data:[]`), son productos simples.
-4. **[Johan] Timbrar a mano 3 facturas en `Draft`** (Siigo rechaza timbrarlas por API: `invalid_date` por la fecha retroactiva) — **$305.352**:
-   | Factura | Fecha | Cliente | Total |
-   |---|---|---|---|
-   | FV-2-1157 | 02-jul | Manuel Vicente Tejada (94460233) | $58.920 |
-   | FV-2-1159 | 03-jul | juan rodriguez (1024489707) | $75.999 |
-   | FV-2-1177 | 09-jul | Aura Edilma Velandia (40046714) | $170.033 |
-   (FV-2-1127 ya se re-fechó al 17-jul y quedó `Accepted`. Las 6 del 16-jul —FV-2-1183..1188— también.)
+4. **[Johan] Timbrar a mano las facturas en `Draft`** (Siigo rechaza timbrarlas por API: `invalid_date` por la fecha retroactiva). Al 21-jul quedan **3** (las de julio ya las timbró Johan) — **$155.999**:
+   | Factura | Fecha | Total |
+   |---|---|---|
+   | FV-2-1042 | 13-may | $0 (revisar, parece basura) |
+   | FV-2-1143 | 30-jun | $40.000 |
+   | FV-2-1144 | 30-jun | $115.999 |
+   Verificar con: FV-2 de los últimos meses con `stamp.status != 'Accepted'`.
 5. **Venta de Silvia sin facturar** ($184.000, "Chocolates" por link de pago ePayco, doc 39569600) — Johan la dejó por fuera.
 5. Barrer `puntos_log` completo contra `ventas_invoices` por si hay más casos tipo Tejada (puntos de facturas que no son cc=168).
 6. (Opcional) `Get FV2` del dashboard baja TODAS las FV-2 en cada llamada y **oscila entre 2,5s y 17,6s** (API de Siigo) — es el mayor cuello de botella restante. Cachearlo requiere cuidado (ver abajo).
+7. **Buscar más ventas de experiencias sin facturar.** Como "Wonka por un Día" y "Un Día como Oompa Loompa" **nunca** pudieron facturarse (skuMap corrupto), es probable que haya ventas viejas sin factura. n8n ya purgó esas ejecuciones → hay que **cruzar los pagos aprobados de ePayco contra las facturas de Siigo**. Solo se recuperó la de Mariana (FV-2-1193), que estaba en las ejecuciones vivas.
+8. **`ventas_items` es un backfill de una sola vez** — ningún workflow lo alimenta, así que las Tablas Dinámicas no incluyen ventas posteriores al último backfill. O se re-corre `flatten_items.py` + `backfill_items.py` periódicamente, o se arma un workflow que lo mantenga (pendiente de decidir).
+9. **Cartera: Siigo NO devuelve `due_date`** (0 de 43 facturas) → el aging cuenta **días desde la fecha de factura**, no desde el vencimiento pactado. Si Chuculat maneja plazos 30/60 días, los buckets se ven más vencidos de lo real. Falta definir de dónde sacar el plazo.
+10. **Las 29 facturas FV-2 ya emitidas con ítems sin bodega no se pueden corregir** (timbradas y aceptadas por la DIAN). Si contabilidad las necesita corregidas: nota crédito + reemisión.
 
 ## Trampas conocidas (leer antes de tocar algo)
 - **NO cachear payloads grandes en staticData de n8n.** Se intentó consolidar la rama en vivo del dashboard en un `Live Siigo` cacheado: números idénticos pero **más lento** (9,8s → 14s) porque staticData creció a 2,78 MB y n8n lo reescribe en cada ejecución. **Revertido.** Baseline de verificación en `baseline_ventas.json` (rango 2025-06-01→2026-06-30: totalGeneral 978.608.844, B2C 483.443.359, B2B 270.097.602, Export 225.067.883, 9.940 facturas) — usarlo para validar cualquier refactor.
 - **El PUT de un workflow limpia el staticData** → la 1ª llamada tras un PUT es fría.
 - **Al editar jsCode desde Python: usar raw strings** (`r'''...'''`). Un `\b` en string normal se vuelve backspace `\x08` y mata la regex en silencio. El jsCode usa saltos `\r\n`.
 - **Siigo rechaza fechas retroactivas** (`invalid_date`) → las facturas de recuperación van con fecha de hoy.
+- **⚠️ Siigo: el `balance` viene SIEMPRE en COP, aunque el `total` esté en la moneda original.** NUNCA multiplicar el saldo por `exchange_rate`. Prueba: FV-2-928 tiene total 2.522,47 EUR y balance 966.899,01 (383× el total). Esto costó dos correcciones: primero se inflaba la cartera a $4.253 millones, y luego una heurística intermedia ("si el saldo cabe en el total está en moneda original") le sumaba $3,1M de más a FV-2-974, cuyo saldo real son 720 pesos.
+- **⚠️ Límite de 300s en los Code node.** Cualquier barrido de Siigo en serie (~30+ páginas a 2-18s c/u) muere por timeout. **Paginar en paralelo con `Promise.all` de a 5.** Le pasó a Reconciliar (300s → 17,8s) y a Cartera (300s → 88s). Si un workflow que reescribe una tabla puede quedar a medias, ponerle **fail-safe: si falla alguna página, no tocar la tabla**.
+- **`page_size` de Siigo está topado en 100** — pide 200/500/1000 y devuelve 100 igual. No se puede reducir el número de páginas por ahí.
+- **El filtro `date_start`/`date_end` de `/v1/invoices` SÍ funciona** (2.610 resultados en 75 días, no 10.652). La nota vieja de que estaba roto no aplica a ese endpoint.
+- **⚠️ Cuando un workflow tiene ramas paralelas que hacen lo mismo, revisarlas TODAS.** El timbrado de la sesión 6 se aplicó solo a una de las dos ramas de Woocommerce; la otra siguió creando facturas en Draft y sin cobrar el domicilio durante días.
+- **Texto no-ASCII en jsCode: usar escapes `\uXXXX`.** El `skuMap` de Confirmar cita tenía `"Wonka por un D?a"` con un `?` literal (alguien lo escribió con una codificación que reemplaza lo no-ASCII) → esa experiencia nunca facturó. Lo mismo aplica a los regex: poner caracteres combinantes literales (para quitar tildes) **no funciona**, hay que usar `/[̀-ͯ]/g`.
+- **ePayco manda `x_description` en mojibake a veces** ("Wonka por un DÃ­a" = UTF-8 leído como Latin-1). Reparar con `decodeURIComponent(escape(s))` antes de comparar.
+- **El listado `/v1/invoices` NO trae `customer.name`** (solo `identification`) → cruzar con `/v1/customers`. Y preferir `name` sobre `commercial_name`, que suele venir como **"No aplica"**.
+- **El histórico del dashboard NO tiene ene–jun 2025** (todo en $0; jul-2025 incompleto; cuadra desde sep-2025). Cualquier comparativo con 2025 debe usar los valores fijos de `VENTAS_ANIO_PREV`, no los datos del sistema.
 - **Siigo PUT /v1/customers/{id}**: el GET devuelve `id_type`/`fiscal_responsibilities`/`city` como objetos, pero el PUT exige `id_type` como **string code** → hay que aplanar.
 - **GHL rechaza teléfono duplicado con HTTP 200 y body vacío** (silencioso). Si otro contacto ya tiene el número, el PUT no hace nada.
 - **En el payload de get-ventas: `categorias[]` usa la clave `categoria`, NO `name`** (en `todosProductos[]` sí es `category`).
