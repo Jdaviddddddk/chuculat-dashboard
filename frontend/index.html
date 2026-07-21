@@ -629,6 +629,29 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                 <span class="meta-bar-pct" id="metaBarPct">0%</span>
             </div>
         </div>
+
+        <!-- Comparativo contra el año anterior (solo meses cerrados) -->
+        <div class="meta-bar-wrap" style="margin-top:20px">
+            <div class="meta-bar-label">
+                <span>📊 Acumulado vs año anterior <small id="cmpPeriodo">—</small></span>
+                <small id="cmpInfo">—</small>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <span style="width:46px;flex:0 0 auto;font-size:11px;font-weight:800;color:var(--gris)" id="cmpLabelPrev">2025</span>
+                <div class="meta-bar-track" style="flex:1">
+                    <div class="meta-bar-fill" id="cmpBarPrev" style="width:0%;background:var(--gris)"></div>
+                    <span class="meta-bar-pct" id="cmpPrevVal">—</span>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+                <span style="width:46px;flex:0 0 auto;font-size:11px;font-weight:800;color:var(--chocolate)" id="cmpLabelCur">2026</span>
+                <div class="meta-bar-track" style="flex:1">
+                    <div class="meta-bar-fill" id="cmpBarCur" style="width:0%"></div>
+                    <span class="meta-bar-pct" id="cmpCurVal">—</span>
+                </div>
+            </div>
+            <div id="cmpResultado" style="margin-top:12px;text-align:center;font-weight:800;font-size:15px">—</div>
+        </div>
     </section>
 
     <!-- 2. Resumen de ventas -->
@@ -2036,6 +2059,16 @@ const META_ANUAL_VAL = 1600000000;
 const META_PCT = { 1:0.06301662, 2:0.06407228, 3:0.07549632, 4:0.06368978, 5:0.12625007, 6:0.06139210, 7:0.05928163, 8:0.06409069, 9:0.08949743, 10:0.10845739, 11:0.11861540, 12:0.10614030 };
 const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
+// Ventas 2025 por mes — fuente: PDF oficial "VENTAS PDT - BASE DE DATOS".
+// Van fijas aquí porque el histórico del dashboard NO tiene ene–jun 2025 (arranca
+// en jul-2025 y solo cuadra con el oficial desde sep). Total 2025: $967.434.175.
+const VENTAS_ANIO_PREV = {
+    anio: 2025,
+    meses: { 1:60964434.00, 2:61985709.35, 3:73037717.90, 4:61615665.27,
+             5:122138628.44, 6:59392815.40, 7:57351077.80, 8:62003521.99,
+             9:86582871.10, 10:104925387.45, 11:114752595.07, 12:102683751.33 }
+};
+
 function renderMeta() {
     // Meta NO se filtra por fechas: siempre sobre el rango por defecto (año en curso)
     const VD = ventasFull || ventasData;
@@ -2134,9 +2167,11 @@ function renderMeta() {
     const mesNombre = mRow ? MESES[mRow.m-1] : '—';
     const lblCC = document.getElementById('metaCCLabel');
     if (lblCC) lblCC.textContent = mesNombre + ' ' + year;
+    let totMetaCC = 0, totRealCC = 0;
     document.getElementById('bodyMetaCanal').innerHTML = Object.keys(CC_SPLIT).map(k=>{
         const metaCC = CC_SPLIT[k]*metaMesVal;
         const real = mRow ? (realMesCC[ccKeyReal[k]][mRow.m]||0) : 0;
+        totMetaCC += metaCC; totRealCC += real;
         const pct = metaCC>0 ? Math.round(real/metaCC*100) : 0;
         const barW = Math.min(pct,100);
         return `<tr>
@@ -2149,7 +2184,22 @@ function renderMeta() {
                 <span style="font-weight:700;font-size:12px;color:${ccColors[k]}">${pct}%</span>
             </div></td>
         </tr>`;
-    }).join('');
+    }).join('') + (() => {
+        // Fila TOTAL (después de Exportación)
+        const pctT = totMetaCC > 0 ? Math.round(totRealCC / totMetaCC * 100) : 0;
+        const barT = Math.min(pctT, 100);
+        const colT = pctT >= 100 ? 'var(--verde)' : pctT >= 70 ? '#f9a825' : 'var(--cereza)';
+        return `<tr style="border-top:2px solid var(--beige);font-weight:800;background:var(--crema)">
+            <td class="td-name"><strong>TOTAL</strong></td>
+            <td><strong>100%</strong></td>
+            <td style="color:var(--chocolate)"><strong>${fmtCOP(Math.round(totMetaCC))}</strong></td>
+            <td class="td-pts verde"><strong>${fmtCOP(totRealCC)}</strong></td>
+            <td style="min-width:130px"><div style="display:flex;align-items:center;gap:8px">
+                <div style="flex:1;background:var(--beige);border-radius:50px;height:14px;overflow:hidden"><div style="height:100%;width:${barT}%;background:${colT};border-radius:50px"></div></div>
+                <span style="font-weight:800;font-size:12px;color:${colT}">${pctT}%</span>
+            </div></td>
+        </tr>`;
+    })();
 }
 
 // ── TABLAS DINÁMICAS (PIVOT) ─────────────────────────────────────────────
@@ -2408,6 +2458,62 @@ function renderMetaBar() {
     document.getElementById('metaBarFill').style.width  = pct + '%';
     document.getElementById('metaBarPct').textContent   = r.cumplimientoPct + '%';
     document.getElementById('metaBarInfo').textContent  = fmtCOP(r.totalGeneral) + ' de ' + fmtCOP(r.metaAnual);
+    renderComparativoAnual();
+}
+
+// Compara lo acumulado del año contra el mismo periodo del año anterior.
+// Reglas acordadas con Johan:
+//   · SOLO meses CERRADOS (el mes en curso entra cuando cierre) — comparar un mes
+//     a medias contra uno completo hundía el crecimiento artificialmente.
+//   · % crecimiento = diferencia / año ACTUAL (así lo viene reportando él;
+//     la fórmula contable estándar sería diferencia / año anterior).
+function renderComparativoAnual() {
+    const VD = ventasAllTime || ventasFull || ventasData;
+    const hoy = new Date();
+    const anioActual = hoy.getFullYear();
+    const ultimoCerrado = hoy.getMonth();   // getMonth() es 0-based => mes anterior, 1-based
+    const el = id => document.getElementById(id);
+    if (!el('cmpResultado')) return;
+
+    el('cmpLabelPrev').textContent = VENTAS_ANIO_PREV.anio;
+    el('cmpLabelCur').textContent  = anioActual;
+
+    if (ultimoCerrado < 1) {   // enero: aún no hay ningún mes cerrado este año
+        el('cmpPeriodo').textContent = '';
+        el('cmpResultado').textContent = 'Aún no hay meses cerrados en ' + anioActual;
+        el('cmpResultado').style.color = 'var(--gris)';
+        return;
+    }
+
+    const realMes = {};
+    for (const m of (VD.meses || [])) {
+        const [y, mo] = m.mes.split('-');
+        if (Number(y) === anioActual) realMes[parseInt(mo, 10)] = m.total || 0;
+    }
+    let cur = 0, prev = 0;
+    for (let m = 1; m <= ultimoCerrado; m++) {
+        cur  += realMes[m] || 0;
+        prev += VENTAS_ANIO_PREV.meses[m] || 0;
+    }
+    const diff = cur - prev;
+    const pctCrec = cur > 0 ? (diff / cur * 100) : 0;
+    const periodo = 'ene–' + MESES_CORTO[ultimoCerrado - 1].toLowerCase();
+
+    // Las dos barras se escalan contra el mayor de los dos años
+    const tope = Math.max(cur, prev, 1);
+    el('cmpBarPrev').style.width = (prev / tope * 100) + '%';
+    el('cmpBarCur').style.width  = (cur  / tope * 100) + '%';
+    el('cmpPrevVal').textContent = fmtCOP(prev);
+    el('cmpCurVal').textContent  = fmtCOP(cur);
+    el('cmpPeriodo').textContent = '· ' + periodo + ' (solo meses cerrados)';
+    el('cmpInfo').textContent    = (diff >= 0 ? '+' : '') + fmtCOP(diff) + ' vs ' + VENTAS_ANIO_PREV.anio;
+
+    const subio = diff >= 0;
+    el('cmpBarCur').style.background = subio ? 'var(--verde)' : 'var(--cereza)';
+    el('cmpResultado').style.color   = subio ? 'var(--verde)' : 'var(--cereza)';
+    el('cmpResultado').innerHTML = (subio ? '📈 Hemos crecido ' : '📉 Hemos decrecido ') +
+        '<strong>' + Math.abs(pctCrec).toFixed(2).replace('.', ',') + '%</strong> respecto a ' +
+        VENTAS_ANIO_PREV.anio + ' <small style="font-weight:600;color:var(--gris)">(' + periodo + ')</small>';
 }
 
 function destroyChart(id) { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
