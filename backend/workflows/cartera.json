@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-07-21T21:51:08.370Z",
+ "updatedAt": "2026-07-22T13:55:48.663Z",
  "createdAt": "2026-07-21T16:06:17.157Z",
  "id": "1OioSrAEK6Loun2n",
  "name": "CHUCULAT | Cartera",
@@ -84,7 +84,7 @@
     220
    ],
    "parameters": {
-    "jsCode": "// Sirve la cartera ya calculada (tabla public.cartera) al dashboard.\n// Rapido: solo lee Supabase, no toca Siigo.\nconst SB  = 'https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY = '__SUPABASE_SERVICE_ROLE__';\nconst H   = { apikey: KEY, Authorization: 'Bearer ' + KEY };\nconst http = (o) => this.helpers.httpRequest(o);\n\nconst rows = await http({ method:'GET', json:true, headers:H,\n  url: SB + '/rest/v1/cartera?select=*&order=saldo_cop.desc&limit=5000' });\nconst facturas = Array.isArray(rows) ? rows : [];\n\nconst num = (x) => Number(x || 0);\nconst sumBucket = (b) => facturas.filter(f => f.bucket === b).reduce((s, f) => s + num(f.saldo_cop), 0);\n\nconst resumen = {\n  totalDeuda: Math.round(facturas.reduce((s, f) => s + num(f.saldo_cop), 0)),\n  facturas: facturas.length,\n  masde180:  Math.round(sumBucket('>180')),\n  masde120:  Math.round(sumBucket('>120')),\n  masde90:   Math.round(sumBucket('>90')),\n  masde31:   Math.round(sumBucket('>31')),\n  porVencer: Math.round(sumBucket('por_vencer'))\n};\n\n// Agrupado por cliente (lo que pinta la tabla de aging)\nconst byCli = {};\nfor (const f of facturas) {\n  const k = f.nit || f.cliente || '?';\n  if (!byCli[k]) byCli[k] = { cliente: f.cliente, nit: f.nit, canal: f.canal, facturas: 0,\n                              deudaTotal: 0, masde180: 0, masde120: 0, masde90: 0, masde31: 0, porVencer: 0 };\n  const c = byCli[k];\n  c.facturas += 1;\n  c.deudaTotal += num(f.saldo_cop);\n  if (f.bucket === '>180') c.masde180 += num(f.saldo_cop);\n  else if (f.bucket === '>120') c.masde120 += num(f.saldo_cop);\n  else if (f.bucket === '>90') c.masde90 += num(f.saldo_cop);\n  else if (f.bucket === '>31') c.masde31 += num(f.saldo_cop);\n  else c.porVencer += num(f.saldo_cop);\n}\nconst porCliente = Object.values(byCli)\n  .map(c => ({ ...c, deudaTotal: Math.round(c.deudaTotal), masde180: Math.round(c.masde180),\n               masde120: Math.round(c.masde120), masde90: Math.round(c.masde90),\n               masde31: Math.round(c.masde31), porVencer: Math.round(c.porVencer) }))\n  .sort((a, b) => b.deudaTotal - a.deudaTotal);\n\nconst actualizado = facturas.length\n  ? facturas.map(f => f.actualizado_en).sort().slice(-1)[0]\n  : null;\n\nreturn [{ json: { resumen, porCliente, facturas, actualizado_en: actualizado,\n                  base: 'saldo real con IVA, en COP, todas las facturas abiertas (sin filtro de fecha)' } }];\n"
+    "jsCode": "// Sirve la cartera al dashboard = cartera VIVA (tabla `cartera`, refrescada desde\n// Siigo cada 6h) + cartera VIEJA (tabla `cartera_legacy`, cargada a mano desde la\n// exportacion del reporte de Siigo, porque la API no expone facturas anteriores al\n// 2025-06-03). Rapido: solo lee Supabase, no toca Siigo.\nconst SB  = 'https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY = '__SUPABASE_SERVICE_ROLE__';\nconst H   = { apikey: KEY, Authorization: 'Bearer ' + KEY };\nconst http = (o) => this.helpers.httpRequest(o);\nconst num = (x) => Number(x || 0);\n\nconst rows = await http({ method:'GET', json:true, headers:H,\n  url: SB + '/rest/v1/cartera?select=*&order=saldo_cop.desc&limit=5000' });\nconst facturas = Array.isArray(rows) ? rows : [];\n\nconst legRows = await http({ method:'GET', json:true, headers:H,\n  url: SB + '/rest/v1/cartera_legacy?select=*&limit=2000' });\nconst legacy = Array.isArray(legRows) ? legRows : [];\n\n// ── Agrupado por cliente: primero lo vivo, luego se le suma lo viejo ──\nconst byCli = {};\nfunction slot(nit, nombre, canal) {\n  const k = String(nit || nombre || '?');\n  if (!byCli[k]) byCli[k] = { cliente: nombre, nit: nit, canal: canal || '', facturas: 0,\n                              deudaTotal: 0, masde180: 0, masde120: 0, masde90: 0,\n                              masde31: 0, porVencer: 0, saldoFavor: 0, legacy: 0 };\n  return byCli[k];\n}\nfor (const f of facturas) {\n  const c = slot(f.nit, f.cliente, f.canal);\n  c.facturas += 1;\n  c.deudaTotal += num(f.saldo_cop);\n  if (f.bucket === '>180') c.masde180 += num(f.saldo_cop);\n  else if (f.bucket === '>120') c.masde120 += num(f.saldo_cop);\n  else if (f.bucket === '>90') c.masde90 += num(f.saldo_cop);\n  else if (f.bucket === '>31') c.masde31 += num(f.saldo_cop);\n  else c.porVencer += num(f.saldo_cop);\n}\nfor (const l of legacy) {\n  const c = slot(l.nit, l.cliente, 'b2b');\n  const v = num(l.saldo_cop);\n  c.deudaTotal += v;\n  c.legacy += v;\n  if (v < 0) c.saldoFavor += -v;   // saldo a favor: se guarda en positivo y resta del total\n  else c.masde180 += v;            // todo lo legacy es anterior a jun-2025 => +180 dias\n}\n\nconst porCliente = Object.values(byCli)\n  .map(c => ({ ...c,\n    deudaTotal: Math.round(c.deudaTotal), masde180: Math.round(c.masde180),\n    masde120: Math.round(c.masde120), masde90: Math.round(c.masde90),\n    masde31: Math.round(c.masde31), porVencer: Math.round(c.porVencer),\n    saldoFavor: Math.round(c.saldoFavor), legacy: Math.round(c.legacy) }))\n  .sort((a, b) => b.deudaTotal - a.deudaTotal);\n\n// OJO: los totales se calculan sobre los valores SIN redondear (byCli) y se\n// redondean una sola vez. Sumando los ya redondeados de porCliente el total\n// quedaba 1-2 pesos arriba y no cuadraba exacto con el reporte de Siigo.\nconst crudos = Object.values(byCli);\nconst sum = (campo) => Math.round(crudos.reduce((s, c) => s + c[campo], 0));\nconst resumen = {\n  totalDeuda: sum('deudaTotal'),\n  facturas: facturas.length,\n  clientes: porCliente.length,\n  masde180: sum('masde180'), masde120: sum('masde120'), masde90: sum('masde90'),\n  masde31: sum('masde31'), porVencer: sum('porVencer'), saldoFavor: sum('saldoFavor'),\n  totalVivo: Math.round(facturas.reduce((s, f) => s + num(f.saldo_cop), 0)),\n  totalLegacy: Math.round(legacy.reduce((s, l) => s + num(l.saldo_cop), 0)),\n  clientesLegacy: legacy.length\n};\n\nconst actualizado = facturas.length\n  ? facturas.map(f => f.actualizado_en).sort().slice(-1)[0]\n  : null;\nconst corteLegacy = legacy.length ? (legacy[0].fecha_corte || null) : null;\n\nreturn [{ json: { resumen, porCliente, facturas, legacy,\n                  actualizado_en: actualizado, corte_legacy: corteLegacy,\n                  base: 'saldo real con IVA, en COP, todas las facturas abiertas (sin filtro de fecha). ' +\n                        'Incluye la deuda anterior a jun-2025, que la API de Siigo no expone.' } }];\n"
    }
   },
   {
@@ -184,14 +184,16 @@
  },
  "staticData": {
   "node:Schedule": {
-   "recurrenceRules": []
+   "recurrenceRules": [
+    6
+   ]
   }
  },
  "meta": null,
  "pinData": null,
- "versionId": "9cc98ed8-33c4-48fa-bc3f-f3c94078f2fc",
- "activeVersionId": "9cc98ed8-33c4-48fa-bc3f-f3c94078f2fc",
- "versionCounter": 25,
+ "versionId": "28e53a62-5e24-4d8c-9a69-372d6f22efda",
+ "activeVersionId": "28e53a62-5e24-4d8c-9a69-372d6f22efda",
+ "versionCounter": 38,
  "triggerCount": 3,
  "shared": [
   {
@@ -214,9 +216,9 @@
  ],
  "tags": [],
  "activeVersion": {
-  "updatedAt": "2026-07-21T21:51:08.374Z",
-  "createdAt": "2026-07-21T21:51:08.374Z",
-  "versionId": "9cc98ed8-33c4-48fa-bc3f-f3c94078f2fc",
+  "updatedAt": "2026-07-22T13:55:48.667Z",
+  "createdAt": "2026-07-22T13:55:48.667Z",
+  "versionId": "28e53a62-5e24-4d8c-9a69-372d6f22efda",
   "workflowId": "1OioSrAEK6Loun2n",
   "nodes": [
    {
@@ -296,7 +298,7 @@
      220
     ],
     "parameters": {
-     "jsCode": "// Sirve la cartera ya calculada (tabla public.cartera) al dashboard.\n// Rapido: solo lee Supabase, no toca Siigo.\nconst SB  = 'https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY = '__SUPABASE_SERVICE_ROLE__';\nconst H   = { apikey: KEY, Authorization: 'Bearer ' + KEY };\nconst http = (o) => this.helpers.httpRequest(o);\n\nconst rows = await http({ method:'GET', json:true, headers:H,\n  url: SB + '/rest/v1/cartera?select=*&order=saldo_cop.desc&limit=5000' });\nconst facturas = Array.isArray(rows) ? rows : [];\n\nconst num = (x) => Number(x || 0);\nconst sumBucket = (b) => facturas.filter(f => f.bucket === b).reduce((s, f) => s + num(f.saldo_cop), 0);\n\nconst resumen = {\n  totalDeuda: Math.round(facturas.reduce((s, f) => s + num(f.saldo_cop), 0)),\n  facturas: facturas.length,\n  masde180:  Math.round(sumBucket('>180')),\n  masde120:  Math.round(sumBucket('>120')),\n  masde90:   Math.round(sumBucket('>90')),\n  masde31:   Math.round(sumBucket('>31')),\n  porVencer: Math.round(sumBucket('por_vencer'))\n};\n\n// Agrupado por cliente (lo que pinta la tabla de aging)\nconst byCli = {};\nfor (const f of facturas) {\n  const k = f.nit || f.cliente || '?';\n  if (!byCli[k]) byCli[k] = { cliente: f.cliente, nit: f.nit, canal: f.canal, facturas: 0,\n                              deudaTotal: 0, masde180: 0, masde120: 0, masde90: 0, masde31: 0, porVencer: 0 };\n  const c = byCli[k];\n  c.facturas += 1;\n  c.deudaTotal += num(f.saldo_cop);\n  if (f.bucket === '>180') c.masde180 += num(f.saldo_cop);\n  else if (f.bucket === '>120') c.masde120 += num(f.saldo_cop);\n  else if (f.bucket === '>90') c.masde90 += num(f.saldo_cop);\n  else if (f.bucket === '>31') c.masde31 += num(f.saldo_cop);\n  else c.porVencer += num(f.saldo_cop);\n}\nconst porCliente = Object.values(byCli)\n  .map(c => ({ ...c, deudaTotal: Math.round(c.deudaTotal), masde180: Math.round(c.masde180),\n               masde120: Math.round(c.masde120), masde90: Math.round(c.masde90),\n               masde31: Math.round(c.masde31), porVencer: Math.round(c.porVencer) }))\n  .sort((a, b) => b.deudaTotal - a.deudaTotal);\n\nconst actualizado = facturas.length\n  ? facturas.map(f => f.actualizado_en).sort().slice(-1)[0]\n  : null;\n\nreturn [{ json: { resumen, porCliente, facturas, actualizado_en: actualizado,\n                  base: 'saldo real con IVA, en COP, todas las facturas abiertas (sin filtro de fecha)' } }];\n"
+     "jsCode": "// Sirve la cartera al dashboard = cartera VIVA (tabla `cartera`, refrescada desde\n// Siigo cada 6h) + cartera VIEJA (tabla `cartera_legacy`, cargada a mano desde la\n// exportacion del reporte de Siigo, porque la API no expone facturas anteriores al\n// 2025-06-03). Rapido: solo lee Supabase, no toca Siigo.\nconst SB  = 'https://wavqyesyqqmawjfaztvb.supabase.co';\nconst KEY = '__SUPABASE_SERVICE_ROLE__';\nconst H   = { apikey: KEY, Authorization: 'Bearer ' + KEY };\nconst http = (o) => this.helpers.httpRequest(o);\nconst num = (x) => Number(x || 0);\n\nconst rows = await http({ method:'GET', json:true, headers:H,\n  url: SB + '/rest/v1/cartera?select=*&order=saldo_cop.desc&limit=5000' });\nconst facturas = Array.isArray(rows) ? rows : [];\n\nconst legRows = await http({ method:'GET', json:true, headers:H,\n  url: SB + '/rest/v1/cartera_legacy?select=*&limit=2000' });\nconst legacy = Array.isArray(legRows) ? legRows : [];\n\n// ── Agrupado por cliente: primero lo vivo, luego se le suma lo viejo ──\nconst byCli = {};\nfunction slot(nit, nombre, canal) {\n  const k = String(nit || nombre || '?');\n  if (!byCli[k]) byCli[k] = { cliente: nombre, nit: nit, canal: canal || '', facturas: 0,\n                              deudaTotal: 0, masde180: 0, masde120: 0, masde90: 0,\n                              masde31: 0, porVencer: 0, saldoFavor: 0, legacy: 0 };\n  return byCli[k];\n}\nfor (const f of facturas) {\n  const c = slot(f.nit, f.cliente, f.canal);\n  c.facturas += 1;\n  c.deudaTotal += num(f.saldo_cop);\n  if (f.bucket === '>180') c.masde180 += num(f.saldo_cop);\n  else if (f.bucket === '>120') c.masde120 += num(f.saldo_cop);\n  else if (f.bucket === '>90') c.masde90 += num(f.saldo_cop);\n  else if (f.bucket === '>31') c.masde31 += num(f.saldo_cop);\n  else c.porVencer += num(f.saldo_cop);\n}\nfor (const l of legacy) {\n  const c = slot(l.nit, l.cliente, 'b2b');\n  const v = num(l.saldo_cop);\n  c.deudaTotal += v;\n  c.legacy += v;\n  if (v < 0) c.saldoFavor += -v;   // saldo a favor: se guarda en positivo y resta del total\n  else c.masde180 += v;            // todo lo legacy es anterior a jun-2025 => +180 dias\n}\n\nconst porCliente = Object.values(byCli)\n  .map(c => ({ ...c,\n    deudaTotal: Math.round(c.deudaTotal), masde180: Math.round(c.masde180),\n    masde120: Math.round(c.masde120), masde90: Math.round(c.masde90),\n    masde31: Math.round(c.masde31), porVencer: Math.round(c.porVencer),\n    saldoFavor: Math.round(c.saldoFavor), legacy: Math.round(c.legacy) }))\n  .sort((a, b) => b.deudaTotal - a.deudaTotal);\n\n// OJO: los totales se calculan sobre los valores SIN redondear (byCli) y se\n// redondean una sola vez. Sumando los ya redondeados de porCliente el total\n// quedaba 1-2 pesos arriba y no cuadraba exacto con el reporte de Siigo.\nconst crudos = Object.values(byCli);\nconst sum = (campo) => Math.round(crudos.reduce((s, c) => s + c[campo], 0));\nconst resumen = {\n  totalDeuda: sum('deudaTotal'),\n  facturas: facturas.length,\n  clientes: porCliente.length,\n  masde180: sum('masde180'), masde120: sum('masde120'), masde90: sum('masde90'),\n  masde31: sum('masde31'), porVencer: sum('porVencer'), saldoFavor: sum('saldoFavor'),\n  totalVivo: Math.round(facturas.reduce((s, f) => s + num(f.saldo_cop), 0)),\n  totalLegacy: Math.round(legacy.reduce((s, l) => s + num(l.saldo_cop), 0)),\n  clientesLegacy: legacy.length\n};\n\nconst actualizado = facturas.length\n  ? facturas.map(f => f.actualizado_en).sort().slice(-1)[0]\n  : null;\nconst corteLegacy = legacy.length ? (legacy[0].fecha_corte || null) : null;\n\nreturn [{ json: { resumen, porCliente, facturas, legacy,\n                  actualizado_en: actualizado, corte_legacy: corteLegacy,\n                  base: 'saldo real con IVA, en COP, todas las facturas abiertas (sin filtro de fecha). ' +\n                        'Incluye la deuda anterior a jun-2025, que la API de Siigo no expone.' } }];\n"
     }
    },
    {
@@ -394,34 +396,34 @@
   "autosaved": false,
   "workflowPublishHistory": [
    {
-    "createdAt": "2026-07-21T21:51:08.540Z",
-    "id": 1064,
+    "createdAt": "2026-07-22T13:55:48.887Z",
+    "id": 1072,
     "workflowId": "1OioSrAEK6Loun2n",
-    "versionId": "9cc98ed8-33c4-48fa-bc3f-f3c94078f2fc",
+    "versionId": "28e53a62-5e24-4d8c-9a69-372d6f22efda",
     "event": "activated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    },
    {
-    "createdAt": "2026-07-21T21:51:09.068Z",
-    "id": 1066,
+    "createdAt": "2026-07-22T13:55:49.344Z",
+    "id": 1074,
     "workflowId": "1OioSrAEK6Loun2n",
-    "versionId": "9cc98ed8-33c4-48fa-bc3f-f3c94078f2fc",
+    "versionId": "28e53a62-5e24-4d8c-9a69-372d6f22efda",
     "event": "activated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    },
    {
-    "createdAt": "2026-07-21T21:51:08.468Z",
-    "id": 1063,
+    "createdAt": "2026-07-22T13:55:48.826Z",
+    "id": 1071,
     "workflowId": "1OioSrAEK6Loun2n",
-    "versionId": "9cc98ed8-33c4-48fa-bc3f-f3c94078f2fc",
+    "versionId": "28e53a62-5e24-4d8c-9a69-372d6f22efda",
     "event": "deactivated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    },
    {
-    "createdAt": "2026-07-21T21:51:08.984Z",
-    "id": 1065,
+    "createdAt": "2026-07-22T13:55:49.297Z",
+    "id": 1073,
     "workflowId": "1OioSrAEK6Loun2n",
-    "versionId": "9cc98ed8-33c4-48fa-bc3f-f3c94078f2fc",
+    "versionId": "28e53a62-5e24-4d8c-9a69-372d6f22efda",
     "event": "deactivated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    }

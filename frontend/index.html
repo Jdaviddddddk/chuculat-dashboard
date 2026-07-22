@@ -853,8 +853,9 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                     <th style="color:var(--naranja)">&gt;90d</th>
                     <th style="color:#f9a825">&gt;31d</th>
                     <th style="color:var(--verde)">Por Vencer</th>
+                    <th style="color:var(--azul)">Saldo a favor</th>
                     <th>Facturas</th>
-                </tr></thead><tbody id="bodyCartera"></tbody></table>
+                </tr></thead><tbody id="bodyCartera"></tbody><tfoot id="footCartera"></tfoot></table>
             </div>
         </div>
     </section>
@@ -2463,27 +2464,22 @@ function renderMetaBar() {
 
 // Compara lo acumulado del año contra el mismo periodo del año anterior.
 // Reglas acordadas con Johan:
-//   · SOLO meses CERRADOS (el mes en curso entra cuando cierre) — comparar un mes
-//     a medias contra uno completo hundía el crecimiento artificialmente.
-//   · % crecimiento = diferencia / año ACTUAL (así lo viene reportando él;
-//     la fórmula contable estándar sería diferencia / año anterior).
+//   · Se INCLUYE el mes en curso: el año anterior entra con el MES COMPLETO y el
+//     año actual con lo que va HASTA HOY. Ojo: eso compara un mes a medias contra
+//     uno entero, así que subestima el crecimiento hasta que cierre el mes (es
+//     como Johan lo viene reportando en su cuadro; se le advirtió).
+//   · % crecimiento = diferencia / año ACTUAL (la fórmula contable estándar
+//     sería diferencia / año anterior).
 function renderComparativoAnual() {
     const VD = ventasAllTime || ventasFull || ventasData;
     const hoy = new Date();
     const anioActual = hoy.getFullYear();
-    const ultimoCerrado = hoy.getMonth();   // getMonth() es 0-based => mes anterior, 1-based
+    const mesActual = hoy.getMonth() + 1;   // 1-based, incluido
     const el = id => document.getElementById(id);
     if (!el('cmpResultado')) return;
 
     el('cmpLabelPrev').textContent = VENTAS_ANIO_PREV.anio;
     el('cmpLabelCur').textContent  = anioActual;
-
-    if (ultimoCerrado < 1) {   // enero: aún no hay ningún mes cerrado este año
-        el('cmpPeriodo').textContent = '';
-        el('cmpResultado').textContent = 'Aún no hay meses cerrados en ' + anioActual;
-        el('cmpResultado').style.color = 'var(--gris)';
-        return;
-    }
 
     const realMes = {};
     for (const m of (VD.meses || [])) {
@@ -2491,13 +2487,14 @@ function renderComparativoAnual() {
         if (Number(y) === anioActual) realMes[parseInt(mo, 10)] = m.total || 0;
     }
     let cur = 0, prev = 0;
-    for (let m = 1; m <= ultimoCerrado; m++) {
+    for (let m = 1; m <= mesActual; m++) {
         cur  += realMes[m] || 0;
         prev += VENTAS_ANIO_PREV.meses[m] || 0;
     }
     const diff = cur - prev;
     const pctCrec = cur > 0 ? (diff / cur * 100) : 0;
-    const periodo = 'ene–' + MESES_CORTO[ultimoCerrado - 1].toLowerCase();
+    const mesTxt = MESES_CORTO[mesActual - 1].toLowerCase();
+    const periodo = 'ene–' + mesTxt;
 
     // Las dos barras se escalan contra el mayor de los dos años
     const tope = Math.max(cur, prev, 1);
@@ -2505,7 +2502,8 @@ function renderComparativoAnual() {
     el('cmpBarCur').style.width  = (cur  / tope * 100) + '%';
     el('cmpPrevVal').textContent = fmtCOP(prev);
     el('cmpCurVal').textContent  = fmtCOP(cur);
-    el('cmpPeriodo').textContent = '· ' + periodo + ' (solo meses cerrados)';
+    el('cmpPeriodo').textContent = '· ' + periodo + ' — ' + VENTAS_ANIO_PREV.anio +
+        ' con ' + mesTxt + ' completo vs ' + anioActual + ' al ' + hoy.getDate() + ' de ' + mesTxt;
     el('cmpInfo').textContent    = (diff >= 0 ? '+' : '') + fmtCOP(diff) + ' vs ' + VENTAS_ANIO_PREV.anio;
 
     const subio = diff >= 0;
@@ -2667,6 +2665,7 @@ function sortB2BClientes(col){ b2bClientesSort.dir=b2bClientesSort.col===col?(b2
 // Base: saldo REAL con IVA, en COP (el resto del panel va sin IVA).
 const CARTERA_URL = 'https://app.rioagencymarketing.com/webhook/get-cartera';
 let carteraData = [];
+let carteraResumen = null;   // totales exactos del backend (para el pie de tabla)
 async function renderCartera() {
     let d = null;
     try {
@@ -2680,6 +2679,7 @@ async function renderCartera() {
     carteraData = d.porCliente || [];
     document.getElementById('navBadgeCartera').textContent = carteraData.length;
     const cr = d.resumen;
+    carteraResumen = cr;
     const total = cr.totalDeuda || 0;
     const pct = v => total > 0 ? Math.round(v / total * 100) + '% del total' : '—';
     document.getElementById('agingTotal').textContent = fmtCOP(total);
@@ -2694,10 +2694,18 @@ async function renderCartera() {
     document.getElementById('agingPV').textContent    = fmtCOP(cr.porVencer || 0);
     document.getElementById('agingPVPct').textContent = pct(cr.porVencer || 0);
     const act = document.getElementById('carteraActualizado');
-    if (act && d.actualizado_en) {
-        const f = new Date(d.actualizado_en);
-        act.textContent = '· ' + (cr.facturas||0) + ' facturas abiertas · actualizado ' +
-            f.toLocaleString('es-CO', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+    if (act) {
+        let txt = '· ' + (cr.facturas||0) + ' facturas abiertas';
+        if (cr.totalLegacy) {
+            txt += ' + ' + fmtCOP(cr.totalLegacy) + ' de deuda anterior a jun-2025 (' +
+                   (cr.clientesLegacy||0) + ' clientes' +
+                   (d.corte_legacy ? ', corte ' + fmtDate(d.corte_legacy) : '') + ')';
+        }
+        if (d.actualizado_en) {
+            txt += ' · actualizado ' + new Date(d.actualizado_en)
+                .toLocaleString('es-CO', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+        }
+        act.textContent = txt;
     }
     _renderCarteraTable();
 }
@@ -2706,7 +2714,29 @@ function _renderCarteraTable() {
     const rows = carteraData.filter(c=>!q||(c.cliente+' '+c.nit).toLowerCase().includes(q));
     document.getElementById('countCartera').textContent = rows.length + ' clientes';
     const tbody = document.getElementById('bodyCartera');
-    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="9">✅ Sin cartera pendiente</td></tr>'; return; }
+    const foot = document.getElementById('footCartera');
+    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="10">✅ Sin cartera pendiente</td></tr>'; if(foot) foot.innerHTML=''; return; }
+    // Fila de totales al pie, como en el reporte de Siigo (suma lo filtrado).
+    // Sin búsqueda usa los totales EXACTOS del backend: sumar aquí los valores ya
+    // redondeados de cada cliente daba 1 peso de más y no cuadraba con Siigo.
+    if (foot) {
+        const completo = !q && carteraResumen;
+        const t = k => completo
+            ? (carteraResumen[k === 'deudaTotal' ? 'totalDeuda' : k] || 0)
+            : rows.reduce((s,c)=>s+(c[k]||0),0);
+        foot.innerHTML = `<tr style="border-top:2px solid var(--beige);font-weight:800;background:var(--crema)">
+            <td class="td-name"><strong>Total general</strong></td>
+            <td style="font-size:12px;color:var(--gris)">${rows.length} cliente${rows.length===1?'':'s'}</td>
+            <td class="td-pts azul"><strong>${fmtCOP(t('deudaTotal'))}</strong></td>
+            <td class="td-pts" style="color:#b71c1c">${fmtCOP(t('masde180'))}</td>
+            <td class="td-pts" style="color:#c0392b">${fmtCOP(t('masde120'))}</td>
+            <td class="td-pts" style="color:var(--naranja)">${fmtCOP(t('masde90'))}</td>
+            <td class="td-pts" style="color:#f9a825">${fmtCOP(t('masde31'))}</td>
+            <td class="td-pts verde">${fmtCOP(t('porVencer'))}</td>
+            <td class="td-pts azul">${fmtCOP(t('saldoFavor'))}</td>
+            <td style="text-align:center">${t('facturas')}</td>
+        </tr>`;
+    }
     tbody.innerHTML = rows.map(c=>`<tr>
         <td class="td-name">${esc(c.cliente)}</td>
         <td style="font-size:12px;color:var(--gris)">${esc(c.nit)}</td>
