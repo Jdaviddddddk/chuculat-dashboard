@@ -15,7 +15,7 @@ KW = re.compile(r'\b(s\.?a\.?s\.?|ltda\.?|factura|corp|inc|empresa|group|grupo|d
 auth = json.loads(urllib.request.urlopen(urllib.request.Request(
     'https://api.siigo.com/auth',
     data=json.dumps({'username': 'facturacioncacaobasico@gmail.com',
-                     'access_key': 'YmUxM2E0MGMtYmFkYi00MmYwLWFkMzktODBlNmRhNmMzYzBhOm94ISk4Mns3RFo='}).encode(),
+                     'access_key': '__SIIGO_ACCESS_KEY__'}).encode(),
     headers={'Content-Type': 'application/json', 'Partner-Id': 'n8nApp'}, method='POST'), timeout=25).read())
 SH = {'Authorization': 'Bearer ' + auth['access_token'], 'Partner-Id': 'n8nApp'}
 
@@ -96,7 +96,7 @@ print(f'ELEGIBLES para puntos: {len(eleg)}')
 
 # 3) puntos_log
 SB = 'https://wavqyesyqqmawjfaztvb.supabase.co'
-SR = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhdnF5ZXN5cXFtYXdqZmF6dHZiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDEyNzMzNywiZXhwIjoyMDk5NzAzMzM3fQ.2CfyDo0-NgKOy32ghmztOcVQIaJ-3eTuBpxyoyNMjGw'
+SR = '__SUPABASE_SERVICE_ROLE__'
 H = {'apikey': SR, 'Authorization': 'Bearer ' + SR}
 logs = []
 off = 0
