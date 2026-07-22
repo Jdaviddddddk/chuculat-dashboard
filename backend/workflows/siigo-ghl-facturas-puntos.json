@@ -1,880 +1,1873 @@
 {
-  "name": "CHUCULAT | SIIGO - GHL FACTURAS",
-  "nodes": [
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.siigo.com/auth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{\n  \"username\": \"<SIIGO_USERNAME>\",\n  \"access_key\": \"<SIIGO_ACCESS_KEY>\"\n}",
-        "options": {}
+ "updatedAt": "2026-07-22T15:56:53.444Z",
+ "createdAt": "2026-05-11T03:00:51.328Z",
+ "id": "b3NqLczq5MzJ3dmb",
+ "name": "CHUCULAT | SIIGO - GHL FACTURAS",
+ "description": null,
+ "active": true,
+ "isArchived": false,
+ "nodes": [
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.siigo.com/auth",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Content-Type",
+       "value": "application/json"
       },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        1184,
-        1168
-      ],
-      "id": "b0eee6c0-0f32-4c6f-87fb-e19ee4c7b70b",
-      "name": "Auth"
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
     },
-    {
-      "parameters": {
-        "jsCode": "const items = $('Factura').first().json.results[0].items || [];\n\nlet subtotal = 0;\n\nfor (const item of items) {\n  const price = Number(item.price || 0);\n  const quantity = Number(item.quantity || 0);\n  subtotal += price * quantity;\n}\n\nreturn [{\n  json: {\n    ...$json,\n    subtotal_calculado: subtotal\n  }\n}];"
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "{\n  \"username\": \"facturacioncacaobasico@gmail.com\",\n  \"access_key\": \"__SIIGO_ACCESS_KEY__\"\n}",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    1184,
+    1168
+   ],
+   "id": "b0eee6c0-0f32-4c6f-87fb-e19ee4c7b70b",
+   "name": "Auth",
+   "retryOnFail": true,
+   "maxTries": 4,
+   "waitBetweenTries": 4000
+  },
+  {
+   "parameters": {
+    "jsCode": "const items = $('Factura').first().json.results[0].items || [];\n\nlet subtotal = 0;\n\nfor (const item of items) {\n  const price = Number(item.price || 0);\n  const quantity = Number(item.quantity || 0);\n  subtotal += price * quantity;\n}\n\nreturn [{\n  json: {\n    ...$json,\n    subtotal_calculado: subtotal\n  }\n}];"
+   },
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1504,
+    1504
+   ],
+   "id": "6dfc2c1c-8470-4d6f-9641-0e1a9d6df1ab",
+   "name": "Code in JavaScript"
+  },
+  {
+   "parameters": {
+    "url": "https://api.siigo.com/v1/invoices?page=1&page_size=1",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{$node[\"Auth\"].json[\"access_token\"]}}"
       },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1504,
-        1504
-      ],
-      "id": "6dfc2c1c-8470-4d6f-9641-0e1a9d6df1ab",
-      "name": "Code in JavaScript"
-    },
-    {
-      "parameters": {
-        "url": "https://api.siigo.com/v1/invoices?page=1&page_size=1",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$node[\"Auth\"].json[\"access_token\"]}}"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "options": {}
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
       },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        1424,
-        1168
-      ],
-      "id": "f7bd6c69-0147-4f05-af34-92052ea7be23",
-      "name": "Factura",
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 3000
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      }
+     ]
     },
-    {
-      "parameters": {
-        "url": "=https://api.siigo.com/v1/customers/{{ $json.customer.id }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{$node[\"Auth\"].json[\"access_token\"]}}"
-            },
-            {
-              "name": "Partner-Id",
-              "value": "n8nApp"
-            }
-          ]
-        },
-        "options": {}
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    1424,
+    1168
+   ],
+   "id": "f7bd6c69-0147-4f05-af34-92052ea7be23",
+   "name": "Factura",
+   "retryOnFail": true,
+   "maxTries": 5,
+   "waitBetweenTries": 5000
+  },
+  {
+   "parameters": {
+    "url": "=https://api.siigo.com/v1/customers/{{ $json.customer.id }}",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "={{$node[\"Auth\"].json[\"access_token\"]}}"
       },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        1248,
-        1744
-      ],
-      "id": "fbc9e6a5-ed6c-4067-b926-888b3787dbf8",
-      "name": "Cliente"
+      {
+       "name": "Partner-Id",
+       "value": "n8nApp"
+      }
+     ]
     },
-    {
-      "parameters": {
-        "jsCode": "const valorCompra = $input.first().json.subtotal_calculado;\nconst puntosGanados = Math.ceil(valorCompra / 1000);\n\nreturn [{\n  json: {\n    ...$json,\n    puntosGanados\n  }\n}];"
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    1248,
+    1744
+   ],
+   "id": "fbc9e6a5-ed6c-4067-b926-888b3787dbf8",
+   "name": "Cliente"
+  },
+  {
+   "parameters": {
+    "jsCode": "const valorCompra = $input.first().json.subtotal_calculado;\nconst puntosGanados = Math.ceil(valorCompra / 1000);\n\nreturn [{\n  json: {\n    ...$json,\n    puntosGanados\n  }\n}];"
+   },
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1504,
+    1744
+   ],
+   "id": "45cdef06-12db-4b76-9863-79170ed44054",
+   "name": "Code in JavaScript1"
+  },
+  {
+   "parameters": {
+    "mode": "runOnceForEachItem",
+    "jsCode": "// Cascada de detección de contacto: cédula → teléfono → email.\n// Devuelve { total, contacts:[uno], matchedBy } igual que /contacts/search.\nconst j = $json;\nconst TOKEN = '__GHL_TOKEN__';\nconst LOC = 'jzrg6bPH71ccLohGddsN';\nconst CED_FIELD = '4C6TxwNRElYAB1HFkJb4';\nconst H = { Authorization: 'Bearer ' + TOKEN, Version: '2021-07-28', 'Content-Type': 'application/json' };\nconst norm = t => String(t || '').replace(/[^0-9]/g, '').replace(/^57(?=\\d{10}$)/, '');\nconst search = (body) => this.helpers.httpRequest({ method:'POST', url:'https://services.leadconnectorhq.com/contacts/search', headers:H, body, json:true });\n\nconst ident = String(j.identification || '').trim();\nconst tel   = norm((j.phones || [])[0] && (j.phones || [])[0].number);\nconst email = String(((j.contacts || [])[0] || {}).email || '').trim().toLowerCase();\n\nlet found = null, matchedBy = '';\n// 1) por cédula (campo personalizado)\nif (ident) {\n  const r = await search({ locationId:LOC, pageLimit:10, page:1, filters:[{ field:'customFields.'+CED_FIELD, operator:'eq', value:ident }] });\n  found = (r.contacts || [])[0] || null; if (found) matchedBy = 'identificacion';\n}\n// 2) por teléfono (contains + verificación exacta)\nif (!found && tel && tel.length >= 7) {\n  const r = await search({ locationId:LOC, pageLimit:10, page:1, filters:[{ field:'phone', operator:'contains', value:tel }] });\n  found = (r.contacts || []).find(c => norm(c.phone) === tel) || null; if (found) matchedBy = 'telefono';\n}\n// 3) por email (eq + verificación exacta)\nif (!found && email) {\n  const r = await search({ locationId:LOC, pageLimit:10, page:1, filters:[{ field:'email', operator:'eq', value:email }] });\n  found = (r.contacts || []).find(c => String(c.email||'').trim().toLowerCase() === email) || null; if (found) matchedBy = 'email';\n}\nreturn { json: { total: found ? 1 : 0, contacts: found ? [found] : [], matchedBy } };"
+   },
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1840,
+    1488
+   ],
+   "id": "3fc6b24f-80c2-4dbe-904b-915cc7be516f",
+   "name": "Buscar contacto",
+   "retryOnFail": true,
+   "maxTries": 5,
+   "waitBetweenTries": 5000
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "strict",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "e2fced20-299c-423c-b8be-aec85e6a8b90",
+       "leftValue": "={{ $json.total }}",
+       "rightValue": 0,
+       "operator": {
+        "type": "number",
+        "operation": "gt"
+       }
       },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1504,
-        1744
-      ],
-      "id": "45cdef06-12db-4b76-9863-79170ed44054",
-      "name": "Code in JavaScript1"
+      {
+       "id": "57352117-80cd-434c-af84-e635f0aad288",
+       "leftValue": "={{ $json.total }}",
+       "rightValue": 2,
+       "operator": {
+        "type": "number",
+        "operation": "lt"
+       }
+      }
+     ],
+     "combinator": "and"
     },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "// Cascada de detección de contacto: cédula → teléfono → email.\n// Devuelve { total, contacts:[uno], matchedBy } igual que /contacts/search.\nconst j = $json;\nconst TOKEN = '<GHL_PRIVATE_TOKEN>';\nconst LOC = 'jzrg6bPH71ccLohGddsN';\nconst CED_FIELD = '4C6TxwNRElYAB1HFkJb4';\nconst H = { Authorization: 'Bearer ' + TOKEN, Version: '2021-07-28', 'Content-Type': 'application/json' };\nconst norm = t => String(t || '').replace(/[^0-9]/g, '').replace(/^57(?=\\d{10}$)/, '');\nconst search = (body) => this.helpers.httpRequest({ method:'POST', url:'https://services.leadconnectorhq.com/contacts/search', headers:H, body, json:true });\n\nconst ident = String(j.identification || '').trim();\nconst tel   = norm((j.phones || [])[0] && (j.phones || [])[0].number);\nconst email = String(((j.contacts || [])[0] || {}).email || '').trim().toLowerCase();\n\nlet found = null, matchedBy = '';\n// 1) por cédula (campo personalizado)\nif (ident) {\n  const r = await search({ locationId:LOC, pageLimit:10, page:1, filters:[{ field:'customFields.'+CED_FIELD, operator:'eq', value:ident }] });\n  found = (r.contacts || [])[0] || null; if (found) matchedBy = 'identificacion';\n}\n// 2) por teléfono (contains + verificación exacta)\nif (!found && tel && tel.length >= 7) {\n  const r = await search({ locationId:LOC, pageLimit:10, page:1, filters:[{ field:'phone', operator:'contains', value:tel }] });\n  found = (r.contacts || []).find(c => norm(c.phone) === tel) || null; if (found) matchedBy = 'telefono';\n}\n// 3) por email (eq + verificación exacta)\nif (!found && email) {\n  const r = await search({ locationId:LOC, pageLimit:10, page:1, filters:[{ field:'email', operator:'eq', value:email }] });\n  found = (r.contacts || []).find(c => String(c.email||'').trim().toLowerCase() === email) || null; if (found) matchedBy = 'email';\n}\nreturn { json: { total: found ? 1 : 0, contacts: found ? [found] : [], matchedBy } };"
+    "options": {}
+   },
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    1856,
+    1760
+   ],
+   "id": "2150d3fd-91fc-43b2-b294-201801396659",
+   "name": "If"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://services.leadconnectorhq.com/contacts/",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Accept",
+       "value": "application/json"
       },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1840,
-        1488
-      ],
-      "id": "3fc6b24f-80c2-4dbe-904b-915cc7be516f",
-      "name": "Buscar contacto",
-      "retryOnFail": true,
-      "maxTries": 5,
-      "waitBetweenTries": 5000
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "e2fced20-299c-423c-b8be-aec85e6a8b90",
-              "leftValue": "={{ $json.total }}",
-              "rightValue": 0,
-              "operator": {
-                "type": "number",
-                "operation": "gt"
-              }
-            },
-            {
-              "id": "57352117-80cd-434c-af84-e635f0aad288",
-              "leftValue": "={{ $json.total }}",
-              "rightValue": 2,
-              "operator": {
-                "type": "number",
-                "operation": "lt"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
+      {
+       "name": "Version",
+       "value": "2023-02-21"
       },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        1856,
-        1760
-      ],
-      "id": "2150d3fd-91fc-43b2-b294-201801396659",
-      "name": "If"
+      {
+       "name": "Authorization",
+       "value": "Bearer __GHL_TOKEN__"
+      }
+     ]
     },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://services.leadconnectorhq.com/contacts/",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Accept",
-              "value": "application/json"
-            },
-            {
-              "name": "Version",
-              "value": "2023-02-21"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer <GHL_PRIVATE_TOKEN>"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"locationId\": \"jzrg6bPH71ccLohGddsN\",\n  \"city\": \"{{ $('Cliente').item.json.address.city.city_name }}\",\n  \"country\": \"{{ $('Cliente').item.json.address.city.country_code }}\",\n  \"name\": \"{{ $('Cliente').item.json.contacts[0].first_name }} {{ $('Cliente').item.json.contacts[0].last_name }}\",\n  \"phone\": \"{{ $('Cliente').item.json.phones[0].number }}\",\n  \"email\": \"{{ $('Cliente').item.json.contacts[0].email }}\",\n  \"customFields\": [\n    {\n      \"id\": \"4C6TxwNRElYAB1HFkJb4\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.identification }}\"\n    },\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.puntosGanados }}\"\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": \"0\"\n    }\n  ]\n}",
-        "options": {
-          "redirect": {
-            "redirect": {}
-          }
-        }
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        2512,
-        1952
-      ],
-      "id": "ca46cd20-0fc6-4c43-ab11-864826abc445",
-      "name": "HTTP Request"
-    },
-    {
-      "parameters": {
-        "jsCode": "const contact = $('Buscar contacto').first().json.contacts[0];\nconst cf = contact.customFields || [];\n\n// Leer por ID de campo (NO por posicion) con coercion numerica segura\nconst num = (id) => { const f = cf.find(x => x.id === id); const v = f ? Number(f.value) : 0; return isNaN(v) ? 0 : v; };\n\nconst PUNTOS_ID    = 'UfFc9GjS1K9az8nactO5'; // saldo de puntos\nconst HIST_ID      = 'ciYvzjlWfz9RcmIlqRkO'; // puntos historicos (total otorgado)\nconst HISTORIAL_ID = 'wdfNkPf305JjwPdTUBwS'; // fechas de recompra\n\nconst puntosActuales = num(PUNTOS_ID);\nconst puntosNuevos   = Number($('Code in JavaScript1').first().json.puntosGanados) || 0;\nconst totalPuntos    = puntosActuales + puntosNuevos;\nconst puntosHistory  = num(HIST_ID) + puntosNuevos;\n\nconst histField        = cf.find(f => f.id === HISTORIAL_ID);\nconst currentHistorial = histField?.value || '';\nconst today            = new Date().toISOString().split('T')[0];\nconst newHistorial     = currentHistorial ? currentHistorial + ',' + today : today;\nconst fechaUltimaRecompra = today;\n\n// ── Enriquecer: rellenar en GHL solo lo que FALTE, con el dato de Siigo ──\n// Nunca pisa un valor que GHL ya tenga: si existe, se reenvia el mismo.\nconst cli = (() => { try { return $('Cliente').first().json || {}; } catch (e) { return {}; } })();\nconst norm = t => String(t || '').replace(/[^0-9]/g, '').replace(/^57(?=\\d{10}$)/, '');\n\nconst telSiigo   = norm((cli.phones || [])[0]?.number);\nconst mailSiigo  = ((cli.contacts || [])[0]?.email || '').trim();\nconst nomSiigo   = [ (cli.contacts || [])[0]?.first_name, (cli.contacts || [])[0]?.last_name ].filter(Boolean).join(' ').trim();\n\nconst telGHL  = norm(contact.phone);\nconst mailGHL = String(contact.email || '').trim();\nconst nomGHL  = String(contact.name || '').trim();\n\n// valor final = el de GHL si lo tiene; si no, el de Siigo (puede quedar vacio)\nconst phone = telGHL  || telSiigo  || '';\nconst email = mailGHL || mailSiigo || '';\nconst name  = nomGHL  || nomSiigo  || '';\nconst completo = { phone: !!telGHL, email: !!mailGHL, name: !!nomGHL };\n\nreturn [{\n  json: { contactId: contact.id, puntosActuales, puntosNuevos, totalPuntos, puntosHistory, newHistorial, fechaUltimaRecompra,\n          phone, email, name, __yaTenia: completo }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2512,
-        1760
-      ],
-      "id": "59eac08a-28fe-4ddd-901b-1c0abd73ae8a",
-      "name": "Code in JavaScript2"
-    },
-    {
-      "parameters": {
-        "method": "PUT",
-        "url": "=https://services.leadconnectorhq.com/contacts/{{ $('If').item.json.contacts[0].id }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Accept",
-              "value": "application/json"
-            },
-            {
-              "name": "Version",
-              "value": "2023-02-21"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer <GHL_PRIVATE_TOKEN>"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"phone\": \"{{ $json.phone }}\",\n  \"email\": \"{{ $json.email }}\",\n  \"name\": \"{{ $json.name }}\",\n  \"customFields\": [\n    {\n      \"id\": \"4C6TxwNRElYAB1HFkJb4\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.identification }}\"\n    },\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": {{ $json.totalPuntos }}\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": {{ $json.puntosHistory }}\n    },\n    {\n      \"id\": \"wdfNkPf305JjwPdTUBwS\",\n      \"field_value\": \"{{ $json.newHistorial }}\"\n    },\n    {\n      \"id\": \"4SxhRfKQzstus8dzHsxS\",\n  \"field_value\": \"{{ $json.fechaUltimaRecompra }}\"\n    }\n  ]\n}",
-        "options": {
-          "redirect": {
-            "redirect": {}
-          }
-        }
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        2704,
-        1760
-      ],
-      "id": "55d96468-af0c-45e8-b863-deb815286e95",
-      "name": "HTTP Request1",
-      "retryOnFail": true,
-      "maxTries": 5,
-      "waitBetweenTries": 5000
-    },
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 1
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
-      "position": [
-        512,
-        1392
-      ],
-      "id": "58ffcfd0-a6d7-4a35-bae3-6b5faa3220de",
-      "name": "Schedule Trigger"
-    },
-    {
-      "parameters": {
-        "fileSelector": "/root/.n8n-files/processed_invoices.json",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1.1,
-      "position": [
-        1040,
-        992
-      ],
-      "id": "8279cc0f-569b-4333-b4ae-4ec480610f50",
-      "name": "Read/Write Files from Disk",
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "jsCode": "const items = $input.all();\n\nconst fileItem  = items[0]?.json;\nconst siigoItem = items[1]?.json;\n\nlet processedData = [];\ntry {\n    if (Array.isArray(fileItem)) {\n        if (fileItem.length > 0 && fileItem[0].data_to_save && Array.isArray(fileItem[0].data_to_save)) {\n            processedData = fileItem[0].data_to_save;\n        } else {\n            processedData = fileItem;\n        }\n    } else if (fileItem && fileItem.data_to_save && Array.isArray(fileItem.data_to_save)) {\n        processedData = fileItem.data_to_save;\n    } else if (fileItem && fileItem.data && Array.isArray(fileItem.data)) {\n        processedData = fileItem.data;\n    }\n} catch (e) {\n    processedData = [];\n}\n\nconst allInvoices     = siigoItem?.results || [];\nconst processedNames  = new Set(processedData.map(p => p.name));\nconst newInvoices     = allInvoices.filter(inv => !processedNames.has(inv.name));\n\nconst updatedProcessed = [\n    ...processedData,\n    ...newInvoices.map(inv => ({ name: inv.name, id: inv.id, date: inv.date }))\n];\n\nconst trimmedProcessed = updatedProcessed.slice(-2000);\n\nreturn [{\n    json: {\n        new_invoices:       newInvoices,\n        new_count:          newInvoices.length,\n        all_invoices_count: allInvoices.length,\n        processed_count:    processedData.length,\n        data_to_save:       JSON.stringify(trimmedProcessed, null, 2)\n    }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1952,
-        1008
-      ],
-      "id": "6da0697d-69bb-43c5-b92f-f66b1583fc7c",
-      "name": "Code in JavaScript3"
-    },
-    {
-      "parameters": {},
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
-      "position": [
-        1712,
-        1008
-      ],
-      "id": "124a672f-5944-401e-baa8-27b40d34fbf5",
-      "name": "Merge"
-    },
-    {
-      "parameters": {
-        "operation": "fromJson",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1.1,
-      "position": [
-        1424,
-        944
-      ],
-      "id": "a738bd28-c1ea-4417-95f6-3c12c3e18f71",
-      "name": "Extract from File"
-    },
-    {
-      "parameters": {
-        "fieldToSplitOut": "new_invoices",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.splitOut",
-      "typeVersion": 1,
-      "position": [
-        1968,
-        1232
-      ],
-      "id": "e13d5f02-1a45-4847-b2da-c6664240d1af",
-      "name": "Split Out"
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [
-        2320,
-        1184
-      ],
-      "id": "3131a49b-3354-4166-8e2a-fc638c3e0913",
-      "name": "Loop Over Items"
-    },
-    {
-      "parameters": {},
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
-      "position": [
-        3056,
-        1920
-      ],
-      "id": "1607c9d0-a567-4aec-827e-8836af38044e",
-      "name": "Merge1"
-    },
-    {
-      "parameters": {
-        "operation": "write",
-        "fileName": "/root/.n8n-files/processed_invoices.json",
-        "dataPropertyName": "=processed_invoices.json",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1.1,
-      "position": [
-        2800,
-        1008
-      ],
-      "id": "5fa5ec25-4793-4387-baef-0f61e7dc786a",
-      "name": "Read/Write Files from Disk1"
-    },
-    {
-      "parameters": {
-        "operation": "toText",
-        "sourceProperty": "data",
-        "binaryPropertyName": "processed_invoices.json",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1.1,
-      "position": [
-        2576,
-        1008
-      ],
-      "id": "948c1e10-0060-4a5d-bc53-ed962ad5a755",
-      "name": "Convert to File"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "9c116af3-e095-4555-b0c5-34de9f8e708c",
-              "name": "data",
-              "value": "={{ $json.data_to_save }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        2368,
-        1008
-      ],
-      "id": "b65e8b01-afbb-46a3-9a56-d4a061033ac3",
-      "name": "Edit Fields"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "has-new",
-              "leftValue": "={{ $json.new_count }}",
-              "rightValue": 0,
-              "operator": {
-                "type": "number",
-                "operation": "gt"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        1744,
-        1264
-      ],
-      "id": "4d046c19-6dd7-4d1c-a2a1-552ef3cd5d0a",
-      "name": "If1"
-    },
-    {
-      "parameters": {
-        "jsCode": "const BLOCKED_IDS=new Set(['7777777777777','222222222222']);\nconst bc=$('Buscar contacto').first().json.contacts[0]||{};\nconst invoice=$('Code in JavaScript1').first().json;\nlet fv='', fdate='';\ntry{ const f=$('Factura').first().json.results[0]; fv=f.name||''; fdate=String(f.date||'').slice(0,10); }catch(e){}\nconst puntos=Number(invoice.puntosGanados)||0;\nconst siigoId=String(invoice.identification||'').trim();\nif(BLOCKED_IDS.has(siigoId))return [];\nconst now=new Date();\nreturn [{ json: { ext_id: Date.now().toString(36)+Math.random().toString(36).slice(2), timestamp: (fdate?fdate+'T12:00:00Z':now.toISOString()), fecha: (fdate||now.toISOString().split('T')[0]), tipo:'suma_puntos', contact_id: bc.id||'', contact_name: ((bc.firstName||'')+' '+(bc.lastName||'')).trim(), phone: bc.phone||'', points: puntos, source:'siigo', invoice_id: fv||null, siigo_id: siigoId||null } }];"
-      },
-      "id": "mq0p3aljjh4ky7",
-      "name": "Log: Preparar Entrada",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3248,
-        1232
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://wavqyesyqqmawjfaztvb.supabase.co/rest/v1/puntos_log",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "<JWT_REDACTED>"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer <JWT_REDACTED>"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Prefer",
-              "value": "return=minimal"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json) }}",
-        "options": {}
-      },
-      "id": "sb-ins-pts",
-      "name": "Insertar Supabase Log",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1600,
-        608
-      ],
-      "retryOnFail": true,
-      "maxTries": 4,
-      "waitBetweenTries": 3000
-    },
-    {
-      "parameters": {
-        "jsCode": "// Factura ACTUAL del loop (antes se usaba results[0] = siempre la primera del lote)\nlet inv = {};\ntry { inv = $('Loop Over Items').item.json || {}; } catch (e) { inv = {}; }\n\nconst cli   = $('Cliente').first().json || {};\nconst ident = String(cli.identification || '').trim();\nconst idtype= String((cli.id_type && cli.id_type.code) || '');\nconst ptype = String(cli.person_type || '');\nlet cname   = cli.name; cname = Array.isArray(cname) ? cname.join(' ') : String(cname || '');\n\nconst invDate = String(inv.date || '').slice(0, 10);\nconst cc      = Number(inv.cost_center);\n\nconst BLOCKED = new Set(['222222222222', '7777777777777']);\nconst LAURA   = /laura\\s+catalina\\s+le[oó]n/i;\nconst KW      = /\\b(s\\.?a\\.?s\\.?|ltda\\.?|factura|corp|inc|empresa|group|grupo|distribu|comercial|industria|hospitality|retail|inversiones)\\b/i;\nconst CUTOFF  = '2026-05-11';\n\n// cc 168 = B2C. Las 166 (B2B) / 315 (export) NO otorgan puntos.\nconst esNatural = cc === 168\n  && !BLOCKED.has(ident)\n  && ptype !== 'Company'\n  && idtype !== '31'\n  && !LAURA.test(cname)\n  && !KW.test(cname)\n  && !(invDate && invDate < CUTOFF);\n\nreturn [{ json: { ...$json, esNatural, __cc: cc, __invName: inv.name || '', __invDate: invDate } }];"
-      },
-      "id": "flt-nat",
-      "name": "Filtro Natural",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        832,
-        912
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "nat1",
-              "leftValue": "={{ $json.esNatural }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "flt-if",
-      "name": "Es Natural?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        976,
-        800
-      ]
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"locationId\": \"jzrg6bPH71ccLohGddsN\",\n  \"city\": \"{{ $('Cliente').item.json.address.city.city_name }}\",\n  \"country\": \"{{ $('Cliente').item.json.address.city.country_code }}\",\n  \"name\": \"{{ $('Cliente').item.json.contacts[0].first_name }} {{ $('Cliente').item.json.contacts[0].last_name }}\",\n  \"phone\": \"{{ $('Cliente').item.json.phones[0].number }}\",\n  \"email\": \"{{ $('Cliente').item.json.contacts[0].email }}\",\n  \"customFields\": [\n    {\n      \"id\": \"4C6TxwNRElYAB1HFkJb4\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.identification }}\"\n    },\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.puntosGanados }}\"\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": \"0\"\n    }\n  ]\n}",
+    "options": {
+     "redirect": {
+      "redirect": {}
+     }
     }
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    2512,
+    1952
+   ],
+   "id": "ca46cd20-0fc6-4c43-ab11-864826abc445",
+   "name": "HTTP Request"
+  },
+  {
+   "parameters": {
+    "jsCode": "const contact = $('Buscar contacto').first().json.contacts[0];\nconst cf = contact.customFields || [];\n\n// Leer por ID de campo (NO por posicion) con coercion numerica segura\nconst num = (id) => { const f = cf.find(x => x.id === id); const v = f ? Number(f.value) : 0; return isNaN(v) ? 0 : v; };\n\nconst PUNTOS_ID    = 'UfFc9GjS1K9az8nactO5'; // saldo de puntos\nconst HIST_ID      = 'ciYvzjlWfz9RcmIlqRkO'; // puntos historicos (total otorgado)\nconst HISTORIAL_ID = 'wdfNkPf305JjwPdTUBwS'; // fechas de recompra\n\nconst puntosActuales = num(PUNTOS_ID);\nconst puntosNuevos   = Number($('Code in JavaScript1').first().json.puntosGanados) || 0;\nconst totalPuntos    = puntosActuales + puntosNuevos;\nconst puntosHistory  = num(HIST_ID) + puntosNuevos;\n\nconst histField        = cf.find(f => f.id === HISTORIAL_ID);\nconst currentHistorial = histField?.value || '';\nconst today            = new Date().toISOString().split('T')[0];\nconst newHistorial     = currentHistorial ? currentHistorial + ',' + today : today;\nconst fechaUltimaRecompra = today;\n\n// ── Enriquecer: rellenar en GHL solo lo que FALTE, con el dato de Siigo ──\n// Nunca pisa un valor que GHL ya tenga: si existe, se reenvia el mismo.\nconst cli = (() => { try { return $('Cliente').first().json || {}; } catch (e) { return {}; } })();\nconst norm = t => String(t || '').replace(/[^0-9]/g, '').replace(/^57(?=\\d{10}$)/, '');\n\nconst telSiigo   = norm((cli.phones || [])[0]?.number);\nconst mailSiigo  = ((cli.contacts || [])[0]?.email || '').trim();\nconst nomSiigo   = [ (cli.contacts || [])[0]?.first_name, (cli.contacts || [])[0]?.last_name ].filter(Boolean).join(' ').trim();\n\nconst telGHL  = norm(contact.phone);\nconst mailGHL = String(contact.email || '').trim();\nconst nomGHL  = String(contact.name || '').trim();\n\n// valor final = el de GHL si lo tiene; si no, el de Siigo (puede quedar vacio)\nconst phone = telGHL  || telSiigo  || '';\nconst email = mailGHL || mailSiigo || '';\nconst name  = nomGHL  || nomSiigo  || '';\nconst completo = { phone: !!telGHL, email: !!mailGHL, name: !!nomGHL };\n\nreturn [{\n  json: { contactId: contact.id, puntosActuales, puntosNuevos, totalPuntos, puntosHistory, newHistorial, fechaUltimaRecompra,\n          phone, email, name, __yaTenia: completo }\n}];"
+   },
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    2512,
+    1760
+   ],
+   "id": "59eac08a-28fe-4ddd-901b-1c0abd73ae8a",
+   "name": "Code in JavaScript2"
+  },
+  {
+   "parameters": {
+    "method": "PUT",
+    "url": "=https://services.leadconnectorhq.com/contacts/{{ $('If').item.json.contacts[0].id }}",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Accept",
+       "value": "application/json"
+      },
+      {
+       "name": "Version",
+       "value": "2023-02-21"
+      },
+      {
+       "name": "Authorization",
+       "value": "Bearer __GHL_TOKEN__"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"phone\": \"{{ $json.phone }}\",\n  \"email\": \"{{ $json.email }}\",\n  \"name\": \"{{ $json.name }}\",\n  \"customFields\": [\n    {\n      \"id\": \"4C6TxwNRElYAB1HFkJb4\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.identification }}\"\n    },\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": {{ $json.totalPuntos }}\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": {{ $json.puntosHistory }}\n    },\n    {\n      \"id\": \"wdfNkPf305JjwPdTUBwS\",\n      \"field_value\": \"{{ $json.newHistorial }}\"\n    },\n    {\n      \"id\": \"4SxhRfKQzstus8dzHsxS\",\n  \"field_value\": \"{{ $json.fechaUltimaRecompra }}\"\n    }\n  ]\n}",
+    "options": {
+     "redirect": {
+      "redirect": {}
+     }
+    }
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    2704,
+    1760
+   ],
+   "id": "55d96468-af0c-45e8-b863-deb815286e95",
+   "name": "HTTP Request1",
+   "retryOnFail": true,
+   "maxTries": 5,
+   "waitBetweenTries": 5000
+  },
+  {
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "minutes",
+       "minutesInterval": 1
+      }
+     ]
+    }
+   },
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.3,
+   "position": [
+    512,
+    1392
+   ],
+   "id": "58ffcfd0-a6d7-4a35-bae3-6b5faa3220de",
+   "name": "Schedule Trigger"
+  },
+  {
+   "parameters": {
+    "fileSelector": "/root/.n8n-files/processed_invoices.json",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.readWriteFile",
+   "typeVersion": 1.1,
+   "position": [
+    1040,
+    992
+   ],
+   "id": "8279cc0f-569b-4333-b4ae-4ec480610f50",
+   "name": "Read/Write Files from Disk",
+   "alwaysOutputData": true
+  },
+  {
+   "parameters": {
+    "jsCode": "const items = $input.all();\n\nconst fileItem  = items[0]?.json;\nconst siigoItem = items[1]?.json;\n\nlet processedData = [];\ntry {\n    if (Array.isArray(fileItem)) {\n        if (fileItem.length > 0 && fileItem[0].data_to_save && Array.isArray(fileItem[0].data_to_save)) {\n            processedData = fileItem[0].data_to_save;\n        } else {\n            processedData = fileItem;\n        }\n    } else if (fileItem && fileItem.data_to_save && Array.isArray(fileItem.data_to_save)) {\n        processedData = fileItem.data_to_save;\n    } else if (fileItem && fileItem.data && Array.isArray(fileItem.data)) {\n        processedData = fileItem.data;\n    }\n} catch (e) {\n    processedData = [];\n}\n\nconst allInvoices     = siigoItem?.results || [];\nconst processedNames  = new Set(processedData.map(p => p.name));\nconst newInvoices     = allInvoices.filter(inv => !processedNames.has(inv.name));\n\nconst updatedProcessed = [\n    ...processedData,\n    ...newInvoices.map(inv => ({ name: inv.name, id: inv.id, date: inv.date }))\n];\n\nconst trimmedProcessed = updatedProcessed.slice(-2000);\n\nreturn [{\n    json: {\n        new_invoices:       newInvoices,\n        new_count:          newInvoices.length,\n        all_invoices_count: allInvoices.length,\n        processed_count:    processedData.length,\n        data_to_save:       JSON.stringify(trimmedProcessed, null, 2)\n    }\n}];"
+   },
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1952,
+    1008
+   ],
+   "id": "6da0697d-69bb-43c5-b92f-f66b1583fc7c",
+   "name": "Code in JavaScript3"
+  },
+  {
+   "parameters": {},
+   "type": "n8n-nodes-base.merge",
+   "typeVersion": 3.2,
+   "position": [
+    1712,
+    1008
+   ],
+   "id": "124a672f-5944-401e-baa8-27b40d34fbf5",
+   "name": "Merge"
+  },
+  {
+   "parameters": {
+    "operation": "fromJson",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.extractFromFile",
+   "typeVersion": 1.1,
+   "position": [
+    1424,
+    944
+   ],
+   "id": "a738bd28-c1ea-4417-95f6-3c12c3e18f71",
+   "name": "Extract from File"
+  },
+  {
+   "parameters": {
+    "fieldToSplitOut": "new_invoices",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.splitOut",
+   "typeVersion": 1,
+   "position": [
+    1968,
+    1232
+   ],
+   "id": "e13d5f02-1a45-4847-b2da-c6664240d1af",
+   "name": "Split Out"
+  },
+  {
+   "parameters": {
+    "options": {}
+   },
+   "type": "n8n-nodes-base.splitInBatches",
+   "typeVersion": 3,
+   "position": [
+    2320,
+    1184
+   ],
+   "id": "3131a49b-3354-4166-8e2a-fc638c3e0913",
+   "name": "Loop Over Items"
+  },
+  {
+   "parameters": {},
+   "type": "n8n-nodes-base.merge",
+   "typeVersion": 3.2,
+   "position": [
+    3056,
+    1920
+   ],
+   "id": "1607c9d0-a567-4aec-827e-8836af38044e",
+   "name": "Merge1"
+  },
+  {
+   "parameters": {
+    "operation": "write",
+    "fileName": "/root/.n8n-files/processed_invoices.json",
+    "dataPropertyName": "=processed_invoices.json",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.readWriteFile",
+   "typeVersion": 1.1,
+   "position": [
+    2800,
+    1008
+   ],
+   "id": "5fa5ec25-4793-4387-baef-0f61e7dc786a",
+   "name": "Read/Write Files from Disk1"
+  },
+  {
+   "parameters": {
+    "operation": "toText",
+    "sourceProperty": "data",
+    "binaryPropertyName": "processed_invoices.json",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.convertToFile",
+   "typeVersion": 1.1,
+   "position": [
+    2576,
+    1008
+   ],
+   "id": "948c1e10-0060-4a5d-bc53-ed962ad5a755",
+   "name": "Convert to File"
+  },
+  {
+   "parameters": {
+    "assignments": {
+     "assignments": [
+      {
+       "id": "9c116af3-e095-4555-b0c5-34de9f8e708c",
+       "name": "data",
+       "value": "={{ $json.data_to_save }}",
+       "type": "string"
+      }
+     ]
+    },
+    "options": {}
+   },
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    2368,
+    1008
+   ],
+   "id": "b65e8b01-afbb-46a3-9a56-d4a061033ac3",
+   "name": "Edit Fields"
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "strict",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "has-new",
+       "leftValue": "={{ $json.new_count }}",
+       "rightValue": 0,
+       "operator": {
+        "type": "number",
+        "operation": "gt"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    1744,
+    1264
+   ],
+   "id": "4d046c19-6dd7-4d1c-a2a1-552ef3cd5d0a",
+   "name": "If1"
+  },
+  {
+   "parameters": {
+    "jsCode": "const BLOCKED_IDS=new Set(['7777777777777','222222222222']);\nconst bc=$('Buscar contacto').first().json.contacts[0]||{};\nconst invoice=$('Code in JavaScript1').first().json;\nlet fv='', fdate='';\ntry{ const f=$('Factura').first().json.results[0]; fv=f.name||''; fdate=String(f.date||'').slice(0,10); }catch(e){}\nconst puntos=Number(invoice.puntosGanados)||0;\nconst siigoId=String(invoice.identification||'').trim();\nif(BLOCKED_IDS.has(siigoId))return [];\nconst now=new Date();\nreturn [{ json: { ext_id: Date.now().toString(36)+Math.random().toString(36).slice(2), timestamp: (fdate?fdate+'T12:00:00Z':now.toISOString()), fecha: (fdate||now.toISOString().split('T')[0]), tipo:'suma_puntos', contact_id: bc.id||'', contact_name: ((bc.firstName||'')+' '+(bc.lastName||'')).trim(), phone: bc.phone||'', points: puntos, source:'siigo', invoice_id: fv||null, siigo_id: siigoId||null } }];"
+   },
+   "id": "mq0p3aljjh4ky7",
+   "name": "Log: Preparar Entrada",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    3248,
+    1232
+   ]
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://wavqyesyqqmawjfaztvb.supabase.co/rest/v1/puntos_log",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "apikey",
+       "value": "__SUPABASE_SERVICE_ROLE__"
+      },
+      {
+       "name": "Authorization",
+       "value": "Bearer __SUPABASE_SERVICE_ROLE__"
+      },
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Prefer",
+       "value": "return=minimal"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json) }}",
+    "options": {}
+   },
+   "id": "sb-ins-pts",
+   "name": "Insertar Supabase Log",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1600,
+    608
+   ],
+   "retryOnFail": true,
+   "maxTries": 4,
+   "waitBetweenTries": 3000
+  },
+  {
+   "parameters": {
+    "jsCode": "// Factura ACTUAL del loop (antes se usaba results[0] = siempre la primera del lote)\nlet inv = {};\ntry { inv = $('Loop Over Items').item.json || {}; } catch (e) { inv = {}; }\n\nconst cli   = $('Cliente').first().json || {};\nconst ident = String(cli.identification || '').trim();\nconst idtype= String((cli.id_type && cli.id_type.code) || '');\nconst ptype = String(cli.person_type || '');\nlet cname   = cli.name; cname = Array.isArray(cname) ? cname.join(' ') : String(cname || '');\n\nconst invDate = String(inv.date || '').slice(0, 10);\nconst cc      = Number(inv.cost_center);\n\nconst BLOCKED = new Set(['222222222222', '7777777777777']);\nconst LAURA   = /laura\\s+catalina\\s+le[oó]n/i;\nconst KW      = /\\b(s\\.?a\\.?s\\.?|ltda\\.?|factura|corp|inc|empresa|group|grupo|distribu|comercial|industria|hospitality|retail|inversiones)\\b/i;\nconst CUTOFF  = '2026-05-11';\n\n// cc 168 = B2C. Las 166 (B2B) / 315 (export) NO otorgan puntos.\nconst esNatural = cc === 168\n  && !BLOCKED.has(ident)\n  && ptype !== 'Company'\n  && idtype !== '31'\n  && !LAURA.test(cname)\n  && !KW.test(cname)\n  && !(invDate && invDate < CUTOFF);\n\nreturn [{ json: { ...$json, esNatural, __cc: cc, __invName: inv.name || '', __invDate: invDate } }];"
+   },
+   "id": "flt-nat",
+   "name": "Filtro Natural",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    832,
+    912
+   ]
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "typeValidation": "strict",
+      "version": 3
+     },
+     "conditions": [
+      {
+       "id": "nat1",
+       "leftValue": "={{ $json.esNatural }}",
+       "rightValue": true,
+       "operator": {
+        "type": "boolean",
+        "operation": "true",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "flt-if",
+   "name": "Es Natural?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    976,
+    800
+   ]
+  }
+ ],
+ "connections": {
+  "Auth": {
+   "main": [
+    [
+     {
+      "node": "Factura",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Factura": {
+   "main": [
+    [
+     {
+      "node": "Merge",
+      "type": "main",
+      "index": 1
+     }
+    ]
+   ]
+  },
+  "Cliente": {
+   "main": [
+    [
+     {
+      "node": "Filtro Natural",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Code in JavaScript1": {
+   "main": [
+    [
+     {
+      "node": "Buscar contacto",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Buscar contacto": {
+   "main": [
+    [
+     {
+      "node": "If",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "If": {
+   "main": [
+    [
+     {
+      "node": "Code in JavaScript2",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "HTTP Request",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Code in JavaScript2": {
+   "main": [
+    [
+     {
+      "node": "HTTP Request1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Code in JavaScript": {
+   "main": [
+    [
+     {
+      "node": "Code in JavaScript1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HTTP Request": {
+   "main": [
+    [
+     {
+      "node": "Merge1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Schedule Trigger": {
+   "main": [
+    [
+     {
+      "node": "Auth",
+      "type": "main",
+      "index": 0
+     },
+     {
+      "node": "Read/Write Files from Disk",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Read/Write Files from Disk": {
+   "main": [
+    [
+     {
+      "node": "Extract from File",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Merge": {
+   "main": [
+    [
+     {
+      "node": "Code in JavaScript3",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Extract from File": {
+   "main": [
+    [
+     {
+      "node": "Merge",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Code in JavaScript3": {
+   "main": [
+    [
+     {
+      "node": "Edit Fields",
+      "type": "main",
+      "index": 0
+     },
+     {
+      "node": "If1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "HTTP Request1": {
+   "main": [
+    [
+     {
+      "node": "Merge1",
+      "type": "main",
+      "index": 0
+     },
+     {
+      "node": "Log: Preparar Entrada",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Split Out": {
+   "main": [
+    [
+     {
+      "node": "Loop Over Items",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Loop Over Items": {
+   "main": [
+    [],
+    [
+     {
+      "node": "Cliente",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Merge1": {
+   "main": [
+    [
+     {
+      "node": "Loop Over Items",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Convert to File": {
+   "main": [
+    [
+     {
+      "node": "Read/Write Files from Disk1",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Edit Fields": {
+   "main": [
+    [
+     {
+      "node": "Convert to File",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "If1": {
+   "main": [
+    [
+     {
+      "node": "Split Out",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Read/Write Files from Disk1": {
+   "main": [
+    []
+   ]
+  },
+  "Log: Preparar Entrada": {
+   "main": [
+    [
+     {
+      "node": "Insertar Supabase Log",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Filtro Natural": {
+   "main": [
+    [
+     {
+      "node": "Es Natural?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Es Natural?": {
+   "main": [
+    [
+     {
+      "node": "Code in JavaScript",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Loop Over Items",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "binaryMode": "separate",
+  "availableInMCP": false,
+  "callerPolicy": "workflowsFromSameOwner",
+  "errorWorkflow": "iVi686P2BTWp2nFg"
+ },
+ "staticData": {
+  "node:Schedule Trigger": {
+   "recurrenceRules": []
+  }
+ },
+ "meta": null,
+ "pinData": {
+  "Schedule Trigger": [
+   {
+    "json": {
+     "timestamp": "2026-07-18T13:46:48.013-04:00",
+     "Readable date": "July 18th 2026, 1:46:48 pm",
+     "Readable time": "1:46:48 pm",
+     "Day of week": "Saturday",
+     "Year": "2026",
+     "Month": "July",
+     "Day of month": "18",
+     "Hour": "13",
+     "Minute": "46",
+     "Second": "48",
+     "Timezone": "America/New_York (UTC-04:00)"
+    },
+    "pairedItem": {
+     "item": 0
+    }
+   }
+  ]
+ },
+ "versionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
+ "activeVersionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
+ "versionCounter": 306,
+ "triggerCount": 1,
+ "shared": [
+  {
+   "updatedAt": "2026-05-11T03:00:51.338Z",
+   "createdAt": "2026-05-11T03:00:51.338Z",
+   "role": "workflow:owner",
+   "workflowId": "b3NqLczq5MzJ3dmb",
+   "projectId": "ofTSkXVMRv5OZd5g",
+   "project": {
+    "updatedAt": "2026-05-06T01:08:19.070Z",
+    "createdAt": "2026-05-06T00:41:47.251Z",
+    "id": "ofTSkXVMRv5OZd5g",
+    "name": "Jhonnatan Arenas <riomarketingyeventos@gmail.com>",
+    "type": "personal",
+    "icon": null,
+    "description": null,
+    "creatorId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   }
+  }
+ ],
+ "tags": [
+  {
+   "updatedAt": "2026-06-03T14:19:14.480Z",
+   "createdAt": "2026-06-03T14:19:14.480Z",
+   "id": "jw5QOoS6phIhWi9P",
+   "name": "Chuculat"
+  }
+ ],
+ "activeVersion": {
+  "updatedAt": "2026-07-22T15:56:55.160Z",
+  "createdAt": "2026-07-22T15:56:55.160Z",
+  "versionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
+  "workflowId": "b3NqLczq5MzJ3dmb",
+  "nodes": [
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "https://api.siigo.com/auth",
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "name": "Partner-Id",
+        "value": "n8nApp"
+       }
+      ]
+     },
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "{\n  \"username\": \"facturacioncacaobasico@gmail.com\",\n  \"access_key\": \"__SIIGO_ACCESS_KEY__\"\n}",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     1184,
+     1168
+    ],
+    "id": "b0eee6c0-0f32-4c6f-87fb-e19ee4c7b70b",
+    "name": "Auth",
+    "retryOnFail": true,
+    "maxTries": 4,
+    "waitBetweenTries": 4000
+   },
+   {
+    "parameters": {
+     "jsCode": "const items = $('Factura').first().json.results[0].items || [];\n\nlet subtotal = 0;\n\nfor (const item of items) {\n  const price = Number(item.price || 0);\n  const quantity = Number(item.quantity || 0);\n  subtotal += price * quantity;\n}\n\nreturn [{\n  json: {\n    ...$json,\n    subtotal_calculado: subtotal\n  }\n}];"
+    },
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     1504,
+     1504
+    ],
+    "id": "6dfc2c1c-8470-4d6f-9641-0e1a9d6df1ab",
+    "name": "Code in JavaScript"
+   },
+   {
+    "parameters": {
+     "url": "https://api.siigo.com/v1/invoices?page=1&page_size=1",
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "Authorization",
+        "value": "=Bearer {{$node[\"Auth\"].json[\"access_token\"]}}"
+       },
+       {
+        "name": "Partner-Id",
+        "value": "n8nApp"
+       },
+       {
+        "name": "Content-Type",
+        "value": "application/json"
+       }
+      ]
+     },
+     "options": {}
+    },
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     1424,
+     1168
+    ],
+    "id": "f7bd6c69-0147-4f05-af34-92052ea7be23",
+    "name": "Factura",
+    "retryOnFail": true,
+    "maxTries": 5,
+    "waitBetweenTries": 5000
+   },
+   {
+    "parameters": {
+     "url": "=https://api.siigo.com/v1/customers/{{ $json.customer.id }}",
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "Authorization",
+        "value": "={{$node[\"Auth\"].json[\"access_token\"]}}"
+       },
+       {
+        "name": "Partner-Id",
+        "value": "n8nApp"
+       }
+      ]
+     },
+     "options": {}
+    },
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     1248,
+     1744
+    ],
+    "id": "fbc9e6a5-ed6c-4067-b926-888b3787dbf8",
+    "name": "Cliente"
+   },
+   {
+    "parameters": {
+     "jsCode": "const valorCompra = $input.first().json.subtotal_calculado;\nconst puntosGanados = Math.ceil(valorCompra / 1000);\n\nreturn [{\n  json: {\n    ...$json,\n    puntosGanados\n  }\n}];"
+    },
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     1504,
+     1744
+    ],
+    "id": "45cdef06-12db-4b76-9863-79170ed44054",
+    "name": "Code in JavaScript1"
+   },
+   {
+    "parameters": {
+     "mode": "runOnceForEachItem",
+     "jsCode": "// Cascada de detección de contacto: cédula → teléfono → email.\n// Devuelve { total, contacts:[uno], matchedBy } igual que /contacts/search.\nconst j = $json;\nconst TOKEN = '__GHL_TOKEN__';\nconst LOC = 'jzrg6bPH71ccLohGddsN';\nconst CED_FIELD = '4C6TxwNRElYAB1HFkJb4';\nconst H = { Authorization: 'Bearer ' + TOKEN, Version: '2021-07-28', 'Content-Type': 'application/json' };\nconst norm = t => String(t || '').replace(/[^0-9]/g, '').replace(/^57(?=\\d{10}$)/, '');\nconst search = (body) => this.helpers.httpRequest({ method:'POST', url:'https://services.leadconnectorhq.com/contacts/search', headers:H, body, json:true });\n\nconst ident = String(j.identification || '').trim();\nconst tel   = norm((j.phones || [])[0] && (j.phones || [])[0].number);\nconst email = String(((j.contacts || [])[0] || {}).email || '').trim().toLowerCase();\n\nlet found = null, matchedBy = '';\n// 1) por cédula (campo personalizado)\nif (ident) {\n  const r = await search({ locationId:LOC, pageLimit:10, page:1, filters:[{ field:'customFields.'+CED_FIELD, operator:'eq', value:ident }] });\n  found = (r.contacts || [])[0] || null; if (found) matchedBy = 'identificacion';\n}\n// 2) por teléfono (contains + verificación exacta)\nif (!found && tel && tel.length >= 7) {\n  const r = await search({ locationId:LOC, pageLimit:10, page:1, filters:[{ field:'phone', operator:'contains', value:tel }] });\n  found = (r.contacts || []).find(c => norm(c.phone) === tel) || null; if (found) matchedBy = 'telefono';\n}\n// 3) por email (eq + verificación exacta)\nif (!found && email) {\n  const r = await search({ locationId:LOC, pageLimit:10, page:1, filters:[{ field:'email', operator:'eq', value:email }] });\n  found = (r.contacts || []).find(c => String(c.email||'').trim().toLowerCase() === email) || null; if (found) matchedBy = 'email';\n}\nreturn { json: { total: found ? 1 : 0, contacts: found ? [found] : [], matchedBy } };"
+    },
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     1840,
+     1488
+    ],
+    "id": "3fc6b24f-80c2-4dbe-904b-915cc7be516f",
+    "name": "Buscar contacto",
+    "retryOnFail": true,
+    "maxTries": 5,
+    "waitBetweenTries": 5000
+   },
+   {
+    "parameters": {
+     "conditions": {
+      "options": {
+       "caseSensitive": true,
+       "leftValue": "",
+       "typeValidation": "strict",
+       "version": 3
+      },
+      "conditions": [
+       {
+        "id": "e2fced20-299c-423c-b8be-aec85e6a8b90",
+        "leftValue": "={{ $json.total }}",
+        "rightValue": 0,
+        "operator": {
+         "type": "number",
+         "operation": "gt"
+        }
+       },
+       {
+        "id": "57352117-80cd-434c-af84-e635f0aad288",
+        "leftValue": "={{ $json.total }}",
+        "rightValue": 2,
+        "operator": {
+         "type": "number",
+         "operation": "lt"
+        }
+       }
+      ],
+      "combinator": "and"
+     },
+     "options": {}
+    },
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.3,
+    "position": [
+     1856,
+     1760
+    ],
+    "id": "2150d3fd-91fc-43b2-b294-201801396659",
+    "name": "If"
+   },
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "https://services.leadconnectorhq.com/contacts/",
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "Accept",
+        "value": "application/json"
+       },
+       {
+        "name": "Version",
+        "value": "2023-02-21"
+       },
+       {
+        "name": "Authorization",
+        "value": "Bearer __GHL_TOKEN__"
+       }
+      ]
+     },
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "={\n  \"locationId\": \"jzrg6bPH71ccLohGddsN\",\n  \"city\": \"{{ $('Cliente').item.json.address.city.city_name }}\",\n  \"country\": \"{{ $('Cliente').item.json.address.city.country_code }}\",\n  \"name\": \"{{ $('Cliente').item.json.contacts[0].first_name }} {{ $('Cliente').item.json.contacts[0].last_name }}\",\n  \"phone\": \"{{ $('Cliente').item.json.phones[0].number }}\",\n  \"email\": \"{{ $('Cliente').item.json.contacts[0].email }}\",\n  \"customFields\": [\n    {\n      \"id\": \"4C6TxwNRElYAB1HFkJb4\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.identification }}\"\n    },\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.puntosGanados }}\"\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": \"0\"\n    }\n  ]\n}",
+     "options": {
+      "redirect": {
+       "redirect": {}
+      }
+     }
+    },
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     2512,
+     1952
+    ],
+    "id": "ca46cd20-0fc6-4c43-ab11-864826abc445",
+    "name": "HTTP Request"
+   },
+   {
+    "parameters": {
+     "jsCode": "const contact = $('Buscar contacto').first().json.contacts[0];\nconst cf = contact.customFields || [];\n\n// Leer por ID de campo (NO por posicion) con coercion numerica segura\nconst num = (id) => { const f = cf.find(x => x.id === id); const v = f ? Number(f.value) : 0; return isNaN(v) ? 0 : v; };\n\nconst PUNTOS_ID    = 'UfFc9GjS1K9az8nactO5'; // saldo de puntos\nconst HIST_ID      = 'ciYvzjlWfz9RcmIlqRkO'; // puntos historicos (total otorgado)\nconst HISTORIAL_ID = 'wdfNkPf305JjwPdTUBwS'; // fechas de recompra\n\nconst puntosActuales = num(PUNTOS_ID);\nconst puntosNuevos   = Number($('Code in JavaScript1').first().json.puntosGanados) || 0;\nconst totalPuntos    = puntosActuales + puntosNuevos;\nconst puntosHistory  = num(HIST_ID) + puntosNuevos;\n\nconst histField        = cf.find(f => f.id === HISTORIAL_ID);\nconst currentHistorial = histField?.value || '';\nconst today            = new Date().toISOString().split('T')[0];\nconst newHistorial     = currentHistorial ? currentHistorial + ',' + today : today;\nconst fechaUltimaRecompra = today;\n\n// ── Enriquecer: rellenar en GHL solo lo que FALTE, con el dato de Siigo ──\n// Nunca pisa un valor que GHL ya tenga: si existe, se reenvia el mismo.\nconst cli = (() => { try { return $('Cliente').first().json || {}; } catch (e) { return {}; } })();\nconst norm = t => String(t || '').replace(/[^0-9]/g, '').replace(/^57(?=\\d{10}$)/, '');\n\nconst telSiigo   = norm((cli.phones || [])[0]?.number);\nconst mailSiigo  = ((cli.contacts || [])[0]?.email || '').trim();\nconst nomSiigo   = [ (cli.contacts || [])[0]?.first_name, (cli.contacts || [])[0]?.last_name ].filter(Boolean).join(' ').trim();\n\nconst telGHL  = norm(contact.phone);\nconst mailGHL = String(contact.email || '').trim();\nconst nomGHL  = String(contact.name || '').trim();\n\n// valor final = el de GHL si lo tiene; si no, el de Siigo (puede quedar vacio)\nconst phone = telGHL  || telSiigo  || '';\nconst email = mailGHL || mailSiigo || '';\nconst name  = nomGHL  || nomSiigo  || '';\nconst completo = { phone: !!telGHL, email: !!mailGHL, name: !!nomGHL };\n\nreturn [{\n  json: { contactId: contact.id, puntosActuales, puntosNuevos, totalPuntos, puntosHistory, newHistorial, fechaUltimaRecompra,\n          phone, email, name, __yaTenia: completo }\n}];"
+    },
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     2512,
+     1760
+    ],
+    "id": "59eac08a-28fe-4ddd-901b-1c0abd73ae8a",
+    "name": "Code in JavaScript2"
+   },
+   {
+    "parameters": {
+     "method": "PUT",
+     "url": "=https://services.leadconnectorhq.com/contacts/{{ $('If').item.json.contacts[0].id }}",
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "Accept",
+        "value": "application/json"
+       },
+       {
+        "name": "Version",
+        "value": "2023-02-21"
+       },
+       {
+        "name": "Authorization",
+        "value": "Bearer __GHL_TOKEN__"
+       }
+      ]
+     },
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "={\n  \"phone\": \"{{ $json.phone }}\",\n  \"email\": \"{{ $json.email }}\",\n  \"name\": \"{{ $json.name }}\",\n  \"customFields\": [\n    {\n      \"id\": \"4C6TxwNRElYAB1HFkJb4\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.identification }}\"\n    },\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": {{ $json.totalPuntos }}\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": {{ $json.puntosHistory }}\n    },\n    {\n      \"id\": \"wdfNkPf305JjwPdTUBwS\",\n      \"field_value\": \"{{ $json.newHistorial }}\"\n    },\n    {\n      \"id\": \"4SxhRfKQzstus8dzHsxS\",\n  \"field_value\": \"{{ $json.fechaUltimaRecompra }}\"\n    }\n  ]\n}",
+     "options": {
+      "redirect": {
+       "redirect": {}
+      }
+     }
+    },
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.4,
+    "position": [
+     2704,
+     1760
+    ],
+    "id": "55d96468-af0c-45e8-b863-deb815286e95",
+    "name": "HTTP Request1",
+    "retryOnFail": true,
+    "maxTries": 5,
+    "waitBetweenTries": 5000
+   },
+   {
+    "parameters": {
+     "rule": {
+      "interval": [
+       {
+        "field": "minutes",
+        "minutesInterval": 1
+       }
+      ]
+     }
+    },
+    "type": "n8n-nodes-base.scheduleTrigger",
+    "typeVersion": 1.3,
+    "position": [
+     512,
+     1392
+    ],
+    "id": "58ffcfd0-a6d7-4a35-bae3-6b5faa3220de",
+    "name": "Schedule Trigger"
+   },
+   {
+    "parameters": {
+     "fileSelector": "/root/.n8n-files/processed_invoices.json",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.readWriteFile",
+    "typeVersion": 1.1,
+    "position": [
+     1040,
+     992
+    ],
+    "id": "8279cc0f-569b-4333-b4ae-4ec480610f50",
+    "name": "Read/Write Files from Disk",
+    "alwaysOutputData": true
+   },
+   {
+    "parameters": {
+     "jsCode": "const items = $input.all();\n\nconst fileItem  = items[0]?.json;\nconst siigoItem = items[1]?.json;\n\nlet processedData = [];\ntry {\n    if (Array.isArray(fileItem)) {\n        if (fileItem.length > 0 && fileItem[0].data_to_save && Array.isArray(fileItem[0].data_to_save)) {\n            processedData = fileItem[0].data_to_save;\n        } else {\n            processedData = fileItem;\n        }\n    } else if (fileItem && fileItem.data_to_save && Array.isArray(fileItem.data_to_save)) {\n        processedData = fileItem.data_to_save;\n    } else if (fileItem && fileItem.data && Array.isArray(fileItem.data)) {\n        processedData = fileItem.data;\n    }\n} catch (e) {\n    processedData = [];\n}\n\nconst allInvoices     = siigoItem?.results || [];\nconst processedNames  = new Set(processedData.map(p => p.name));\nconst newInvoices     = allInvoices.filter(inv => !processedNames.has(inv.name));\n\nconst updatedProcessed = [\n    ...processedData,\n    ...newInvoices.map(inv => ({ name: inv.name, id: inv.id, date: inv.date }))\n];\n\nconst trimmedProcessed = updatedProcessed.slice(-2000);\n\nreturn [{\n    json: {\n        new_invoices:       newInvoices,\n        new_count:          newInvoices.length,\n        all_invoices_count: allInvoices.length,\n        processed_count:    processedData.length,\n        data_to_save:       JSON.stringify(trimmedProcessed, null, 2)\n    }\n}];"
+    },
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     1952,
+     1008
+    ],
+    "id": "6da0697d-69bb-43c5-b92f-f66b1583fc7c",
+    "name": "Code in JavaScript3"
+   },
+   {
+    "parameters": {},
+    "type": "n8n-nodes-base.merge",
+    "typeVersion": 3.2,
+    "position": [
+     1712,
+     1008
+    ],
+    "id": "124a672f-5944-401e-baa8-27b40d34fbf5",
+    "name": "Merge"
+   },
+   {
+    "parameters": {
+     "operation": "fromJson",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.extractFromFile",
+    "typeVersion": 1.1,
+    "position": [
+     1424,
+     944
+    ],
+    "id": "a738bd28-c1ea-4417-95f6-3c12c3e18f71",
+    "name": "Extract from File"
+   },
+   {
+    "parameters": {
+     "fieldToSplitOut": "new_invoices",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.splitOut",
+    "typeVersion": 1,
+    "position": [
+     1968,
+     1232
+    ],
+    "id": "e13d5f02-1a45-4847-b2da-c6664240d1af",
+    "name": "Split Out"
+   },
+   {
+    "parameters": {
+     "options": {}
+    },
+    "type": "n8n-nodes-base.splitInBatches",
+    "typeVersion": 3,
+    "position": [
+     2320,
+     1184
+    ],
+    "id": "3131a49b-3354-4166-8e2a-fc638c3e0913",
+    "name": "Loop Over Items"
+   },
+   {
+    "parameters": {},
+    "type": "n8n-nodes-base.merge",
+    "typeVersion": 3.2,
+    "position": [
+     3056,
+     1920
+    ],
+    "id": "1607c9d0-a567-4aec-827e-8836af38044e",
+    "name": "Merge1"
+   },
+   {
+    "parameters": {
+     "operation": "write",
+     "fileName": "/root/.n8n-files/processed_invoices.json",
+     "dataPropertyName": "=processed_invoices.json",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.readWriteFile",
+    "typeVersion": 1.1,
+    "position": [
+     2800,
+     1008
+    ],
+    "id": "5fa5ec25-4793-4387-baef-0f61e7dc786a",
+    "name": "Read/Write Files from Disk1"
+   },
+   {
+    "parameters": {
+     "operation": "toText",
+     "sourceProperty": "data",
+     "binaryPropertyName": "processed_invoices.json",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.convertToFile",
+    "typeVersion": 1.1,
+    "position": [
+     2576,
+     1008
+    ],
+    "id": "948c1e10-0060-4a5d-bc53-ed962ad5a755",
+    "name": "Convert to File"
+   },
+   {
+    "parameters": {
+     "assignments": {
+      "assignments": [
+       {
+        "id": "9c116af3-e095-4555-b0c5-34de9f8e708c",
+        "name": "data",
+        "value": "={{ $json.data_to_save }}",
+        "type": "string"
+       }
+      ]
+     },
+     "options": {}
+    },
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [
+     2368,
+     1008
+    ],
+    "id": "b65e8b01-afbb-46a3-9a56-d4a061033ac3",
+    "name": "Edit Fields"
+   },
+   {
+    "parameters": {
+     "conditions": {
+      "options": {
+       "caseSensitive": true,
+       "leftValue": "",
+       "typeValidation": "strict",
+       "version": 3
+      },
+      "conditions": [
+       {
+        "id": "has-new",
+        "leftValue": "={{ $json.new_count }}",
+        "rightValue": 0,
+        "operator": {
+         "type": "number",
+         "operation": "gt"
+        }
+       }
+      ],
+      "combinator": "and"
+     },
+     "options": {}
+    },
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.3,
+    "position": [
+     1744,
+     1264
+    ],
+    "id": "4d046c19-6dd7-4d1c-a2a1-552ef3cd5d0a",
+    "name": "If1"
+   },
+   {
+    "parameters": {
+     "jsCode": "const BLOCKED_IDS=new Set(['7777777777777','222222222222']);\nconst bc=$('Buscar contacto').first().json.contacts[0]||{};\nconst invoice=$('Code in JavaScript1').first().json;\nlet fv='', fdate='';\ntry{ const f=$('Factura').first().json.results[0]; fv=f.name||''; fdate=String(f.date||'').slice(0,10); }catch(e){}\nconst puntos=Number(invoice.puntosGanados)||0;\nconst siigoId=String(invoice.identification||'').trim();\nif(BLOCKED_IDS.has(siigoId))return [];\nconst now=new Date();\nreturn [{ json: { ext_id: Date.now().toString(36)+Math.random().toString(36).slice(2), timestamp: (fdate?fdate+'T12:00:00Z':now.toISOString()), fecha: (fdate||now.toISOString().split('T')[0]), tipo:'suma_puntos', contact_id: bc.id||'', contact_name: ((bc.firstName||'')+' '+(bc.lastName||'')).trim(), phone: bc.phone||'', points: puntos, source:'siigo', invoice_id: fv||null, siigo_id: siigoId||null } }];"
+    },
+    "id": "mq0p3aljjh4ky7",
+    "name": "Log: Preparar Entrada",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     3248,
+     1232
+    ]
+   },
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "https://wavqyesyqqmawjfaztvb.supabase.co/rest/v1/puntos_log",
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "apikey",
+        "value": "__SUPABASE_SERVICE_ROLE__"
+       },
+       {
+        "name": "Authorization",
+        "value": "Bearer __SUPABASE_SERVICE_ROLE__"
+       },
+       {
+        "name": "Content-Type",
+        "value": "application/json"
+       },
+       {
+        "name": "Prefer",
+        "value": "return=minimal"
+       }
+      ]
+     },
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "={{ JSON.stringify($json) }}",
+     "options": {}
+    },
+    "id": "sb-ins-pts",
+    "name": "Insertar Supabase Log",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.2,
+    "position": [
+     1600,
+     608
+    ],
+    "retryOnFail": true,
+    "maxTries": 4,
+    "waitBetweenTries": 3000
+   },
+   {
+    "parameters": {
+     "jsCode": "// Factura ACTUAL del loop (antes se usaba results[0] = siempre la primera del lote)\nlet inv = {};\ntry { inv = $('Loop Over Items').item.json || {}; } catch (e) { inv = {}; }\n\nconst cli   = $('Cliente').first().json || {};\nconst ident = String(cli.identification || '').trim();\nconst idtype= String((cli.id_type && cli.id_type.code) || '');\nconst ptype = String(cli.person_type || '');\nlet cname   = cli.name; cname = Array.isArray(cname) ? cname.join(' ') : String(cname || '');\n\nconst invDate = String(inv.date || '').slice(0, 10);\nconst cc      = Number(inv.cost_center);\n\nconst BLOCKED = new Set(['222222222222', '7777777777777']);\nconst LAURA   = /laura\\s+catalina\\s+le[oó]n/i;\nconst KW      = /\\b(s\\.?a\\.?s\\.?|ltda\\.?|factura|corp|inc|empresa|group|grupo|distribu|comercial|industria|hospitality|retail|inversiones)\\b/i;\nconst CUTOFF  = '2026-05-11';\n\n// cc 168 = B2C. Las 166 (B2B) / 315 (export) NO otorgan puntos.\nconst esNatural = cc === 168\n  && !BLOCKED.has(ident)\n  && ptype !== 'Company'\n  && idtype !== '31'\n  && !LAURA.test(cname)\n  && !KW.test(cname)\n  && !(invDate && invDate < CUTOFF);\n\nreturn [{ json: { ...$json, esNatural, __cc: cc, __invName: inv.name || '', __invDate: invDate } }];"
+    },
+    "id": "flt-nat",
+    "name": "Filtro Natural",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     832,
+     912
+    ]
+   },
+   {
+    "parameters": {
+     "conditions": {
+      "options": {
+       "caseSensitive": true,
+       "typeValidation": "strict",
+       "version": 3
+      },
+      "conditions": [
+       {
+        "id": "nat1",
+        "leftValue": "={{ $json.esNatural }}",
+        "rightValue": true,
+        "operator": {
+         "type": "boolean",
+         "operation": "true",
+         "singleValue": true
+        }
+       }
+      ],
+      "combinator": "and"
+     },
+     "options": {}
+    },
+    "id": "flt-if",
+    "name": "Es Natural?",
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.3,
+    "position": [
+     976,
+     800
+    ]
+   }
   ],
   "connections": {
-    "Auth": {
-      "main": [
-        [
-          {
-            "node": "Factura",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Factura": {
-      "main": [
-        [
-          {
-            "node": "Merge",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Cliente": {
-      "main": [
-        [
-          {
-            "node": "Filtro Natural",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript1": {
-      "main": [
-        [
-          {
-            "node": "Buscar contacto",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Buscar contacto": {
-      "main": [
-        [
-          {
-            "node": "If",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript2",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "HTTP Request",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript2": {
-      "main": [
-        [
-          {
-            "node": "HTTP Request1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HTTP Request": {
-      "main": [
-        [
-          {
-            "node": "Merge1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Schedule Trigger": {
-      "main": [
-        [
-          {
-            "node": "Auth",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Read/Write Files from Disk",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Read/Write Files from Disk": {
-      "main": [
-        [
-          {
-            "node": "Extract from File",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract from File": {
-      "main": [
-        [
-          {
-            "node": "Merge",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript3": {
-      "main": [
-        [
-          {
-            "node": "Edit Fields",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "If1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HTTP Request1": {
-      "main": [
-        [
-          {
-            "node": "Merge1",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Log: Preparar Entrada",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Split Out": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Loop Over Items": {
-      "main": [
-        [],
-        [
-          {
-            "node": "Cliente",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge1": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Convert to File": {
-      "main": [
-        [
-          {
-            "node": "Read/Write Files from Disk1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Edit Fields": {
-      "main": [
-        [
-          {
-            "node": "Convert to File",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If1": {
-      "main": [
-        [
-          {
-            "node": "Split Out",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Read/Write Files from Disk1": {
-      "main": [
-        []
-      ]
-    },
-    "Log: Preparar Entrada": {
-      "main": [
-        [
-          {
-            "node": "Insertar Supabase Log",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Filtro Natural": {
-      "main": [
-        [
-          {
-            "node": "Es Natural?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Es Natural?": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+   "Auth": {
+    "main": [
+     [
+      {
+       "node": "Factura",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Factura": {
+    "main": [
+     [
+      {
+       "node": "Merge",
+       "type": "main",
+       "index": 1
+      }
+     ]
+    ]
+   },
+   "Cliente": {
+    "main": [
+     [
+      {
+       "node": "Filtro Natural",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Code in JavaScript1": {
+    "main": [
+     [
+      {
+       "node": "Buscar contacto",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Buscar contacto": {
+    "main": [
+     [
+      {
+       "node": "If",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "If": {
+    "main": [
+     [
+      {
+       "node": "Code in JavaScript2",
+       "type": "main",
+       "index": 0
+      }
+     ],
+     [
+      {
+       "node": "HTTP Request",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Code in JavaScript2": {
+    "main": [
+     [
+      {
+       "node": "HTTP Request1",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Code in JavaScript": {
+    "main": [
+     [
+      {
+       "node": "Code in JavaScript1",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HTTP Request": {
+    "main": [
+     [
+      {
+       "node": "Merge1",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Schedule Trigger": {
+    "main": [
+     [
+      {
+       "node": "Auth",
+       "type": "main",
+       "index": 0
+      },
+      {
+       "node": "Read/Write Files from Disk",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Read/Write Files from Disk": {
+    "main": [
+     [
+      {
+       "node": "Extract from File",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Merge": {
+    "main": [
+     [
+      {
+       "node": "Code in JavaScript3",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Extract from File": {
+    "main": [
+     [
+      {
+       "node": "Merge",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Code in JavaScript3": {
+    "main": [
+     [
+      {
+       "node": "Edit Fields",
+       "type": "main",
+       "index": 0
+      },
+      {
+       "node": "If1",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "HTTP Request1": {
+    "main": [
+     [
+      {
+       "node": "Merge1",
+       "type": "main",
+       "index": 0
+      },
+      {
+       "node": "Log: Preparar Entrada",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Split Out": {
+    "main": [
+     [
+      {
+       "node": "Loop Over Items",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Loop Over Items": {
+    "main": [
+     [],
+     [
+      {
+       "node": "Cliente",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Merge1": {
+    "main": [
+     [
+      {
+       "node": "Loop Over Items",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Convert to File": {
+    "main": [
+     [
+      {
+       "node": "Read/Write Files from Disk1",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Edit Fields": {
+    "main": [
+     [
+      {
+       "node": "Convert to File",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "If1": {
+    "main": [
+     [
+      {
+       "node": "Split Out",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Read/Write Files from Disk1": {
+    "main": [
+     []
+    ]
+   },
+   "Log: Preparar Entrada": {
+    "main": [
+     [
+      {
+       "node": "Insertar Supabase Log",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Filtro Natural": {
+    "main": [
+     [
+      {
+       "node": "Es Natural?",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Es Natural?": {
+    "main": [
+     [
+      {
+       "node": "Code in JavaScript",
+       "type": "main",
+       "index": 0
+      }
+     ],
+     [
+      {
+       "node": "Loop Over Items",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   }
   },
-  "settings": {
-    "executionOrder": "v1"
-  }
+  "authors": "Jhonnatan Arenas",
+  "name": null,
+  "description": null,
+  "autosaved": false,
+  "workflowPublishHistory": [
+   {
+    "createdAt": "2026-07-22T15:56:55.420Z",
+    "id": 1084,
+    "workflowId": "b3NqLczq5MzJ3dmb",
+    "versionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
+    "event": "activated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   },
+   {
+    "createdAt": "2026-07-22T15:56:56.687Z",
+    "id": 1086,
+    "workflowId": "b3NqLczq5MzJ3dmb",
+    "versionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
+    "event": "activated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   },
+   {
+    "createdAt": "2026-07-22T15:56:55.306Z",
+    "id": 1083,
+    "workflowId": "b3NqLczq5MzJ3dmb",
+    "versionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
+    "event": "deactivated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   },
+   {
+    "createdAt": "2026-07-22T15:56:55.815Z",
+    "id": 1085,
+    "workflowId": "b3NqLczq5MzJ3dmb",
+    "versionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
+    "event": "deactivated",
+    "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
+   }
+  ]
+ }
 }
