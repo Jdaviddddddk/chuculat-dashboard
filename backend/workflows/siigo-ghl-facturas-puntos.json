@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-07-22T15:56:53.444Z",
+ "updatedAt": "2026-07-22T20:14:43.616Z",
  "createdAt": "2026-05-11T03:00:51.328Z",
  "id": "b3NqLczq5MzJ3dmb",
  "name": "CHUCULAT | SIIGO - GHL FACTURAS",
@@ -210,7 +210,7 @@
     },
     "sendBody": true,
     "specifyBody": "json",
-    "jsonBody": "={\n  \"locationId\": \"jzrg6bPH71ccLohGddsN\",\n  \"city\": \"{{ $('Cliente').item.json.address.city.city_name }}\",\n  \"country\": \"{{ $('Cliente').item.json.address.city.country_code }}\",\n  \"name\": \"{{ $('Cliente').item.json.contacts[0].first_name }} {{ $('Cliente').item.json.contacts[0].last_name }}\",\n  \"phone\": \"{{ $('Cliente').item.json.phones[0].number }}\",\n  \"email\": \"{{ $('Cliente').item.json.contacts[0].email }}\",\n  \"customFields\": [\n    {\n      \"id\": \"4C6TxwNRElYAB1HFkJb4\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.identification }}\"\n    },\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.puntosGanados }}\"\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": \"0\"\n    }\n  ]\n}",
+    "jsonBody": "={\n  \"locationId\": \"jzrg6bPH71ccLohGddsN\",\n  \"city\": \"{{ $('Cliente').item.json.address.city.city_name }}\",\n  \"country\": \"{{ $('Cliente').item.json.address.city.country_code }}\",\n  \"name\": \"{{ $('Cliente').item.json.contacts[0].first_name }} {{ $('Cliente').item.json.contacts[0].last_name }}\",\n  \"phone\": \"{{ $('Cliente').item.json.phones[0].number }}\",\n  \"email\": \"{{ $('Cliente').item.json.contacts[0].email }}\",\n  \"customFields\": [\n    {\n      \"id\": \"4C6TxwNRElYAB1HFkJb4\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.identification }}\"\n    },\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.puntosGanados }}\"\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.puntosGanados }}\"\n    }\n  ]\n}",
     "options": {
      "redirect": {
       "redirect": {}
@@ -482,7 +482,7 @@
   },
   {
    "parameters": {
-    "jsCode": "const BLOCKED_IDS=new Set(['7777777777777','222222222222']);\nconst bc=$('Buscar contacto').first().json.contacts[0]||{};\nconst invoice=$('Code in JavaScript1').first().json;\nlet fv='', fdate='';\ntry{ const f=$('Factura').first().json.results[0]; fv=f.name||''; fdate=String(f.date||'').slice(0,10); }catch(e){}\nconst puntos=Number(invoice.puntosGanados)||0;\nconst siigoId=String(invoice.identification||'').trim();\nif(BLOCKED_IDS.has(siigoId))return [];\nconst now=new Date();\nreturn [{ json: { ext_id: Date.now().toString(36)+Math.random().toString(36).slice(2), timestamp: (fdate?fdate+'T12:00:00Z':now.toISOString()), fecha: (fdate||now.toISOString().split('T')[0]), tipo:'suma_puntos', contact_id: bc.id||'', contact_name: ((bc.firstName||'')+' '+(bc.lastName||'')).trim(), phone: bc.phone||'', points: puntos, source:'siigo', invoice_id: fv||null, siigo_id: siigoId||null } }];"
+    "jsCode": "const BLOCKED_IDS=new Set(['7777777777777','222222222222']);\n\n// El log se alimenta de las DOS ramas: contacto existente (Buscar contacto) y\n// contacto RECIEN CREADO (HTTP Request). Antes solo la primera estaba conectada,\n// por eso las compras de clientes nuevos nunca quedaban registradas en puntos_log.\nlet bc = {};\ntry { bc = $('Buscar contacto').first().json.contacts[0] || {}; } catch (e) { bc = {}; }\nif (!bc || !bc.id) {\n  try {\n    const r = $('HTTP Request').first().json || {};\n    const c = r.contact || r;\n    if (c && c.id) bc = { id:c.id, firstName:c.firstName||'', lastName:c.lastName||'', phone:c.phone||'' };\n  } catch (e) { /* venimos de la rama de contacto existente */ }\n}\n\nconst invoice = $('Code in JavaScript1').first().json;\n\n// Factura del ciclo actual (antes: results[0] = siempre la primera del lote)\nlet fv='', fdate='';\ntry { const f=$('Loop Over Items').item.json; fv=f.name||''; fdate=String(f.date||'').slice(0,10); } catch(e){}\nif(!fv){ try{ const f=$('Factura').first().json.results[0]; fv=f.name||''; fdate=String(f.date||'').slice(0,10); }catch(e){} }\n\nconst puntos  = Number(invoice.puntosGanados)||0;\nconst siigoId = String(invoice.identification||'').trim();\nif(BLOCKED_IDS.has(siigoId)) return [];\n\n// Nombre/telefono: si el contacto recien creado no los trae, se usan los de Siigo\nlet nombre = ((bc.firstName||'')+' '+(bc.lastName||'')).trim();\nlet tel = bc.phone||'';\ntry {\n  const cli = $('Cliente').first().json || {};\n  if(!nombre){ const n=cli.name; nombre = Array.isArray(n)? n.join(' ') : String(n||''); }\n  if(!tel){ tel = ((cli.phones||[])[0]||{}).number || ''; }\n} catch(e){}\n\nconst now=new Date();\nreturn [{ json: {\n  ext_id: Date.now().toString(36)+Math.random().toString(36).slice(2),\n  timestamp: (fdate? fdate+'T12:00:00Z' : now.toISOString()),\n  fecha: (fdate||now.toISOString().split('T')[0]),\n  tipo:'suma_puntos',\n  contact_id: bc.id||'',\n  contact_name: nombre,\n  phone: tel,\n  points: puntos,\n  source:'siigo',\n  invoice_id: fv||null,\n  siigo_id: siigoId||null\n} }];"
    },
    "id": "mq0p3aljjh4ky7",
    "name": "Log: Preparar Entrada",
@@ -683,6 +683,11 @@
     [
      {
       "node": "Merge1",
+      "type": "main",
+      "index": 0
+     },
+     {
+      "node": "Log: Preparar Entrada",
       "type": "main",
       "index": 0
      }
@@ -918,9 +923,9 @@
    }
   ]
  },
- "versionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
- "activeVersionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
- "versionCounter": 306,
+ "versionId": "ed9d9b26-e4fc-4826-8897-3009cdd5e757",
+ "activeVersionId": "ed9d9b26-e4fc-4826-8897-3009cdd5e757",
+ "versionCounter": 311,
  "triggerCount": 1,
  "shared": [
   {
@@ -950,9 +955,9 @@
   }
  ],
  "activeVersion": {
-  "updatedAt": "2026-07-22T15:56:55.160Z",
-  "createdAt": "2026-07-22T15:56:55.160Z",
-  "versionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
+  "updatedAt": "2026-07-22T20:14:43.631Z",
+  "createdAt": "2026-07-22T20:14:43.631Z",
+  "versionId": "ed9d9b26-e4fc-4826-8897-3009cdd5e757",
   "workflowId": "b3NqLczq5MzJ3dmb",
   "nodes": [
    {
@@ -1158,7 +1163,7 @@
      },
      "sendBody": true,
      "specifyBody": "json",
-     "jsonBody": "={\n  \"locationId\": \"jzrg6bPH71ccLohGddsN\",\n  \"city\": \"{{ $('Cliente').item.json.address.city.city_name }}\",\n  \"country\": \"{{ $('Cliente').item.json.address.city.country_code }}\",\n  \"name\": \"{{ $('Cliente').item.json.contacts[0].first_name }} {{ $('Cliente').item.json.contacts[0].last_name }}\",\n  \"phone\": \"{{ $('Cliente').item.json.phones[0].number }}\",\n  \"email\": \"{{ $('Cliente').item.json.contacts[0].email }}\",\n  \"customFields\": [\n    {\n      \"id\": \"4C6TxwNRElYAB1HFkJb4\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.identification }}\"\n    },\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.puntosGanados }}\"\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": \"0\"\n    }\n  ]\n}",
+     "jsonBody": "={\n  \"locationId\": \"jzrg6bPH71ccLohGddsN\",\n  \"city\": \"{{ $('Cliente').item.json.address.city.city_name }}\",\n  \"country\": \"{{ $('Cliente').item.json.address.city.country_code }}\",\n  \"name\": \"{{ $('Cliente').item.json.contacts[0].first_name }} {{ $('Cliente').item.json.contacts[0].last_name }}\",\n  \"phone\": \"{{ $('Cliente').item.json.phones[0].number }}\",\n  \"email\": \"{{ $('Cliente').item.json.contacts[0].email }}\",\n  \"customFields\": [\n    {\n      \"id\": \"4C6TxwNRElYAB1HFkJb4\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.identification }}\"\n    },\n    {\n      \"id\": \"UfFc9GjS1K9az8nactO5\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.puntosGanados }}\"\n    },\n    {\n      \"id\": \"ciYvzjlWfz9RcmIlqRkO\",\n      \"value\": \"{{ $('Code in JavaScript1').item.json.puntosGanados }}\"\n    }\n  ]\n}",
      "options": {
       "redirect": {
        "redirect": {}
@@ -1430,7 +1435,7 @@
    },
    {
     "parameters": {
-     "jsCode": "const BLOCKED_IDS=new Set(['7777777777777','222222222222']);\nconst bc=$('Buscar contacto').first().json.contacts[0]||{};\nconst invoice=$('Code in JavaScript1').first().json;\nlet fv='', fdate='';\ntry{ const f=$('Factura').first().json.results[0]; fv=f.name||''; fdate=String(f.date||'').slice(0,10); }catch(e){}\nconst puntos=Number(invoice.puntosGanados)||0;\nconst siigoId=String(invoice.identification||'').trim();\nif(BLOCKED_IDS.has(siigoId))return [];\nconst now=new Date();\nreturn [{ json: { ext_id: Date.now().toString(36)+Math.random().toString(36).slice(2), timestamp: (fdate?fdate+'T12:00:00Z':now.toISOString()), fecha: (fdate||now.toISOString().split('T')[0]), tipo:'suma_puntos', contact_id: bc.id||'', contact_name: ((bc.firstName||'')+' '+(bc.lastName||'')).trim(), phone: bc.phone||'', points: puntos, source:'siigo', invoice_id: fv||null, siigo_id: siigoId||null } }];"
+     "jsCode": "const BLOCKED_IDS=new Set(['7777777777777','222222222222']);\n\n// El log se alimenta de las DOS ramas: contacto existente (Buscar contacto) y\n// contacto RECIEN CREADO (HTTP Request). Antes solo la primera estaba conectada,\n// por eso las compras de clientes nuevos nunca quedaban registradas en puntos_log.\nlet bc = {};\ntry { bc = $('Buscar contacto').first().json.contacts[0] || {}; } catch (e) { bc = {}; }\nif (!bc || !bc.id) {\n  try {\n    const r = $('HTTP Request').first().json || {};\n    const c = r.contact || r;\n    if (c && c.id) bc = { id:c.id, firstName:c.firstName||'', lastName:c.lastName||'', phone:c.phone||'' };\n  } catch (e) { /* venimos de la rama de contacto existente */ }\n}\n\nconst invoice = $('Code in JavaScript1').first().json;\n\n// Factura del ciclo actual (antes: results[0] = siempre la primera del lote)\nlet fv='', fdate='';\ntry { const f=$('Loop Over Items').item.json; fv=f.name||''; fdate=String(f.date||'').slice(0,10); } catch(e){}\nif(!fv){ try{ const f=$('Factura').first().json.results[0]; fv=f.name||''; fdate=String(f.date||'').slice(0,10); }catch(e){} }\n\nconst puntos  = Number(invoice.puntosGanados)||0;\nconst siigoId = String(invoice.identification||'').trim();\nif(BLOCKED_IDS.has(siigoId)) return [];\n\n// Nombre/telefono: si el contacto recien creado no los trae, se usan los de Siigo\nlet nombre = ((bc.firstName||'')+' '+(bc.lastName||'')).trim();\nlet tel = bc.phone||'';\ntry {\n  const cli = $('Cliente').first().json || {};\n  if(!nombre){ const n=cli.name; nombre = Array.isArray(n)? n.join(' ') : String(n||''); }\n  if(!tel){ tel = ((cli.phones||[])[0]||{}).number || ''; }\n} catch(e){}\n\nconst now=new Date();\nreturn [{ json: {\n  ext_id: Date.now().toString(36)+Math.random().toString(36).slice(2),\n  timestamp: (fdate? fdate+'T12:00:00Z' : now.toISOString()),\n  fecha: (fdate||now.toISOString().split('T')[0]),\n  tipo:'suma_puntos',\n  contact_id: bc.id||'',\n  contact_name: nombre,\n  phone: tel,\n  points: puntos,\n  source:'siigo',\n  invoice_id: fv||null,\n  siigo_id: siigoId||null\n} }];"
     },
     "id": "mq0p3aljjh4ky7",
     "name": "Log: Preparar Entrada",
@@ -1631,6 +1636,11 @@
      [
       {
        "node": "Merge1",
+       "type": "main",
+       "index": 0
+      },
+      {
+       "node": "Log: Preparar Entrada",
        "type": "main",
        "index": 0
       }
@@ -1837,34 +1847,34 @@
   "autosaved": false,
   "workflowPublishHistory": [
    {
-    "createdAt": "2026-07-22T15:56:55.420Z",
-    "id": 1084,
+    "createdAt": "2026-07-22T20:14:43.785Z",
+    "id": 1093,
     "workflowId": "b3NqLczq5MzJ3dmb",
-    "versionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
+    "versionId": "ed9d9b26-e4fc-4826-8897-3009cdd5e757",
     "event": "activated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    },
    {
-    "createdAt": "2026-07-22T15:56:56.687Z",
-    "id": 1086,
+    "createdAt": "2026-07-22T20:14:44.315Z",
+    "id": 1095,
     "workflowId": "b3NqLczq5MzJ3dmb",
-    "versionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
+    "versionId": "ed9d9b26-e4fc-4826-8897-3009cdd5e757",
     "event": "activated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    },
    {
-    "createdAt": "2026-07-22T15:56:55.306Z",
-    "id": 1083,
+    "createdAt": "2026-07-22T20:14:43.753Z",
+    "id": 1092,
     "workflowId": "b3NqLczq5MzJ3dmb",
-    "versionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
+    "versionId": "ed9d9b26-e4fc-4826-8897-3009cdd5e757",
     "event": "deactivated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    },
    {
-    "createdAt": "2026-07-22T15:56:55.815Z",
-    "id": 1085,
+    "createdAt": "2026-07-22T20:14:44.271Z",
+    "id": 1094,
     "workflowId": "b3NqLczq5MzJ3dmb",
-    "versionId": "f8d7dcd5-557d-4de2-8466-fa9bc1cde527",
+    "versionId": "ed9d9b26-e4fc-4826-8897-3009cdd5e757",
     "event": "deactivated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    }
