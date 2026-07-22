@@ -840,7 +840,8 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         <div class="table-section">
             <div class="table-header"><h2>💳 Aging por Cliente</h2>
                 <div class="table-controls">
-                    <div class="search-wrap"><input type="text" id="searchCartera" placeholder="Buscar empresa, NIT..." oninput="_renderCarteraTable()"></div>
+                    <button class="btn-filter secondary" id="btnCarteraPlegar" onclick="toggleCarteraTabla()">▴ Ocultar clientes</button>
+                    <div class="search-wrap" id="wrapBuscarCartera"><input type="text" id="searchCartera" placeholder="Buscar empresa, NIT..." oninput="_renderCarteraTable()"></div>
                     <span class="table-count" id="countCartera">0 clientes</span>
                 </div>
             </div>
@@ -2665,6 +2666,30 @@ function sortB2BClientes(col){ b2bClientesSort.dir=b2bClientesSort.col===col?(b2
 const CARTERA_URL = 'https://app.rioagencymarketing.com/webhook/get-cartera';
 let carteraData = [];
 let carteraResumen = null;   // totales exactos del backend (para el pie de tabla)
+
+// La tabla de cartera se puede plegar para dejar solo los plazos y sus totales
+// (encabezado + fila "Total general"), sin el detalle por cliente. Se recuerda.
+let carteraPlegada = localStorage.getItem('chuculat.carteraPlegada') === '1';
+function aplicarCarteraPlegada() {
+    const tb  = document.getElementById('bodyCartera');
+    const btn = document.getElementById('btnCarteraPlegar');
+    const bus = document.getElementById('wrapBuscarCartera');
+    if (!tb || !btn) return;
+    tb.style.display  = carteraPlegada ? 'none' : '';
+    btn.textContent   = carteraPlegada ? '▾ Ver clientes' : '▴ Ocultar clientes';
+    // Con las filas ocultas, buscar no tiene sentido y ademas dejaria el pie
+    // mostrando un total filtrado sin que se vea por que.
+    if (bus) bus.style.display = carteraPlegada ? 'none' : '';
+}
+function toggleCarteraTabla() {
+    carteraPlegada = !carteraPlegada;
+    localStorage.setItem('chuculat.carteraPlegada', carteraPlegada ? '1' : '0');
+    if (carteraPlegada) {
+        const q = document.getElementById('searchCartera');
+        if (q && q.value) { q.value = ''; _renderCarteraTable(); return; }  // totales completos
+    }
+    aplicarCarteraPlegada();
+}
 async function renderCartera() {
     let d = null;
     try {
@@ -2748,6 +2773,7 @@ function _renderCarteraTable() {
         <td class="td-pts azul">${c.saldoFavor > 0 ? fmtCOP(c.saldoFavor) : '<span style="color:var(--gris)">—</span>'}</td>
         <td style="text-align:center">${c.facturas}</td>
     </tr>`).join('');
+    aplicarCarteraPlegada();   // se re-aplica: el innerHTML de arriba pisa el display
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────────────────────
