@@ -167,6 +167,12 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 
 ## PENDIENTE
 
+0. **🔴 [Johan] ROTAR CREDENCIALES — hay secretos en el historial de git.** El commit **`cc6d57c`** (22-jul-2026) subió `backend/code/auditar_puntos.py` **sin sanitizar**, con el **`access_key` de Siigo** y el **`service_role` de Supabase** en texto plano. Se sanitizó en `67bf10b` (HEAD limpio) pero **siguen en el historial de un repo PÚBLICO**. Johan decidió posponerlo.
+   - **Rotar Siigo `access_key`** y actualizarla en: puntos (`b3NqLczq5MzJ3dmb`), Dashboard Ventas (`Ya8z4KTp9nTu4oOW`), Cartera (`1OioSrAEK6Loun2n`), Confirmar cita (`VQKbig1zk65gk3G5`), Woocommerce (`T5vFnAkNZKPmuzv9`), Reconciliar (`Pq20DQX58YMzdls2`), Cierre Mensual (`W7ELd8Y2IGy8SAst`).
+   - **Rotar Supabase `service_role`** y actualizarlo en todos los que escriben a Supabase.
+   - Opcional (secundario): reescribir el historial + force-push. Reduce pero no elimina la exposición.
+   - **Causa del error:** la auditoría de secretos se corría en la misma línea del `git commit`, así que imprimía el resultado *después* de haber commiteado. **Debe correr y BLOQUEAR antes.** Y los scripts `.py`/`.js` que se copian al repo hay que sanitizarlos igual que los exports de workflows.
+
 1. **[Johan] Pegar `frontend/redencion.html` en GHL** y hacer **una redención de prueba con pocos puntos**: es el único eslabón sin ejercitar (no lo probé porque descontaría puntos reales). Verificar que `items` llegue a `puntos_log`.
 2. **[Johan] Confirmar tabletas 30g** (366/368): ¿$15.000/105 pts como las cargué, o $24.000/168 como decía el PDF?
 3. **[Johan] SKU a los combos en WooCommerce** (product_id **4120** "Combo para la casa" y **4118** "Combo Amateur"): ya existen en Siigo (730/731/732) pero Woo manda `sku:""` → **cada venta con combo seguirá fallando**. No son bundles (`meta_data:[]`), son productos simples.
