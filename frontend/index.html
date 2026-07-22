@@ -829,13 +829,12 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
     <!-- Cartera B2B -->
     <section class="dash-section" id="sec-b2b-cartera">
         <div class="section-title">📋 Cartera · Cuentas por Cobrar <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· saldo real CON IVA</small></div>
-        <p class="section-note">💰 A diferencia del resto del panel, aquí los montos son la <strong>deuda real con IVA</strong> (lo que efectivamente hay que cobrar), y se incluyen <strong>todas las facturas abiertas sin importar la fecha</strong> — igual que el reporte de Siigo. <span id="carteraActualizado" style="color:var(--gris)"></span></p>
         <div class="aging-grid">
             <div class="aging-card a-total"><div class="aging-label">Total Cartera</div><div class="aging-value" id="agingTotal">—</div><div class="aging-pct">Pendiente total</div></div>
-            <div class="aging-card a-180"><div class="aging-label">&gt;180 días</div><div class="aging-value" id="aging180">—</div><div class="aging-pct" id="aging180Pct">—</div></div>
-            <div class="aging-card a-180"><div class="aging-label">&gt;120 días</div><div class="aging-value" id="aging120">—</div><div class="aging-pct" id="aging120Pct">—</div></div>
-            <div class="aging-card a-90"><div class="aging-label">&gt;90 días</div><div class="aging-value" id="aging90">—</div><div class="aging-pct" id="aging90Pct">—</div></div>
             <div class="aging-card a-31"><div class="aging-label">&gt;31 días</div><div class="aging-value" id="aging31">—</div><div class="aging-pct" id="aging31Pct">—</div></div>
+            <div class="aging-card a-90"><div class="aging-label">&gt;90 días</div><div class="aging-value" id="aging90">—</div><div class="aging-pct" id="aging90Pct">—</div></div>
+            <div class="aging-card a-180"><div class="aging-label">&gt;120 días</div><div class="aging-value" id="aging120">—</div><div class="aging-pct" id="aging120Pct">—</div></div>
+            <div class="aging-card a-180"><div class="aging-label">&gt;180 días</div><div class="aging-value" id="aging180">—</div><div class="aging-pct" id="aging180Pct">—</div></div>
             <div class="aging-card a-pv"><div class="aging-label">Por Vencer</div><div class="aging-value" id="agingPV">—</div><div class="aging-pct" id="agingPVPct">—</div></div>
         </div>
         <div class="table-section">
@@ -848,10 +847,10 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             <div class="table-wrap">
                 <table><thead><tr>
                     <th>Cliente</th><th>NIT</th><th>Deuda Total</th>
-                    <th style="color:#b71c1c">&gt;180d</th>
-                    <th style="color:#c0392b">&gt;120d</th>
-                    <th style="color:var(--naranja)">&gt;90d</th>
                     <th style="color:#f9a825">&gt;31d</th>
+                    <th style="color:var(--naranja)">&gt;90d</th>
+                    <th style="color:#c0392b">&gt;120d</th>
+                    <th style="color:#b71c1c">&gt;180d</th>
                     <th style="color:var(--verde)">Por Vencer</th>
                     <th style="color:var(--azul)">Saldo a favor</th>
                     <th>Facturas</th>
@@ -2728,10 +2727,10 @@ function _renderCarteraTable() {
             <td class="td-name"><strong>Total general</strong></td>
             <td style="font-size:12px;color:var(--gris)">${rows.length} cliente${rows.length===1?'':'s'}</td>
             <td class="td-pts azul"><strong>${fmtCOP(t('deudaTotal'))}</strong></td>
-            <td class="td-pts" style="color:#b71c1c">${fmtCOP(t('masde180'))}</td>
-            <td class="td-pts" style="color:#c0392b">${fmtCOP(t('masde120'))}</td>
-            <td class="td-pts" style="color:var(--naranja)">${fmtCOP(t('masde90'))}</td>
             <td class="td-pts" style="color:#f9a825">${fmtCOP(t('masde31'))}</td>
+            <td class="td-pts" style="color:var(--naranja)">${fmtCOP(t('masde90'))}</td>
+            <td class="td-pts" style="color:#c0392b">${fmtCOP(t('masde120'))}</td>
+            <td class="td-pts" style="color:#b71c1c">${fmtCOP(t('masde180'))}</td>
             <td class="td-pts verde">${fmtCOP(t('porVencer'))}</td>
             <td class="td-pts azul">${fmtCOP(t('saldoFavor'))}</td>
             <td style="text-align:center">${t('facturas')}</td>
@@ -2741,11 +2740,12 @@ function _renderCarteraTable() {
         <td class="td-name">${esc(c.cliente)}</td>
         <td style="font-size:12px;color:var(--gris)">${esc(c.nit)}</td>
         <td class="td-pts azul">${fmtCOP(c.deudaTotal)}</td>
-        <td class="td-pts" style="color:#b71c1c">${c.masde180 > 0 ? fmtCOP(c.masde180) : '<span style="color:var(--gris)">—</span>'}</td>
-        <td class="td-pts" style="color:#c0392b">${c.masde120 > 0 ? fmtCOP(c.masde120) : '<span style="color:var(--gris)">—</span>'}</td>
-        <td class="td-pts" style="color:var(--naranja)">${c.masde90 > 0 ? fmtCOP(c.masde90) : '<span style="color:var(--gris)">—</span>'}</td>
         <td class="td-pts" style="color:#f9a825">${c.masde31 > 0 ? fmtCOP(c.masde31) : '<span style="color:var(--gris)">—</span>'}</td>
+        <td class="td-pts" style="color:var(--naranja)">${c.masde90 > 0 ? fmtCOP(c.masde90) : '<span style="color:var(--gris)">—</span>'}</td>
+        <td class="td-pts" style="color:#c0392b">${c.masde120 > 0 ? fmtCOP(c.masde120) : '<span style="color:var(--gris)">—</span>'}</td>
+        <td class="td-pts" style="color:#b71c1c">${c.masde180 > 0 ? fmtCOP(c.masde180) : '<span style="color:var(--gris)">—</span>'}</td>
         <td class="td-pts verde">${c.porVencer > 0 ? fmtCOP(c.porVencer) : '<span style="color:var(--gris)">—</span>'}</td>
+        <td class="td-pts azul">${c.saldoFavor > 0 ? fmtCOP(c.saldoFavor) : '<span style="color:var(--gris)">—</span>'}</td>
         <td style="text-align:center">${c.facturas}</td>
     </tr>`).join('');
 }
