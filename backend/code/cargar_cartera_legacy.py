@@ -64,8 +64,8 @@ for nit in sorted(set(list(siigo) + list(api))):
         'nit': nit,
         'cliente': siigo.get(nit, {}).get('cliente') or '(solo en la API)',
         'saldo_cop': dif,
-        # Todo lo legacy es anterior a jun-2025 => mas de 180 dias.
-        'bucket': 'saldo_favor' if dif < 0 else '>180',
+        # Todo lo legacy es anterior a jun-2025 => mas de 91 dias vencido.
+        'bucket': 'saldo_favor' if dif < 0 else 'v91',
         'fecha_corte': time.strftime('%Y-%m-%d'),
         'nota': 'Deuda anterior a jun-2025: la API de Siigo no expone facturas previas al 2025-06-03. Cargado desde la exportacion del reporte de cartera.'
     })
