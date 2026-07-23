@@ -858,6 +858,37 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                 </tr></thead><tbody id="bodyCartera"></tbody><tfoot id="footCartera"></tfoot></table>
             </div>
         </div>
+
+        <!-- Reporte detallado (réplica del reporte de Siigo, 13 rangos por vencimiento) -->
+        <div class="table-section" style="margin-top:22px">
+            <div class="table-header"><h2>📄 Reporte detallado · por rango de vencimiento</h2>
+                <div class="table-controls">
+                    <button class="btn-filter secondary" id="btnCarteraDetPlegar" onclick="toggleCarteraDetalle()">▾ Mostrar detalle</button>
+                    <div class="search-wrap" id="wrapBuscarCarteraDet" style="display:none"><input type="text" id="searchCarteraDet" placeholder="Buscar empresa, NIT..." oninput="_renderCarteraDetalleTable()"></div>
+                    <span class="table-count" id="countCarteraDet" style="display:none">0 clientes</span>
+                </div>
+            </div>
+            <p class="section-note" id="carteraDetNota" style="display:none">Réplica del reporte de Siigo "Cuentas por cobrar general por cliente". Saldo CON IVA. <strong>Vencido</strong> = pasado el plazo · <strong>Por vencer</strong> = aún dentro del plazo.</p>
+            <div class="table-wrap" id="wrapCarteraDet" style="display:none;overflow-x:auto">
+                <table id="tblCarteraDet"><thead><tr>
+                    <th>Cliente</th><th>NIT</th>
+                    <th>Saldo cartera</th><th style="color:var(--azul)">Anticipo</th>
+                    <th style="color:#7a0e0e">Venc. +361</th>
+                    <th style="color:#9a1414">181-360</th>
+                    <th style="color:#b71c1c">121-180</th>
+                    <th style="color:#c0392b">91-120</th>
+                    <th style="color:#d35400">61-90</th>
+                    <th style="color:var(--naranja)">31-60</th>
+                    <th style="color:#f9a825">1-30</th>
+                    <th style="color:var(--gris)">Hoy</th>
+                    <th style="color:#7cb342">PV 1-7</th>
+                    <th style="color:#62B22A">PV 8-15</th>
+                    <th style="color:#4A8A1F">PV 16-30</th>
+                    <th style="color:#356312">PV 31-60</th>
+                    <th style="color:#204008">PV +61</th>
+                </tr></thead><tbody id="bodyCarteraDet"></tbody><tfoot id="footCarteraDet"></tfoot></table>
+            </div>
+        </div>
     </section>
 
         </div>
@@ -2664,7 +2695,7 @@ function sortB2BClientes(col){ b2bClientesSort.dir=b2bClientesSort.col===col?(b2
 //   · barrer las ~10.6k facturas de Siigo toma minutos: no cabe en un request.
 // Base: saldo REAL con IVA, en COP (el resto del panel va sin IVA).
 const CARTERA_URL = 'https://app.rioagencymarketing.com/webhook/get-cartera';
-let carteraData = [];
+let carteraData = [], carteraFacturas = [], carteraLegacy = [];
 let carteraResumen = null;   // totales exactos del backend (para el pie de tabla)
 
 // La tabla de cartera se puede plegar para dejar solo los plazos y sus totales
@@ -2701,6 +2732,8 @@ async function renderCartera() {
         return;
     }
     carteraData = d.porCliente || [];
+    carteraFacturas = d.facturas || [];
+    carteraLegacy = d.legacy || [];
     document.getElementById('navBadgeCartera').textContent = carteraData.length;
     const cr = d.resumen;
     carteraResumen = cr;
@@ -2732,6 +2765,94 @@ async function renderCartera() {
         act.textContent = txt;
     }
     _renderCarteraTable();
+    renderCarteraDetalle();
+}
+
+// ── REPORTE DETALLADO (13 rangos por vencimiento, réplica del reporte Siigo) ──
+// Rangos calculados desde `dias` (relativo al vencimiento): >0 = vencido, <0 = por
+// vencer, 0 = hoy. La legacy usa su bucket fino guardado en cartera_legacy.
+const CARTERA_DET_COLS = ['>361','181-360','121-180','91-120','61-90','31-60','1-30','0hoy','pv1-7','pv8-15','pv16-30','pv31-60','pv>61'];
+let carteraDetalle = [];
+function _bucketDias(dias){
+    const d = Math.round(Number(dias)||0);
+    if (d > 0){
+        if (d >= 361) return '>361';
+        if (d >= 181) return '181-360';
+        if (d >= 121) return '121-180';
+        if (d >= 91)  return '91-120';
+        if (d >= 61)  return '61-90';
+        if (d >= 31)  return '31-60';
+        return '1-30';
+    }
+    if (d === 0) return '0hoy';
+    const a = -d;
+    if (a <= 7)  return 'pv1-7';
+    if (a <= 15) return 'pv8-15';
+    if (a <= 30) return 'pv16-30';
+    if (a <= 60) return 'pv31-60';
+    return 'pv>61';
+}
+function renderCarteraDetalle(){
+    const byCli = {};
+    const slot = (nit, cli) => {
+        const k = String(nit || cli || '?');
+        if (!byCli[k]) { byCli[k] = { cliente: cli, nit: nit, saldo: 0, anticipo: 0 };
+            CARTERA_DET_COLS.forEach(b => byCli[k][b] = 0); }
+        return byCli[k];
+    };
+    // Facturas vivas → rango por dias
+    for (const f of carteraFacturas){
+        const c = slot(f.nit, f.cliente);
+        const v = Number(f.saldo_cop) || 0;
+        c.saldo += v;
+        if (v < 0) c.anticipo += v; else c[_bucketDias(f.dias)] += v;
+    }
+    // Legacy (pre-2025) → su bucket fino; saldo negativo = anticipo
+    for (const l of carteraLegacy){
+        const c = slot(l.nit, l.cliente);
+        const v = Number(l.saldo_cop) || 0;
+        c.saldo += v;
+        if (v < 0 || l.bucket === 'saldo_favor') c.anticipo += v;
+        else if (CARTERA_DET_COLS.includes(l.bucket)) c[l.bucket] += v;
+        else c['>361'] += v;   // fallback: legacy siempre es vieja
+    }
+    carteraDetalle = Object.values(byCli).sort((a,b) => b.saldo - a.saldo);
+    _renderCarteraDetalleTable();
+}
+function _renderCarteraDetalleTable(){
+    const q = (document.getElementById('searchCarteraDet').value||'').toLowerCase().trim();
+    const rows = carteraDetalle.filter(c => !q || (String(c.cliente)+' '+String(c.nit)).toLowerCase().includes(q));
+    document.getElementById('countCarteraDet').textContent = rows.length + ' clientes';
+    const tbody = document.getElementById('bodyCarteraDet');
+    const foot  = document.getElementById('footCarteraDet');
+    const cell = v => v ? fmtCOP(v) : '<span style="color:var(--beige)">—</span>';
+    if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="17">Sin cartera</td></tr>'; if(foot) foot.innerHTML=''; return; }
+    tbody.innerHTML = rows.map(c => `<tr>
+        <td class="td-name">${esc(c.cliente)}</td>
+        <td style="font-size:11px;color:var(--gris)">${esc(c.nit)}</td>
+        <td class="td-pts azul"><strong>${fmtCOP(c.saldo)}</strong></td>
+        <td class="td-pts" style="color:var(--azul)">${c.anticipo ? fmtCOP(c.anticipo) : '<span style="color:var(--beige)">—</span>'}</td>
+        ${CARTERA_DET_COLS.map(b => `<td class="td-pts">${cell(c[b])}</td>`).join('')}
+    </tr>`).join('');
+    if (foot){
+        const t = k => rows.reduce((s,c)=>s+(c[k]||0),0);
+        foot.innerHTML = `<tr style="border-top:2px solid var(--beige);font-weight:800;background:var(--crema)">
+            <td class="td-name"><strong>Total general</strong></td>
+            <td style="font-size:11px;color:var(--gris)">${rows.length}</td>
+            <td class="td-pts azul"><strong>${fmtCOP(t('saldo'))}</strong></td>
+            <td class="td-pts" style="color:var(--azul)">${t('anticipo')?fmtCOP(t('anticipo')):'—'}</td>
+            ${CARTERA_DET_COLS.map(b => `<td class="td-pts">${t(b)?fmtCOP(t(b)):'—'}</td>`).join('')}
+        </tr>`;
+    }
+}
+function toggleCarteraDetalle(){
+    const wrap = document.getElementById('wrapCarteraDet');
+    const oculto = wrap.style.display === 'none';
+    wrap.style.display = oculto ? 'block' : 'none';
+    document.getElementById('wrapBuscarCarteraDet').style.display = oculto ? 'block' : 'none';
+    document.getElementById('countCarteraDet').style.display = oculto ? 'inline-block' : 'none';
+    document.getElementById('carteraDetNota').style.display = oculto ? 'block' : 'none';
+    document.getElementById('btnCarteraDetPlegar').textContent = oculto ? '▴ Ocultar detalle' : '▾ Mostrar detalle';
 }
 function _renderCarteraTable() {
     const q = document.getElementById('searchCartera').value.toLowerCase().trim();
