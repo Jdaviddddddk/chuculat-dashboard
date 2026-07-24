@@ -406,7 +406,6 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
     <nav class="topbar-nav nav-b2c show" id="navB2C">
         <a class="nav-item active" href="#sec-kpis"      onclick="b2cNav(this)"><span class="nav-icon">📊</span> KPIs</a>
         <a class="nav-item" href="#sec-recompras"        onclick="b2cNav(this)"><span class="nav-icon">🔁</span> Recompras <span class="nav-badge" id="navBadgeRecompras">0</span></a>
-        <a class="nav-item" href="#sec-clientes"         onclick="b2cNav(this)"><span class="nav-icon">👥</span> Clientes <span class="nav-badge" id="navBadgeClientes">0</span></a>
         <a class="nav-item" href="#sec-historial"        onclick="b2cNav(this)"><span class="nav-icon">📅</span> Actividad</a>
         <a class="nav-item" href="#sec-logs"             onclick="b2cNav(this)"><span class="nav-icon">🗒️</span> Log</a>
         <a class="nav-item" href="#sec-encuestas"        onclick="b2cNav(this)"><span class="nav-icon">📝</span> Encuestas <span class="nav-badge" id="navBadgeEncuestas">0</span></a>
@@ -498,47 +497,6 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
     </section>
 
     <!-- Todos los clientes -->
-    <section class="dash-section" id="sec-clientes">
-        <div class="section-title">📋 Todos los Clientes</div>
-        <div class="table-section">
-            <div class="table-header"><h2>👥 Base Completa</h2>
-                <div class="table-controls">
-                    <div class="search-wrap"><input type="text" id="tableSearch" placeholder="Nombre, cédula, teléfono..." oninput="resetPage(); renderTable()"></div>
-                    <select class="filter-select" id="filterTasa" onchange="resetPage(); renderTable()">
-                        <option value="">Todos</option>
-                        <option value="alta">Tasa alta (≥50%)</option>
-                        <option value="media">Tasa media (20–49%)</option>
-                        <option value="baja">Tasa baja (&lt;20%)</option>
-                        <option value="sin">Sin redenciones</option>
-                    </select>
-                    <select class="filter-select" id="pageSize" onchange="resetPage(); renderTable()">
-                        <option value="10">10/pág</option>
-                        <option value="20">20/pág</option>
-                        <option value="50" selected>50/pág</option>
-                        <option value="100">100/pág</option>
-                    </select>
-                    <span class="table-count" id="tableCount">0 clientes</span>
-                </div>
-            </div>
-            <div class="dash-loading" id="dashLoading"><div class="loading-spinner"></div><p>Cargando contactos...</p></div>
-            <div class="table-wrap" id="tableWrap" style="display:none">
-                <table><thead><tr>
-                    <th onclick="sortBy('fullName')"       data-col="fullName">      Nombre      <i class="si">⇅</i></th>
-                    <th onclick="sortBy('identification')" data-col="identification">Cédula/NIT  <i class="si">⇅</i></th>
-                    <th onclick="sortBy('phone')"          data-col="phone">         Teléfono    <i class="si">⇅</i></th>
-                    <th onclick="sortBy('historicPoints')" data-col="historicPoints">Otorgados   <i class="si">⇅</i></th>
-                    <th onclick="sortBy('redeemedPoints')" data-col="redeemedPoints">Redimidos   <i class="si">⇅</i></th>
-                    <th onclick="sortBy('totalPoints')"    data-col="totalPoints">   Saldo       <i class="si">⇅</i></th>
-                    <th onclick="sortBy('tasaNum')"        data-col="tasaNum">       Tasa        <i class="si">⇅</i></th>
-                </tr></thead><tbody id="tableBody"></tbody></table>
-            </div>
-            <div class="pagination" id="paginationBar" style="display:none">
-                <span class="pagination-info" id="paginationInfo"></span>
-                <div class="pagination-controls" id="paginationControls"></div>
-            </div>
-        </div>
-    </section>
-
     <!-- Historial -->
     <section class="dash-section" id="sec-historial">
         <div class="section-title">📅 Actividad por Período</div>
@@ -674,7 +632,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             <div class="table-header"><h2>🎯 Cumplimiento del mes por centro</h2><span class="table-count" id="metaCCLabel">—</span></div>
             <div class="table-wrap">
                 <table><thead><tr>
-                    <th>Centro de costo</th><th>% Split</th><th>Meta del Mes</th><th>Real del Mes</th><th>Cumplimiento</th>
+                    <th>Centro de costo</th><th>% Split</th><th>Meta del Mes</th><th>Real del Mes</th><th>Comprobantes</th><th>Cumplimiento</th>
                 </tr></thead><tbody id="bodyMetaCanal"></tbody></table>
             </div>
         </div>
@@ -1156,7 +1114,7 @@ function b2bNav(el) {
 const obsB2C = new IntersectionObserver(entries => {
     entries.forEach(e => {
         if (!e.isIntersecting || currentSegment!=='b2c') return;
-        const map = {'sec-kpis':'#sec-kpis','sec-recompras':'#sec-recompras','sec-clientes':'#sec-clientes','sec-historial':'#sec-historial','sec-logs':'#sec-logs','sec-encuestas':'#sec-encuestas'};
+        const map = {'sec-kpis':'#sec-kpis','sec-recompras':'#sec-recompras','sec-historial':'#sec-historial','sec-logs':'#sec-logs','sec-encuestas':'#sec-encuestas'};
         document.querySelectorAll('#navB2C .nav-item').forEach(i=>i.classList.toggle('active',i.getAttribute('href')===map[e.target.id]));
     });
 }, { threshold: 0.3 });
@@ -1171,22 +1129,14 @@ let sortColR='compras', sortDirR='desc';
 let currentPage=1;
 
 async function loadData() {
+    // La tabla "Base Completa" se quito (Johan no la necesita) y el endpoint
+    // get-all-contacts ahora es de busqueda (?q=), no de descarga masiva. Aqui
+    // solo se traen los stats para los KPIs de arriba (get-stats).
     try {
-        const [cr, sr] = await Promise.all([fetch(CONTACTS_URL), fetch(STATS_URL)]);
-        const contactsData = await cr.json();
-        statsGlobal = await sr.json();
-        const statsMap={};
-        for (const s of (statsGlobal.contacts||[])) statsMap[s.id]=s;
-        allContacts = (contactsData.contacts||[])
-            .filter(c=>{ const id=String(c.identification||'').trim(); return !BLOCKED_IDS.has(id) && !!c.phone && !isB2BContact(c); })
-            .map(c=>{ const ex=statsMap[c.id]||{}; const h=parseInt(ex.historicPoints||0); const r=parseInt(ex.redeemedPoints||0);
-                return {...c, totalPoints:parseInt(c.totalPoints||0), historicPoints:h, redeemedPoints:r, tasaNum:h>0?Math.round(r/h*100):0, updatedAt:tsToDate(c.dateUpdated||c.dateAdded||'')}; });
-        document.getElementById('navBadgeClientes').textContent=allContacts.length;
-        document.getElementById('dashLoading').style.display='none';
-        document.getElementById('tableWrap').style.display='block';
-        renderKPIsFromStats(); renderTable();
+        statsGlobal = await (await fetch(STATS_URL)).json();
+        renderKPIsFromStats();
     } catch(err) {
-        document.getElementById('dashLoading').innerHTML='<p style="color:#D32F2F;padding:30px;">❌ Error cargando datos.</p>';
+        console.error('stats', err);
     }
 }
 
@@ -1682,6 +1632,7 @@ function renderB2BFiltered(){
     renderB2BCategorias();
     renderB2BTop10();
     renderExportClientes(((ventasData.exportacion)||{}).clientes || []);
+    renderB2BClientes();
 }
 
 // ── GRUPOS DE SECCIONES (panel Ventas) ───────────────────────────────────
@@ -1707,7 +1658,7 @@ function initVentasGroups(){
 const FILTER_TAGS = {
     'sec-b2b-resumen':'green', 'sec-b2b-cats':'green', 'sec-b2b-top10':'green',
     'sec-b2b-progreso':'red', 'sec-b2b-metacc':'red', 'sec-b2b-meta':'red', 'sec-b2b-mensual':'red',
-    'sec-b2b-export':'red', 'sec-b2b-cartera':'red', 'sec-b2b-clientes':'red'
+    'sec-b2b-export':'red', 'sec-b2b-cartera':'red', 'sec-b2b-clientes':'green'
 };
 function applyFilterTags(){
     const put = (sec, tipo) => {
@@ -2106,7 +2057,7 @@ function renderMeta() {
     const VD = ventasFull || ventasData;
     const year = (VD.meta.dateStart || '').slice(0,4) || String(new Date().getFullYear());
     // Real por mes (subtotal) desde meses[], total y desglosado por centro
-    const realMes = {}, realMesCC = { b2c:{}, b2b:{}, export:{} };
+    const realMes = {}, realMesCC = { b2c:{}, b2b:{}, export:{} }, realMesCCFac = { b2c:{}, b2b:{}, export:{} };
     for (const m of (VD.meses || [])) {
         const [y, mo] = m.mes.split('-');
         if (y !== year) continue;
@@ -2115,6 +2066,9 @@ function renderMeta() {
         realMesCC.b2c[mi]    = m.b2c || 0;
         realMesCC.b2b[mi]    = m.b2b || 0;
         realMesCC.export[mi] = m.export || 0;
+        realMesCCFac.b2c[mi]    = m.b2c_fac || 0;
+        realMesCCFac.b2b[mi]    = m.b2b_fac || 0;
+        realMesCCFac.export[mi] = m.export_fac || 0;
     }
     // Mes actual (si el año consultado es el año en curso; si es pasado, todos cerrados)
     const now = new Date();
@@ -2199,11 +2153,12 @@ function renderMeta() {
     const mesNombre = mRow ? MESES[mRow.m-1] : '—';
     const lblCC = document.getElementById('metaCCLabel');
     if (lblCC) lblCC.textContent = mesNombre + ' ' + year;
-    let totMetaCC = 0, totRealCC = 0;
+    let totMetaCC = 0, totRealCC = 0, totFacCC = 0;
     document.getElementById('bodyMetaCanal').innerHTML = Object.keys(CC_SPLIT).map(k=>{
         const metaCC = CC_SPLIT[k]*metaMesVal;
         const real = mRow ? (realMesCC[ccKeyReal[k]][mRow.m]||0) : 0;
-        totMetaCC += metaCC; totRealCC += real;
+        const fac  = mRow ? (realMesCCFac[ccKeyReal[k]][mRow.m]||0) : 0;
+        totMetaCC += metaCC; totRealCC += real; totFacCC += fac;
         const pct = metaCC>0 ? Math.round(real/metaCC*100) : 0;
         const barW = Math.min(pct,100);
         return `<tr>
@@ -2211,6 +2166,7 @@ function renderMeta() {
             <td>${Math.round(CC_SPLIT[k]*100)}%</td>
             <td style="color:var(--gris)">${fmtCOP(Math.round(metaCC))}</td>
             <td class="td-pts verde">${fmtCOP(real)}</td>
+            <td style="text-align:center;font-weight:700">${fmt(fac)}</td>
             <td style="min-width:130px"><div style="display:flex;align-items:center;gap:8px">
                 <div style="flex:1;background:var(--beige);border-radius:50px;height:14px;overflow:hidden"><div style="height:100%;width:${barW}%;background:${ccColors[k]};border-radius:50px"></div></div>
                 <span style="font-weight:700;font-size:12px;color:${ccColors[k]}">${pct}%</span>
@@ -2226,6 +2182,7 @@ function renderMeta() {
             <td><strong>100%</strong></td>
             <td style="color:var(--chocolate)"><strong>${fmtCOP(Math.round(totMetaCC))}</strong></td>
             <td class="td-pts verde"><strong>${fmtCOP(totRealCC)}</strong></td>
+            <td style="text-align:center"><strong>${fmt(totFacCC)}</strong></td>
             <td style="min-width:130px"><div style="display:flex;align-items:center;gap:8px">
                 <div style="flex:1;background:var(--beige);border-radius:50px;height:14px;overflow:hidden"><div style="height:100%;width:${barT}%;background:${colT};border-radius:50px"></div></div>
                 <span style="font-weight:800;font-size:12px;color:${colT}">${pctT}%</span>
@@ -2663,8 +2620,8 @@ function renderExportClientes(clis){
 
 let b2bClientesData = [];
 function renderB2BClientes() {
-    // Clientes B2B NO se filtra por fechas: siempre el histórico (año en curso).
-    b2bClientesData = (ventasFull || ventasData).clientesB2B || [];
+    // Clientes B2B SÍ responde al filtro de fechas (usa ventasData del rango).
+    b2bClientesData = (ventasData || ventasFull).clientesB2B || [];
     _renderB2BClientesTable();
 }
 function _renderB2BClientesTable() {
