@@ -1,5 +1,5 @@
 # Handoff — Chuculat (fidelización + ventas + Supabase)
-_Para continuar en otro chat. Actualizado: 2026-07-21 (sesiones 3–7)._
+_Para continuar en otro chat. Actualizado: 2026-07-24 (sesiones 3–8)._
 
 ## Contexto rápido
 Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymarketing.com`, header API `X-N8N-API-KEY`).
@@ -31,6 +31,7 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 | `GriVDvrNIY6RGDx1` | **Get Premios** (`get-premios`) | catálogo de premios desde Supabase |
 | `GKelHhGiTUYu1QzD` | Get Logs (`get-logs`) | lee `puntos_log`; el nodo `Mapear` mapea campo a campo |
 | `KebzbxEJltA9a86w` | Stats (`get-stats`) | redimidos = campo GHL `jyDAuEv0t1ugBAop1HAQ` |
+| `ZPNPaLUolL3M782e` | **Buscar Clientes** (`get-all-contacts`) | ahora BUSCA por `?q=<cédula\|tel>` (POST /contacts/search), NO descarga todos. Lo usa el sitio de redención |
 | `O1NgZF4VXxdRjSeo` | Enriquecimiento Siigo→GHL (cada 1h) | tags `cat:`/`prod:` + campos de compras + notas 🛒 por cliente B2C |
 | `T5vFnAkNZKPmuzv9` | Woocommerce-Siigo | idempotente; timbra DIAN; enlazado al Error Handler |
 | `VQKbig1zk65gk3G5` | Confirmar cita (`payment-confirmation`) | experiencias vía ePayco; `/contacts/upsert`; timbra DIAN |
@@ -165,6 +166,29 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 
 ---
 
+## HECHO en la sesión 8 (22–24 jul-2026 — commits `fd7ef51`..`ec0b959`)
+
+### Puntos
+- **Fallos de `Auth` con reintento** (`fd7ef51`): el nodo `Auth` del workflow de puntos no tenia `retryOnFail` y moria con hipos de Siigo. Se le puso (4×4s) y a `Factura` se subio a 5×5s. Inofensivos: mueren antes de marcar la factura como procesada.
+- **Rama de CLIENTE NUEVO no registraba en el log** (`02c059a`): las 16+ facturas que aparecian "sin puntos" SI tenian los puntos en GHL; lo que faltaba era el registro en `puntos_log`. El `If` bifurca y solo la rama de contacto existente estaba conectada al log; ademas el POST de creacion mandaba el historico hardcodeado en `"0"`. Se conecto `HTTP Request → Log: Preparar Entrada`, se corrigio el historico y se reescribio el nodo de log para resolver el contacto desde cualquiera de las dos ramas. Auditoria: **264 elegibles / 264 logueadas**. Script: `backend/code/auditar_puntos.py`.
+- **Recuperados** a mano: Beatriz Espinosa (163) y Jhon Faber Vidales (92) — los unicos 2 (de 16) que NO tenian los puntos. Los otros 14 solo les faltaba el log (sumarlos habria duplicado saldos → **por eso se SIMULA siempre antes de acreditar**).
+
+### WooCommerce
+- **Revertido el warehouse en la linea de Domicilio** (`c15469f`): el codigo 672 tiene `stock_control=False` y Siigo rechazaba la factura entera (`product_settings`). Rompio TODAS las ventas con envio del 22 al 24-jul. Los productos SI llevan bodega; el domicilio NO.
+- **Fuente de la venta → observaciones de Siigo** (`00ceda0`): la atribucion de WooCommerce (`_wc_order_attribution_*`) se pone en `observations` de la factura como `"Fuente: Instagram (pago)"` / `"Directo"` / etc. NO se puede mandar a los extra de ePayco (el pago ya ocurrio cuando llega el webhook). OJO: `utm_source` viene `(direct)` en ventas directas (placeholder, se ignora).
+- **Pedidos 4194 y 4195**: quedaron sin factura por el bug del domicilio, pero AMBOS habian retrocedido de `completed` a `processing` en WooCommerce, asi que no se deben facturar aun (Johan: solo tras enviar). El 4195 estaba marcado en `woo_processed_orders.json` (condicion de carrera) → se libero a mano para que se facture cuando se complete de verdad.
+
+### Sitio de redencion + dashboard B2C
+- **`get-all-contacts` paso de descarga masiva a BUSQUEDA** (`2a57efc`): descargar los ~3.000 contactos ya no cabia (GHL corta la paginacion sostenida con 400; el gateway corta a 120s → 504). Ahora recibe `?q=<cedula|telefono>` y hace `POST /contacts/search` (~0,5s). **La pagina de redencion (`redencion-carrito.html`, local, NO va al repo) se actualizo** para consultar por `?q=` en vez de precargar. **[Johan]: pegar el HTML actualizado en GHL.**
+- **Se quito la tabla "Base Completa"** del panel B2C (`ec0b959`): Johan no la necesita, y ademas dependia del `get-all-contacts` viejo. `loadData` solo trae `get-stats` para los KPIs.
+
+### Dashboard Ventas
+- **Comprobantes por centro** (`ec0b959`): Compute Stats emite `b2b_fac`/`b2c_fac`/`export_fac` por mes; la tabla "Meta por centro del mes" tiene columna Comprobantes + total.
+- **Clientes B2B pasa de Consolidada a Por fechas** (`ec0b959`): responde al filtro flotante.
+- **Cartera 1-30 NO era bug**: cuadra al peso con Siigo (por `due_date`); la diferencia que veia Johan era vs un Excel de 2 dias antes (aging).
+
+---
+
 ## PENDIENTE
 
 0. **🔴 [Johan] ROTAR CREDENCIALES — hay secretos en el historial de git.** El commit **`cc6d57c`** (22-jul-2026) subió `backend/code/auditar_puntos.py` **sin sanitizar**, con el **`access_key` de Siigo** y el **`service_role` de Supabase** en texto plano. Se sanitizó en `67bf10b` (HEAD limpio) pero **siguen en el historial de un repo PÚBLICO**. Johan decidió posponerlo.
@@ -173,7 +197,7 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
    - Opcional (secundario): reescribir el historial + force-push. Reduce pero no elimina la exposición.
    - **Causa del error:** la auditoría de secretos se corría en la misma línea del `git commit`, así que imprimía el resultado *después* de haber commiteado. **Debe correr y BLOQUEAR antes.** Y los scripts `.py`/`.js` que se copian al repo hay que sanitizarlos igual que los exports de workflows.
 
-1. **[Johan] Pegar `frontend/redencion.html` en GHL** y hacer **una redención de prueba con pocos puntos**: es el único eslabón sin ejercitar (no lo probé porque descontaría puntos reales). Verificar que `items` llegue a `puntos_log`.
+1. **[Johan] Pegar la versión ACTUALIZADA de `redencion-carrito.html` en GHL** (local, NO va al repo). Se cambio el 24-jul para buscar por `?q=<cedula|telefono>` en vez de precargar los 3.000 contactos (que ya no cabia). Probado en local: login OK, busca y encuentra, carrito recalcula. Falta pegarlo en GHL y hacer **una redención de prueba con pocos puntos** (verificar que `items` llegue a `puntos_log`).
 2. **[Johan] Confirmar tabletas 30g** (366/368): ¿$15.000/105 pts como las cargué, o $24.000/168 como decía el PDF?
 3. **[Johan] SKU a los combos en WooCommerce** (product_id **4120** "Combo para la casa" y **4118** "Combo Amateur"): ya existen en Siigo (730/731/732) pero Woo manda `sku:""` → **cada venta con combo seguirá fallando**. No son bundles (`meta_data:[]`), son productos simples.
 4. **[Johan] Timbrar a mano las facturas en `Draft`** (Siigo rechaza timbrarlas por API: `invalid_date` por la fecha retroactiva). Al 21-jul quedan **3** (las de julio ya las timbró Johan) — **$155.999**:
@@ -187,8 +211,8 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 5. Barrer `puntos_log` completo contra `ventas_invoices` por si hay más casos tipo Tejada (puntos de facturas que no son cc=168).
 6. (Opcional) `Get FV2` del dashboard baja TODAS las FV-2 en cada llamada y **oscila entre 2,5s y 17,6s** (API de Siigo) — es el mayor cuello de botella restante. Cachearlo requiere cuidado (ver abajo).
 7. **Buscar más ventas de experiencias sin facturar.** Como "Wonka por un Día" y "Un Día como Oompa Loompa" **nunca** pudieron facturarse (skuMap corrupto), es probable que haya ventas viejas sin factura. n8n ya purgó esas ejecuciones → hay que **cruzar los pagos aprobados de ePayco contra las facturas de Siigo**. Solo se recuperó la de Mariana (FV-2-1193), que estaba en las ejecuciones vivas.
-8. **`ventas_items` es un backfill de una sola vez** — ningún workflow lo alimenta, así que las Tablas Dinámicas no incluyen ventas posteriores al último backfill. O se re-corre `flatten_items.py` + `backfill_items.py` periódicamente, o se arma un workflow que lo mantenga (pendiente de decidir).
-9. **Cartera: Siigo NO devuelve `due_date`** (0 de 43 facturas) → el aging cuenta **días desde la fecha de factura**, no desde el vencimiento pactado. Si Chuculat maneja plazos 30/60 días, los buckets se ven más vencidos de lo real. Falta definir de dónde sacar el plazo.
+8. **🔴 Las Tablas Dinámicas (`ventas_items`) NO CUADRAN con el panel Ventas** (detectado 24-jul). Comparado 2026 mes a mes: mayo 145,5M (tabla) vs 108M (panel), jul 39,3M vs 57,6M, ene 41,5M vs 51,3M. **Dos causas:** (a) `ventas_items` es un **backfill de una sola vez** (17-jul) que ningún workflow alimenta → le faltan las ventas nuevas; (b) se aplanó de `ventas_hist_full.json` con `flatten_items.py`, que **NO netea notas crédito** ni usa el mismo snapshot que `ventas_invoices.raw` (fuente del panel). **Fix (pendiente de decidir con Johan):** rehacer `flatten_items.py` para leer de `ventas_invoices.raw` restando NCs (igual que Compute Stats), re-`backfill_items.py`, y montar un refresco periódico.
+9. **✅ Cartera aging RESUELTO** (24-jul): la fecha de vencimiento SÍ la da Siigo, anidada en **`payments[].due_date`** (yo la había buscado como `inv.due_date` y por eso creí que no existía). El aging ahora cuenta días desde el vencimiento y cuadra al peso con Siigo por rango y por cliente.
 10. **Las 29 facturas FV-2 ya emitidas con ítems sin bodega no se pueden corregir** (timbradas y aceptadas por la DIAN). Si contabilidad las necesita corregidas: nota crédito + reemisión.
 11. **[Riesgo latente, decidido dejarlo así por ahora] El nodo `Factura` del workflow de puntos pide `page_size=1`** (`/v1/invoices?page=1&page_size=1`) → solo ve la factura **más reciente**. Con el volumen actual (~35 facturas/día contra una corrida por minuto) casi nunca colisiona, pero si entran 2+ en el mismo minuto, las que no sean la más nueva **no se vuelven a ver nunca** (Siigo devuelve en orden DESC).
     **Si algún día se sube, hay que hacer TRES cosas juntas o se rompe:**
