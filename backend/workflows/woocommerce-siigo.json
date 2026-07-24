@@ -1,5 +1,5 @@
 {
- "updatedAt": "2026-07-24T16:17:02.896Z",
+ "updatedAt": "2026-07-24T20:27:56.911Z",
  "createdAt": "2026-05-07T16:01:27.950Z",
  "id": "T5vFnAkNZKPmuzv9",
  "name": "CHUCULAT | Woocommerce - Siigo",
@@ -221,7 +221,7 @@
     },
     "sendBody": true,
     "specifyBody": "json",
-    "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
+    "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"observations\": \"Fuente: {{ $('Code in JavaScript').item.json.fuente }}\",\n  \"stamp\": { \"send\": true }\n}",
     "options": {}
    },
    "type": "n8n-nodes-base.httpRequest",
@@ -256,7 +256,7 @@
     },
     "sendBody": true,
     "specifyBody": "json",
-    "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('HTTP Request1').item.json.results[0].identification }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
+    "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('HTTP Request1').item.json.results[0].identification }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"observations\": \"Fuente: {{ $('Code in JavaScript').item.json.fuente }}\",\n  \"stamp\": { \"send\": true }\n}",
     "options": {}
    },
    "type": "n8n-nodes-base.httpRequest",
@@ -303,7 +303,7 @@
   },
   {
    "parameters": {
-    "jsCode": "// Obtiene el array meta_data\nconst metaData = $('Webhook').first().json.body.meta_data || [];\n\n// Busca el objeto cuya key sea \"identificacion\"\nconst identificacion = metaData.find(\n  item => item.key?.toLowerCase() === '_billing_identification'\n);\n\n// Devuelve solo el valor\nreturn [\n  {\n    json: {\n      identificacion: identificacion?.value || null\n    }\n  }\n];"
+    "jsCode": "// Datos del pedido de WooCommerce que necesita la factura de Siigo:\n//  - identificacion (cedula del cliente, de _billing_identification)\n//  - fuente de la venta (atribucion de pedido de WooCommerce) -> va en observaciones\nconst metaData = $('Webhook').first().json.body.meta_data || [];\nconst mget = (k) => {\n  const m = metaData.find(x => (x.key || '').toLowerCase() === k.toLowerCase());\n  return m ? String(m.value == null ? '' : m.value).trim() : '';\n};\n\nconst identificacion = mget('_billing_identification') || null;\n\n// --- FUENTE de la venta ---\n// utm_source viene con placeholders \"(direct)\"/\"(none)\" en ventas sin campana; se ignoran.\nlet utmSrc = mget('_wc_order_attribution_utm_source').toLowerCase();\nif (/^\\(.*\\)$/.test(utmSrc) || utmSrc === 'direct' || utmSrc === 'none' || utmSrc === 'not set') utmSrc = '';\nconst srcType  = mget('_wc_order_attribution_source_type').toLowerCase();\nconst medium   = mget('_wc_order_attribution_utm_medium').toLowerCase();\nconst referrer = mget('_wc_order_attribution_referrer');\nconst NOMBRE = {\n  ig:'Instagram', instagram:'Instagram', fb:'Facebook', facebook:'Facebook',\n  google:'Google', 'google ads':'Google Ads', tiktok:'TikTok', tt:'TikTok',\n  wa:'WhatsApp', whatsapp:'WhatsApp', email:'Email', mail:'Email', youtube:'YouTube', yt:'YouTube'\n};\nlet fuente;\nif (utmSrc) {\n  fuente = NOMBRE[utmSrc] || (utmSrc.charAt(0).toUpperCase() + utmSrc.slice(1));\n  if (medium === 'paid') fuente += ' (pago)';\n} else if (srcType === 'organic') {\n  fuente = 'Buscador organico';\n} else if (srcType === 'referral') {\n  let host = ''; try { host = new URL(referrer).hostname.replace(/^www\\./, ''); } catch (e) {}\n  fuente = host ? ('Referido (' + host + ')') : 'Referido';\n} else if (srcType === 'admin') {\n  fuente = 'Manual';\n} else if (srcType === 'mobile_app') {\n  fuente = 'App';\n} else {\n  fuente = 'Directo';   // typein, vacio o desconocido\n}\n\nreturn [{ json: { identificacion, fuente } }];"
    },
    "type": "n8n-nodes-base.code",
    "typeVersion": 2,
@@ -911,9 +911,9 @@
    }
   ]
  },
- "versionId": "9c704113-6f30-477e-901c-c73cec9c3a08",
- "activeVersionId": "9c704113-6f30-477e-901c-c73cec9c3a08",
- "versionCounter": 490,
+ "versionId": "46186ca5-a756-4855-9977-ac795d641648",
+ "activeVersionId": "46186ca5-a756-4855-9977-ac795d641648",
+ "versionCounter": 495,
  "triggerCount": 1,
  "shared": [
   {
@@ -943,9 +943,9 @@
   }
  ],
  "activeVersion": {
-  "updatedAt": "2026-07-24T16:17:02.899Z",
-  "createdAt": "2026-07-24T16:17:02.899Z",
-  "versionId": "9c704113-6f30-477e-901c-c73cec9c3a08",
+  "updatedAt": "2026-07-24T20:27:56.918Z",
+  "createdAt": "2026-07-24T20:27:56.918Z",
+  "versionId": "46186ca5-a756-4855-9977-ac795d641648",
   "workflowId": "T5vFnAkNZKPmuzv9",
   "nodes": [
    {
@@ -1162,7 +1162,7 @@
      },
      "sendBody": true,
      "specifyBody": "json",
-     "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
+     "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('Code in JavaScript').item.json.identificacion }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"observations\": \"Fuente: {{ $('Code in JavaScript').item.json.fuente }}\",\n  \"stamp\": { \"send\": true }\n}",
      "options": {}
     },
     "type": "n8n-nodes-base.httpRequest",
@@ -1197,7 +1197,7 @@
      },
      "sendBody": true,
      "specifyBody": "json",
-     "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('HTTP Request1').item.json.results[0].identification }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"stamp\": { \"send\": true }\n}",
+     "jsonBody": "={\n  \"document\": {\n    \"id\": 30537\n  },\n  \"date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n  \"customer\": {\n    \"identification\": \"{{ $('HTTP Request1').item.json.results[0].identification }}\"\n  },\n  \"seller\": 10857,\n  \"cost_center\": 168,\n  \"payments\": [\n    {\n      \"id\": 13848,\n      \"value\": {{ $('Webhook').item.json.body.total }}\n    }\n  ],\n  \"items\": {{ JSON.stringify(\n    ($('Webhook').item.json.body.line_items || []).map(item => ({\n      code: String(item.sku),\n      description: item.name,\n      quantity: Number(item.quantity),\n      price: Number(item.price),\n      warehouse: 30\n    })).concat(\n      ($('Webhook').item.json.body.shipping_lines || []).map(item => ({\n        code: \"672\",\n        description: \"Domicilio\",\n        quantity: 1,\n        price: Number(item.total)\n      }))\n    )\n  ) }}\n,\n\n  \"observations\": \"Fuente: {{ $('Code in JavaScript').item.json.fuente }}\",\n  \"stamp\": { \"send\": true }\n}",
      "options": {}
     },
     "type": "n8n-nodes-base.httpRequest",
@@ -1244,7 +1244,7 @@
    },
    {
     "parameters": {
-     "jsCode": "// Obtiene el array meta_data\nconst metaData = $('Webhook').first().json.body.meta_data || [];\n\n// Busca el objeto cuya key sea \"identificacion\"\nconst identificacion = metaData.find(\n  item => item.key?.toLowerCase() === '_billing_identification'\n);\n\n// Devuelve solo el valor\nreturn [\n  {\n    json: {\n      identificacion: identificacion?.value || null\n    }\n  }\n];"
+     "jsCode": "// Datos del pedido de WooCommerce que necesita la factura de Siigo:\n//  - identificacion (cedula del cliente, de _billing_identification)\n//  - fuente de la venta (atribucion de pedido de WooCommerce) -> va en observaciones\nconst metaData = $('Webhook').first().json.body.meta_data || [];\nconst mget = (k) => {\n  const m = metaData.find(x => (x.key || '').toLowerCase() === k.toLowerCase());\n  return m ? String(m.value == null ? '' : m.value).trim() : '';\n};\n\nconst identificacion = mget('_billing_identification') || null;\n\n// --- FUENTE de la venta ---\n// utm_source viene con placeholders \"(direct)\"/\"(none)\" en ventas sin campana; se ignoran.\nlet utmSrc = mget('_wc_order_attribution_utm_source').toLowerCase();\nif (/^\\(.*\\)$/.test(utmSrc) || utmSrc === 'direct' || utmSrc === 'none' || utmSrc === 'not set') utmSrc = '';\nconst srcType  = mget('_wc_order_attribution_source_type').toLowerCase();\nconst medium   = mget('_wc_order_attribution_utm_medium').toLowerCase();\nconst referrer = mget('_wc_order_attribution_referrer');\nconst NOMBRE = {\n  ig:'Instagram', instagram:'Instagram', fb:'Facebook', facebook:'Facebook',\n  google:'Google', 'google ads':'Google Ads', tiktok:'TikTok', tt:'TikTok',\n  wa:'WhatsApp', whatsapp:'WhatsApp', email:'Email', mail:'Email', youtube:'YouTube', yt:'YouTube'\n};\nlet fuente;\nif (utmSrc) {\n  fuente = NOMBRE[utmSrc] || (utmSrc.charAt(0).toUpperCase() + utmSrc.slice(1));\n  if (medium === 'paid') fuente += ' (pago)';\n} else if (srcType === 'organic') {\n  fuente = 'Buscador organico';\n} else if (srcType === 'referral') {\n  let host = ''; try { host = new URL(referrer).hostname.replace(/^www\\./, ''); } catch (e) {}\n  fuente = host ? ('Referido (' + host + ')') : 'Referido';\n} else if (srcType === 'admin') {\n  fuente = 'Manual';\n} else if (srcType === 'mobile_app') {\n  fuente = 'App';\n} else {\n  fuente = 'Directo';   // typein, vacio o desconocido\n}\n\nreturn [{ json: { identificacion, fuente } }];"
     },
     "type": "n8n-nodes-base.code",
     "typeVersion": 2,
@@ -1501,34 +1501,34 @@
   "autosaved": false,
   "workflowPublishHistory": [
    {
-    "createdAt": "2026-07-24T16:17:03.074Z",
-    "id": 1118,
+    "createdAt": "2026-07-24T20:27:57.090Z",
+    "id": 1122,
     "workflowId": "T5vFnAkNZKPmuzv9",
-    "versionId": "9c704113-6f30-477e-901c-c73cec9c3a08",
+    "versionId": "46186ca5-a756-4855-9977-ac795d641648",
     "event": "activated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    },
    {
-    "createdAt": "2026-07-24T16:17:03.607Z",
-    "id": 1120,
+    "createdAt": "2026-07-24T20:27:59.646Z",
+    "id": 1124,
     "workflowId": "T5vFnAkNZKPmuzv9",
-    "versionId": "9c704113-6f30-477e-901c-c73cec9c3a08",
+    "versionId": "46186ca5-a756-4855-9977-ac795d641648",
     "event": "activated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    },
    {
-    "createdAt": "2026-07-24T16:17:03.029Z",
-    "id": 1117,
+    "createdAt": "2026-07-24T20:27:57.018Z",
+    "id": 1121,
     "workflowId": "T5vFnAkNZKPmuzv9",
-    "versionId": "9c704113-6f30-477e-901c-c73cec9c3a08",
+    "versionId": "46186ca5-a756-4855-9977-ac795d641648",
     "event": "deactivated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    },
    {
-    "createdAt": "2026-07-24T16:17:03.527Z",
-    "id": 1119,
+    "createdAt": "2026-07-24T20:27:59.600Z",
+    "id": 1123,
     "workflowId": "T5vFnAkNZKPmuzv9",
-    "versionId": "9c704113-6f30-477e-901c-c73cec9c3a08",
+    "versionId": "46186ca5-a756-4855-9977-ac795d641648",
     "event": "deactivated",
     "userId": "d2aaa719-da68-4e8c-8ed6-ed63271a0f57"
    }
