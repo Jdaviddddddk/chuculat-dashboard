@@ -50,6 +50,7 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 - **`premios_puntos`** — 60 premios (sku, nombre, precio_cop, puntos, imagen). SQL: `backend/supabase_premios.sql`.
 - **`ventas_items`** — 45.816 ítems aplanados (inv_id, fecha, canal, categoria, code, producto, subtotal, qty) + RPC `ventas_opciones()` y `ventas_pivot()`. Alimenta las **Tablas Dinámicas con cruce**. SQL: `backend/supabase_ventas_items.sql`. **Es un backfill de una sola vez**: se re-arma corriendo `flatten_items.py` + `backfill_items.py`.
 - **`cartera`** — foto viva de las facturas con saldo (numero, fecha, cliente, nit, canal, moneda, total_cop, **saldo_cop = CON IVA**, dias, bucket) + RPC `cartera_resumen()`. La llena el workflow Cartera. SQL: `backend/supabase_cartera.sql`.
+- **`cartera_legacy`** — deuda pre-2025 que la API de Siigo no expone (6 clientes, cargada a mano del reporte de cartera). Col `bucket` = **rango FINO** (`>361`/`91-120`/`saldo_favor`), usado por el reporte detallado. La vista gruesa la agrupa por signo del saldo, no por bucket.
 
 ---
 
@@ -186,6 +187,13 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 - **Comprobantes por centro** (`ec0b959`): Compute Stats emite `b2b_fac`/`b2c_fac`/`export_fac` por mes; la tabla "Meta por centro del mes" tiene columna Comprobantes + total.
 - **Clientes B2B pasa de Consolidada a Por fechas** (`ec0b959`): responde al filtro flotante.
 - **Cartera 1-30 NO era bug**: cuadra al peso con Siigo (por `due_date`); la diferencia que veia Johan era vs un Excel de 2 dias antes (aging).
+
+### Cartera — reporte detallado 13 rangos (`2a57efc`)
+- Debajo del aging por cliente, tabla nueva **"Reporte detallado por rango de vencimiento"** que replica el reporte de Siigo *"Cuentas por cobrar general por cliente"*: por cliente → Saldo + Anticipo + **13 columnas** (Vencido >361/181-360/121-180/91-120/61-90/31-60/1-30, Hoy, Por vencer 1-7/8-15/16-30/31-60/>61) + fila Total general. Plegable, scroll horizontal, buscador. Funciones `renderCarteraDetalle()` / `_renderCarteraDetalleTable()` / `toggleCarteraDetalle()`.
+- Los 13 rangos se calculan en el frontend desde el `dias` por factura (ya viene relativo al vencimiento en get-cartera): `>0` vencido, `<0` por vencer, `0` hoy.
+- **La deuda legacy pre-2025 se reimportó en `cartera_legacy` con su rango FINO** (`>361` / `91-120` / `saldo_favor`), derivado de la reconciliación *Excel − vivo*. La vista gruesa NO se afectó (`Leer Cartera` agrupa la legacy por SIGNO del saldo, no por bucket). ⚠️ **Si se recarga `cartera_legacy` desde un export viejo (rango grueso), el detalle de esos 6 clientes se descuadra** → al reimportar hay que ponerle el rango fino.
+- Verificado en navegador contra el Excel de Siigo (22-jul): las 15 columnas cuadran con **diferencia CERO**. 17 clientes, $66.254.395.
+- **⚠️ Pendiente/riesgo del refresco de cartera:** el workflow hace `DELETE` de TODA la tabla `cartera` y luego reinserta → hay una ventana (peor con refrescos manuales seguidos) donde `get-cartera` cae en la tabla vacía y el dashboard muestra $0. Fix propuesto (no aplicado): upsert por `numero` + borrar las que ya no tengan saldo, en vez de borrar-todo-y-reinsertar.
 
 ---
 
