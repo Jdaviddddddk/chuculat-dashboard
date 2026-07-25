@@ -1,5 +1,5 @@
 # Handoff — Chuculat (fidelización + ventas + Supabase)
-_Para continuar en otro chat. Actualizado: 2026-07-24 (sesiones 3–8)._
+_Para continuar en otro chat. Actualizado: 2026-07-25 (sesiones 3–8)._
 
 ## Contexto rápido
 Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymarketing.com`, header API `X-N8N-API-KEY`).
@@ -39,6 +39,7 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 | `Pq20DQX58YMzdls2` | **Reconciliar Supabase** (diario 5am) | borra de `ventas_invoices` las facturas anuladas en Siigo (fantasmas). Webhook manual: `/webhook/reconciliar-ahora` |
 | `1OioSrAEK6Loun2n` | **Cartera** (cada 6h) | barre Siigo, llena la tabla `cartera` y la sirve en `/webhook/get-cartera`. Refresco manual: `/webhook/refrescar-cartera` |
 | `XYo0ijLoVGksTyDx` | **Ventas Cross** (`get-ventas-cross`) | proxy de las RPC de `ventas_items` para las Tablas Dinámicas con cruce |
+| `E6hioRumFdruvTCq` | **Refrescar ventas_items** (diario 4am) | reconstruye `ventas_items` = merge `ventas_invoices.raw`+vivo (dedup por id) net NCs, con la lógica de Compute Stats. Manual: `/webhook/refrescar-items` |
 | `iIGA54Txfw5BfKjN` | TEST Log Activity | insert manual a `puntos_log` |
 
 **Alertas SMS:** el Error Handler está enlazado (`settings.errorWorkflow`) a los críticos: Redimir Puntos, SIIGO-GHL FACTURAS, Dashboard Ventas, Enriquecimiento, Cierre Mensual, **Confirmar cita, Woocommerce, Reconciliar Supabase**. SMS por la **sub-cuenta GWA** (location `fPuvVoCK3e5wQQVtSujb`, número Twilio **+16619908570**, token `pit-b01308b1…`) porque la location Chuculat NO tiene número SMS ni WhatsApp proactivo. Destino: contacto `Vjg9EwykevCwzxbZA4hA` (+573123408459) en GWA.
@@ -48,7 +49,7 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 - **`puntos_log`** — logs de puntos. **`items` (jsonb)** = detalle de redención `[{sku,nombre,puntos,precio_cop,qty}]`.
 - **`productos_categorias`** — 218 productos, 23 categorías propias. SQL: `backend/supabase_productos_categorias.sql`.
 - **`premios_puntos`** — 60 premios (sku, nombre, precio_cop, puntos, imagen). SQL: `backend/supabase_premios.sql`.
-- **`ventas_items`** — 45.816 ítems aplanados (inv_id, fecha, canal, categoria, code, producto, subtotal, qty) + RPC `ventas_opciones()` y `ventas_pivot()`. Alimenta las **Tablas Dinámicas con cruce**. SQL: `backend/supabase_ventas_items.sql`. **Es un backfill de una sola vez**: se re-arma corriendo `flatten_items.py` + `backfill_items.py`.
+- **`ventas_items`** — ~47.664 ítems aplanados (inv_id, fecha, canal, categoria, code, producto, subtotal, qty) + RPC `ventas_opciones()` y `ventas_pivot()`. Alimenta las **Tablas Dinámicas con cruce**. SQL: `backend/supabase_ventas_items.sql`. **La reconstruye a diario el workflow `Refrescar ventas_items` (`E6hioRumFdruvTCq`)** con la lógica del panel (merge hist+vivo, NCs netadas, categoría fina). `subtotal` YA lleva descuento+moneda y las NCs entran como filas negativas.
 - **`cartera`** — foto viva de las facturas con saldo (numero, fecha, cliente, nit, canal, moneda, total_cop, **saldo_cop = CON IVA**, dias, bucket) + RPC `cartera_resumen()`. La llena el workflow Cartera. SQL: `backend/supabase_cartera.sql`.
 - **`cartera_legacy`** — deuda pre-2025 que la API de Siigo no expone (6 clientes, cargada a mano del reporte de cartera). Col `bucket` = **rango FINO** (`>361`/`91-120`/`saldo_favor`), usado por el reporte detallado. La vista gruesa la agrupa por signo del saldo, no por bucket.
 
@@ -219,7 +220,9 @@ Ecosistema de **Chuculat** (cacao) en el n8n de Johan (`https://app.rioagencymar
 5. Barrer `puntos_log` completo contra `ventas_invoices` por si hay más casos tipo Tejada (puntos de facturas que no son cc=168).
 6. (Opcional) `Get FV2` del dashboard baja TODAS las FV-2 en cada llamada y **oscila entre 2,5s y 17,6s** (API de Siigo) — es el mayor cuello de botella restante. Cachearlo requiere cuidado (ver abajo).
 7. **Buscar más ventas de experiencias sin facturar.** Como "Wonka por un Día" y "Un Día como Oompa Loompa" **nunca** pudieron facturarse (skuMap corrupto), es probable que haya ventas viejas sin factura. n8n ya purgó esas ejecuciones → hay que **cruzar los pagos aprobados de ePayco contra las facturas de Siigo**. Solo se recuperó la de Mariana (FV-2-1193), que estaba en las ejecuciones vivas.
-8. **🔴 Las Tablas Dinámicas (`ventas_items`) NO CUADRAN con el panel Ventas** (detectado 24-jul). Comparado 2026 mes a mes: mayo 145,5M (tabla) vs 108M (panel), jul 39,3M vs 57,6M, ene 41,5M vs 51,3M. **Dos causas:** (a) `ventas_items` es un **backfill de una sola vez** (17-jul) que ningún workflow alimenta → le faltan las ventas nuevas; (b) se aplanó de `ventas_hist_full.json` con `flatten_items.py`, que **NO netea notas crédito** ni usa el mismo snapshot que `ventas_invoices.raw` (fuente del panel). **Fix (pendiente de decidir con Johan):** rehacer `flatten_items.py` para leer de `ventas_invoices.raw` restando NCs (igual que Compute Stats), re-`backfill_items.py`, y montar un refresco periódico.
+8. **✅ Tablas Dinámicas (`ventas_items`) — RESUELTO** (25-jul, workflow `E6hioRumFdruvTCq`). Se reconstruye a diario (4am) con la MISMA fuente y lógica del panel: **merge `ventas_invoices.raw` (hist) + barrido en vivo de Siigo FV-4+FV-2, dedup por id** (vivo pisa hist, pero hist rescata las FV-2 que el vivo no devuelve por su inestabilidad), `subtotal=(price*qty−disc)*fx`, **notas crédito netadas** (ítems de NC como filas negativas), y **categoría fina** de `productos_categorias`. Validado: los 6 meses cerrados de 2026 cuadran **al peso** con el panel (antes mayo tenía 37M de error). El mes en curso puede tener drift menor (día activo + FV-2 flaky), converge con el refresco diario.
+   - ⚠️ El refresco hace `DELETE` de toda `ventas_items` + INSERT (~47k filas en lotes) → misma ventana-vacía que la cartera, pero a las 4am. Bajo riesgo.
+   - Los scripts `flatten_items.py`/`backfill_items.py` (backfill manual viejo) quedan **obsoletos**; ya no hace falta correrlos.
 9. **✅ Cartera aging RESUELTO** (24-jul): la fecha de vencimiento SÍ la da Siigo, anidada en **`payments[].due_date`** (yo la había buscado como `inv.due_date` y por eso creí que no existía). El aging ahora cuenta días desde el vencimiento y cuadra al peso con Siigo por rango y por cliente.
 10. **Las 29 facturas FV-2 ya emitidas con ítems sin bodega no se pueden corregir** (timbradas y aceptadas por la DIAN). Si contabilidad las necesita corregidas: nota crédito + reemisión.
 11. **[Riesgo latente, decidido dejarlo así por ahora] El nodo `Factura` del workflow de puntos pide `page_size=1`** (`/v1/invoices?page=1&page_size=1`) → solo ve la factura **más reciente**. Con el volumen actual (~35 facturas/día contra una corrida por minuto) casi nunca colisiona, pero si entran 2+ en el mismo minuto, las que no sean la más nueva **no se vuelven a ver nunca** (Siigo devuelve en orden DESC).
