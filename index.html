@@ -188,6 +188,14 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 .td-pts.cereza { color: var(--cereza); }
 .td-pts.verde  { color: var(--verde); }
 .td-pts.morado { color: var(--morado); }
+/* Cartera detallada: cifras y NIT SIEMPRE en una sola línea (fuerzan scroll horizontal,
+   nunca se parten); nombres hasta 2 líneas, sin cortar palabras. */
+#tblCarteraDet td, #tblCarteraDet th { white-space: nowrap; word-break: normal; overflow-wrap: normal; }
+#tblCarteraDet td.td-name, #tblCarteraDet th:first-child { white-space: normal; }
+#tblCarteraDet td.td-name {
+    min-width: 190px; max-width: 280px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .badge { display: inline-block; padding: 3px 10px; border-radius: 50px; font-size: 11px; font-weight: 700; }
 .badge-alta  { background: #e8f5e9; color: #2e7d32; }
 .badge-media { background: #fff8e1; color: #f57f17; }
