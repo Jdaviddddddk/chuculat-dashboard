@@ -196,6 +196,16 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
     min-width: 190px; max-width: 280px;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
+/* Cartera (Aging por Cliente): valores en una sola línea; fuente un poco menor para
+   que quepan más columnas sin necesitar tanto scroll; nombres hasta 2 líneas. */
+#tblCartera td, #tblCartera th { white-space: nowrap; word-break: normal; overflow-wrap: normal; }
+#tblCartera td.td-name, #tblCartera th:first-child { white-space: normal; }
+#tblCartera td.td-name {
+    min-width: 170px; max-width: 260px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+#tblCartera td.td-pts { font-size: 13px; }
+#tblCartera th { font-size: 10px; }
 .badge { display: inline-block; padding: 3px 10px; border-radius: 50px; font-size: 11px; font-weight: 700; }
 .badge-alta  { background: #e8f5e9; color: #2e7d32; }
 .badge-media { background: #fff8e1; color: #f57f17; }
@@ -812,7 +822,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                 </div>
             </div>
             <div class="table-wrap">
-                <table><thead><tr>
+                <table id="tblCartera"><thead><tr>
                     <th>Cliente</th><th>NIT</th><th>Deuda Total</th>
                     <th style="color:#f9a825">Venc. 1-30</th>
                     <th style="color:var(--naranja)">Venc. 31-60</th>
