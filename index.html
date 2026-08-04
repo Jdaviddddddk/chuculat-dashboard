@@ -206,6 +206,27 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 }
 #tblCartera td.td-pts { font-size: 13px; }
 #tblCartera th { font-size: 10px; }
+/* Mora exacta + Relación estado de cartera: dos columnas que colapsan en móvil */
+.cartera-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 22px; align-items: start; }
+@media (max-width: 1100px) { .cartera-2col { grid-template-columns: 1fr; } }
+#tblMora td, #tblMora th { white-space: nowrap; }
+#tblMora td.td-name { white-space: normal; min-width: 150px; max-width: 240px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#tblMora td.mora-list { white-space: normal; font-size: 12px; line-height: 1.7; }
+.mora-chip { display: inline-block; padding: 2px 9px; border-radius: 50px; font-size: 11px;
+    font-weight: 700; margin: 2px 4px 2px 0; background: var(--crema); border: 1px solid var(--beige); }
+.mora-chip.m1  { color: #f9a825; border-color: #f9d68a; }   /* 1-30   */
+.mora-chip.m2  { color: var(--naranja); border-color: #f0b78a; } /* 31-90  */
+.mora-chip.m3  { color: #c0392b; border-color: #e3a49c; }   /* 91-180 */
+.mora-chip.m4  { color: #7a0e0e; border-color: #d59a9a; }   /* +180   */
+#tblEstadoCartera td, #tblEstadoCartera th { white-space: nowrap; }
+.pct-cell { position: relative; }
+.pct-bar { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 60%;
+    background: rgba(0,171,225,.13); border-radius: 4px; z-index: 0; }
+.pct-val { position: relative; z-index: 1; font-weight: 700; }
+/* Clientes B2B: resalta el bloque que acumula el 80% (Pareto) */
+#bodyB2BClientes tr.pareto-80 { background: rgba(98,178,42,.07); }
+#bodyB2BClientes tr.pareto-80 td.td-name { box-shadow: inset 3px 0 0 var(--verde); font-weight: 700; }
 .badge { display: inline-block; padding: 3px 10px; border-radius: 50px; font-size: 11px; font-weight: 700; }
 .badge-alta  { background: #e8f5e9; color: #2e7d32; }
 .badge-media { background: #fff8e1; color: #f57f17; }
@@ -757,7 +778,8 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                     <th onclick="sortB2BClientes('facturas')"     data-col="facturas">     Facturas        <i class="si">⇅</i></th>
                     <th onclick="sortB2BClientes('ultimaCompra')" data-col="ultimaCompra"> Última Compra   <i class="si">⇅</i></th>
                     <th onclick="sortB2BClientes('primeraCompra')"data-col="primeraCompra">Primera Compra  <i class="si">⇅</i></th>
-                </tr></thead><tbody id="bodyB2BClientes"></tbody></table>
+                    <th onclick="sortB2BClientes('totalCompras')" data-col="totalCompras" style="text-align:right">% Part. <i class="si">⇅</i></th>
+                </tr></thead><tbody id="bodyB2BClientes"></tbody><tfoot id="footB2BClientes"></tfoot></table>
             </div>
         </div>
     </section>
@@ -863,6 +885,34 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                     <th style="color:#356312">PV 31-60</th>
                     <th style="color:#204008">PV +61</th>
                 </tr></thead><tbody id="bodyCarteraDet"></tbody><tfoot id="footCarteraDet"></tfoot></table>
+            </div>
+        </div>
+
+        <!-- Mora exacta + Relación estado de cartera, en dos columnas -->
+        <div class="cartera-2col">
+            <div class="table-section">
+                <div class="table-header"><h2>⏱️ Mora por cliente · días exactos</h2>
+                    <div class="table-controls">
+                        <div class="search-wrap"><input type="text" id="searchMora" placeholder="Buscar empresa, NIT..." oninput="_renderMoraTable()"></div>
+                        <span class="table-count" id="countMora">0 clientes</span>
+                    </div>
+                </div>
+                <p class="section-note">Solo saldo <strong>vencido</strong>. Cada factura con sus días exactos de mora, de la más vieja a la más reciente.</p>
+                <div class="table-wrap">
+                    <table id="tblMora"><thead><tr>
+                        <th>Cliente</th><th>Deuda vencida</th><th>Mora (días · saldo)</th>
+                    </tr></thead><tbody id="bodyMora"></tbody><tfoot id="footMora"></tfoot></table>
+                </div>
+            </div>
+
+            <div class="table-section">
+                <div class="table-header"><h2>📊 Relación estado cartera clientes</h2></div>
+                <p class="section-note">Participación de cada rango sobre la deuda total. Saldo CON IVA.</p>
+                <div class="table-wrap">
+                    <table id="tblEstadoCartera"><thead><tr>
+                        <th>Estado</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th>
+                    </tr></thead><tbody id="bodyEstadoCartera"></tbody><tfoot id="footEstadoCartera"></tfoot></table>
+                </div>
             </div>
         </div>
     </section>
@@ -2649,15 +2699,42 @@ function _renderB2BClientesTable() {
         return typeof av==='number'?(b2bClientesSort.dir==='asc'?av-bv:bv-av):(b2bClientesSort.dir==='asc'?String(av).localeCompare(String(bv),'es'):String(bv).localeCompare(String(av),'es')); });
     document.getElementById('countB2BClientes').textContent = rows.length + ' empresas';
     const tbody = document.getElementById('bodyB2BClientes');
-    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="6">Sin clientes B2B</td></tr>'; return; }
-    tbody.innerHTML = rows.map(c=>`<tr>
+    const foot  = document.getElementById('footB2BClientes');
+    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="7">Sin clientes B2B</td></tr>'; if(foot) foot.innerHTML=''; return; }
+    // % de participación sobre el TOTAL de clientes B2B (no sobre lo filtrado, para que
+    // el porcentaje no cambie al buscar) + bloque Pareto: los que acumulan el 80%.
+    const totalB2B = b2bClientesData.reduce((s,c)=>s+(c.totalCompras||0),0);
+    const pareto = new Set();
+    let acum = 0;
+    for (const c of [...b2bClientesData].sort((a,b)=>(b.totalCompras||0)-(a.totalCompras||0))) {
+        if (acum / (totalB2B||1) >= 0.8) break;
+        pareto.add(c.identification || c.name);
+        acum += c.totalCompras || 0;
+    }
+    tbody.innerHTML = rows.map(c=>{
+        const p = totalB2B > 0 ? (c.totalCompras||0)/totalB2B*100 : 0;
+        const top = pareto.has(c.identification || c.name);
+        return `<tr class="${top?'pareto-80':''}">
         <td class="td-name">${esc(c.name)}</td>
         <td style="color:var(--gris);font-size:12px">${esc(c.identification)}</td>
         <td class="td-pts azul">${fmtCOP(c.totalCompras)}</td>
         <td style="text-align:center">${c.facturas}</td>
         <td>${fmtDate(c.ultimaCompra)}</td>
         <td>${fmtDate(c.primeraCompra)}</td>
-    </tr>`).join('');
+        <td class="pct-cell" style="text-align:right;width:86px">
+            <div class="pct-bar" style="width:${Math.max(0,Math.min(100,p)).toFixed(1)}%"></div>
+            <span class="pct-val" style="color:${top?'var(--verde)':'var(--chocolate)'}">${p.toFixed(2)}%</span></td>
+    </tr>`;}).join('');
+    if (foot){
+        const vis = rows.reduce((s,c)=>s+(c.totalCompras||0),0);
+        foot.innerHTML = `<tr style="border-top:2px solid var(--beige);font-weight:800;background:var(--crema)">
+            <td><strong>Total</strong></td>
+            <td style="font-size:12px;color:var(--gris)">${rows.length}</td>
+            <td class="td-pts azul"><strong>${fmtCOP(vis)}</strong></td>
+            <td colspan="3" style="font-size:11px;color:var(--verde);font-weight:700">
+                ▌ ${pareto.size} empresa${pareto.size===1?'':'s'} concentran el 80% de las ventas B2B</td>
+            <td style="text-align:right">${totalB2B>0?(vis/totalB2B*100).toFixed(2):'0.00'}%</td></tr>`;
+    }
 }
 function sortB2BClientes(col){ b2bClientesSort.dir=b2bClientesSort.col===col?(b2bClientesSort.dir==='asc'?'desc':'asc'):'desc'; b2bClientesSort.col=col; _renderB2BClientesTable(); }
 
@@ -2741,6 +2818,111 @@ async function renderCartera() {
     }
     _renderCarteraTable();
     renderCarteraDetalle();
+    renderMora();
+    renderEstadoCartera();
+}
+
+// ── MORA POR CLIENTE (días exactos) ───────────────────────────────────────
+// Cada factura vencida con su mora real (`dias` ya viene relativo al vencimiento
+// en get-cartera). La deuda legacy (pre jun-2025) no tiene detalle por factura:
+// se muestra como un solo bloque marcado "antigua".
+let moraData = [];
+const LEG_DIAS = { '>361':361, '181-360':181, '121-180':121, '91-120':91, '61-90':61, '31-60':31, '1-30':1 };
+function fmtCorto(v){
+    const n = Math.abs(Number(v)||0);
+    if (n >= 1e6) return '$' + (v/1e6).toLocaleString('es-CO',{minimumFractionDigits:1,maximumFractionDigits:1}) + ' M';
+    if (n >= 1e3) return '$' + Math.round(v/1e3).toLocaleString('es-CO') + ' K';
+    return fmtCOP(v);
+}
+function moraClase(d){ return d > 180 ? 'm4' : d > 90 ? 'm3' : d > 30 ? 'm2' : 'm1'; }
+function renderMora(){
+    const by = {};
+    const add = (cliente, nit, dias, saldo, aprox) => {
+        const k = nit || cliente;
+        if (!by[k]) by[k] = { cliente, nit, total:0, items:[] };
+        by[k].total += saldo;
+        by[k].items.push({ dias, saldo, aprox });
+    };
+    for (const f of carteraFacturas) {
+        if ((f.dias||0) > 0 && (f.saldo_cop||0) > 0) add(f.cliente, f.nit, f.dias, f.saldo_cop, false);
+    }
+    for (const l of carteraLegacy) {
+        const v = Number(l.saldo_cop)||0;
+        if (v > 0 && LEG_DIAS[l.bucket] !== undefined) add(l.cliente, l.nit, LEG_DIAS[l.bucket], v, true);
+    }
+    moraData = Object.values(by).map(c => {
+        c.items.sort((a,b) => b.dias - a.dias);
+        return c;
+    }).sort((a,b) => b.total - a.total);
+    _renderMoraTable();
+}
+function _renderMoraTable(){
+    const q = (document.getElementById('searchMora').value||'').toLowerCase().trim();
+    const rows = moraData.filter(c => !q || (String(c.cliente)+' '+String(c.nit)).toLowerCase().includes(q));
+    document.getElementById('countMora').textContent = rows.length + ' clientes';
+    const tbody = document.getElementById('bodyMora'), foot = document.getElementById('footMora');
+    if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="3">✅ Sin saldo vencido</td></tr>'; if(foot) foot.innerHTML=''; return; }
+    tbody.innerHTML = rows.map(c => `<tr>
+        <td class="td-name">${esc(c.cliente)}</td>
+        <td class="td-pts azul">${fmtCOP(c.total)}</td>
+        <td class="mora-list">${c.items.map(i =>
+            `<span class="mora-chip ${moraClase(i.dias)}">${i.aprox?'+':''}${i.dias}d · ${fmtCorto(i.saldo)}</span>`).join('')}</td>
+    </tr>`).join('');
+    if (foot){
+        const t = rows.reduce((s,c)=>s+c.total,0);
+        const nf = rows.reduce((s,c)=>s+c.items.length,0);
+        foot.innerHTML = `<tr style="border-top:2px solid var(--beige);font-weight:800;background:var(--crema)">
+            <td><strong>Total vencido</strong></td>
+            <td class="td-pts azul"><strong>${fmtCOP(t)}</strong></td>
+            <td style="font-size:12px;color:var(--gris)">${nf} factura${nf===1?'':'s'} vencida${nf===1?'':'s'}</td></tr>`;
+    }
+}
+
+// ── RELACIÓN ESTADO CARTERA (participación por rango) ─────────────────────
+// Réplica del cuadro "RELACION ESTADO CARTERA CLIENTES": cuánto pesa cada rango
+// sobre la deuda total. Se incluye 1-30 (que el cuadro de Johan no trae) para que
+// la suma cuadre siempre con el total.
+const EST_RANGOS = [
+    { k:'v180',  label:'Vencido más de 180 días', color:'#7a0e0e',        test:d => d > 180 },
+    { k:'v121',  label:'Vencido 121 - 180 días',  color:'#b71c1c',        test:d => d > 120 && d <= 180 },
+    { k:'v91',   label:'Vencido 91 - 120 días',   color:'#c0392b',        test:d => d > 90  && d <= 120 },
+    { k:'v31',   label:'Vencido 31 - 90 días',    color:'var(--naranja)', test:d => d > 30  && d <= 90 },
+    { k:'v1',    label:'Vencido 1 - 30 días',     color:'#f9a825',        test:d => d > 0   && d <= 30 },
+    { k:'pv',    label:'Sin vencer',              color:'var(--verde)',   test:d => d <= 0 }
+];
+function renderEstadoCartera(){
+    const acc = {}; EST_RANGOS.forEach(r => acc[r.k] = 0);
+    let favor = 0;
+    const clasificar = (dias, v) => { const r = EST_RANGOS.find(x => x.test(dias)); if (r) acc[r.k] += v; };
+    for (const f of carteraFacturas){
+        const v = Number(f.saldo_cop)||0;
+        if (v < 0) { favor += v; continue; }
+        clasificar(Number(f.dias)||0, v);
+    }
+    for (const l of carteraLegacy){
+        const v = Number(l.saldo_cop)||0;
+        if (v < 0 || l.bucket === 'saldo_favor') { favor += v; continue; }
+        const d = LEG_DIAS[l.bucket];
+        clasificar(d === undefined ? 0 : d, v);
+    }
+    const total = EST_RANGOS.reduce((s,r)=>s+acc[r.k],0) + favor;
+    const tbody = document.getElementById('bodyEstadoCartera'), foot = document.getElementById('footEstadoCartera');
+    const fila = (label,color,val) => {
+        const p = total > 0 ? (val/total*100) : 0;
+        return `<tr>
+            <td class="td-name" style="color:${color};font-weight:700">${label}</td>
+            <td class="td-pts" style="text-align:right;color:${color}">${fmtCOP(val)}</td>
+            <td class="pct-cell" style="text-align:right;width:88px">
+                <div class="pct-bar" style="width:${Math.max(0,Math.min(100,p)).toFixed(1)}%"></div>
+                <span class="pct-val">${p.toFixed(2)}%</span></td></tr>`;
+    };
+    let html = EST_RANGOS.map(r => fila(r.label, r.color, acc[r.k])).join('');
+    if (favor) html += fila('Saldo a favor', 'var(--azul)', favor);
+    tbody.innerHTML = html;
+    if (foot) foot.innerHTML = `<tr style="border-top:2px solid var(--beige);font-weight:800;background:var(--crema)">
+        <td><strong>Valor total cartera</strong></td>
+        <td class="td-pts azul" style="text-align:right"><strong>${fmtCOP(total)}</strong></td>
+        <td style="text-align:right">100%</td></tr>`;
 }
 
 // ── REPORTE DETALLADO (13 rangos por vencimiento, réplica del reporte Siigo) ──
