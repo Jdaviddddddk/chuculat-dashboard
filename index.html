@@ -835,6 +835,10 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             <div class="aging-card a-180"><div class="aging-label">Vencido más de 91</div><div class="aging-value" id="aging91">—</div><div class="aging-pct" id="aging91Pct">—</div></div>
             <div class="aging-card a-pv"><div class="aging-label">Por Vencer</div><div class="aging-value" id="agingPV">—</div><div class="aging-pct" id="agingPVPct">—</div></div>
         </div>
+        <div class="section-note" id="carteraExcluidosBanner" style="display:none;background:rgba(236,97,151,.08);border:1px solid rgba(236,97,151,.3);border-radius:12px;padding:10px 14px;margin-bottom:12px">
+            <strong id="carteraExcluidosTxt"></strong> — los totales, tarjetas y tablas de abajo se recalculan sin ellos.
+            <button class="btn-filter secondary" onclick="carteraToggleAll(true)" style="margin-left:10px">↺ Mostrar todo</button>
+        </div>
         <div class="table-section">
             <div class="table-header"><h2>💳 Aging por Cliente</h2>
                 <div class="table-controls">
@@ -845,6 +849,8 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             </div>
             <div class="table-wrap">
                 <table id="tblCartera"><thead><tr>
+                    <th style="width:34px;text-align:center" title="Mostrar / ocultar en los totales">
+                        <input type="checkbox" id="chkCarteraAll" checked onclick="carteraToggleAll(this.checked)" style="cursor:pointer"></th>
                     <th>Cliente</th><th>NIT</th><th>Deuda Total</th>
                     <th style="color:#f9a825">Venc. 1-30</th>
                     <th style="color:var(--naranja)">Venc. 31-60</th>
@@ -2789,19 +2795,7 @@ async function renderCartera() {
     document.getElementById('navBadgeCartera').textContent = carteraData.length;
     const cr = d.resumen;
     carteraResumen = cr;
-    const total = cr.totalDeuda || 0;
-    const pct = v => total > 0 ? Math.round(v / total * 100) + '% del total' : '—';
-    document.getElementById('agingTotal').textContent = fmtCOP(total);
-    document.getElementById('aging1_30').textContent   = fmtCOP(cr.v1_30 || 0);
-    document.getElementById('aging1_30Pct').textContent= pct(cr.v1_30 || 0);
-    document.getElementById('aging31_60').textContent  = fmtCOP(cr.v31_60 || 0);
-    document.getElementById('aging31_60Pct').textContent= pct(cr.v31_60 || 0);
-    document.getElementById('aging61_90').textContent  = fmtCOP(cr.v61_90 || 0);
-    document.getElementById('aging61_90Pct').textContent= pct(cr.v61_90 || 0);
-    document.getElementById('aging91').textContent     = fmtCOP(cr.v91 || 0);
-    document.getElementById('aging91Pct').textContent  = pct(cr.v91 || 0);
-    document.getElementById('agingPV').textContent    = fmtCOP(cr.porVencer || 0);
-    document.getElementById('agingPVPct').textContent = pct(cr.porVencer || 0);
+    renderCarteraCards();
     const act = document.getElementById('carteraActualizado');
     if (act) {
         let txt = '· ' + (cr.facturas||0) + ' facturas abiertas';
@@ -2820,6 +2814,66 @@ async function renderCartera() {
     renderCarteraDetalle();
     renderMora();
     renderEstadoCartera();
+}
+
+// ── APAGAR CLIENTES DE LA CARTERA ─────────────────────────────────────────
+// El check de cada fila saca a ese cliente de TODO el bloque de cartera (tarjetas
+// de aging, totales, reporte detallado, mora y relación por rangos), para poder
+// mirar la cartera "sin CACAOFE" o sin la deuda antigua y ver qué queda.
+// Se recuerda entre sesiones; el banner rosado avisa que hay filtros puestos.
+let carteraExcluidos = new Set(JSON.parse(localStorage.getItem('chuculat.carteraExcluidos') || '[]'));
+const claveCli = (nit, cliente) => String(nit || cliente || '');
+const carteraVisible = (nit, cliente) => !carteraExcluidos.has(claveCli(nit, cliente));
+function carteraGuardarExcluidos(){
+    localStorage.setItem('chuculat.carteraExcluidos', JSON.stringify([...carteraExcluidos]));
+}
+function carteraToggle(k){
+    if (carteraExcluidos.has(k)) carteraExcluidos.delete(k); else carteraExcluidos.add(k);
+    carteraGuardarExcluidos(); carteraRecalcular();
+}
+function carteraToggleAll(on){
+    carteraExcluidos = on ? new Set() : new Set(carteraData.map(c => claveCli(c.nit, c.cliente)));
+    carteraGuardarExcluidos(); carteraRecalcular();
+}
+function carteraRecalcular(){
+    renderCarteraCards();
+    _renderCarteraTable();
+    renderCarteraDetalle();
+    renderMora();
+    renderEstadoCartera();
+    const n = carteraData.filter(c => !carteraVisible(c.nit, c.cliente)).length;
+    const ban = document.getElementById('carteraExcluidosBanner');
+    if (ban){
+        ban.style.display = n ? 'block' : 'none';
+        const t = document.getElementById('carteraExcluidosTxt');
+        if (t) t.textContent = n === 1 ? '1 cliente oculto' : n + ' clientes ocultos';
+    }
+    const all = document.getElementById('chkCarteraAll');
+    if (all) all.checked = !n;
+}
+// Tarjetas de aging. Sin filtros usa los totales EXACTOS del backend (sumar aquí los
+// valores ya redondeados daba 1 peso de más); con filtros los recalcula de lo visible.
+function renderCarteraCards(){
+    const hayFiltro = carteraData.some(c => !carteraVisible(c.nit, c.cliente));
+    let t;
+    if (!hayFiltro && carteraResumen){
+        const cr = carteraResumen;
+        t = { total: cr.totalDeuda||0, v1_30: cr.v1_30||0, v31_60: cr.v31_60||0,
+              v61_90: cr.v61_90||0, v91: cr.v91||0, pv: cr.porVencer||0 };
+    } else {
+        const vis = carteraData.filter(c => carteraVisible(c.nit, c.cliente));
+        const s = k => vis.reduce((a,c)=>a+(c[k]||0),0);
+        t = { total: s('deudaTotal'), v1_30: s('v1_30'), v31_60: s('v31_60'),
+              v61_90: s('v61_90'), v91: s('v91'), pv: s('porVencer') };
+    }
+    const pct = v => t.total > 0 ? Math.round(v / t.total * 100) + '% del total' : '—';
+    const set = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+    set('agingTotal', fmtCOP(t.total));
+    set('aging1_30', fmtCOP(t.v1_30));   set('aging1_30Pct', pct(t.v1_30));
+    set('aging31_60', fmtCOP(t.v31_60)); set('aging31_60Pct', pct(t.v31_60));
+    set('aging61_90', fmtCOP(t.v61_90)); set('aging61_90Pct', pct(t.v61_90));
+    set('aging91', fmtCOP(t.v91));       set('aging91Pct', pct(t.v91));
+    set('agingPV', fmtCOP(t.pv));        set('agingPVPct', pct(t.pv));
 }
 
 // ── MORA POR CLIENTE (días exactos) ───────────────────────────────────────
@@ -2844,9 +2898,11 @@ function renderMora(){
         by[k].items.push({ dias, saldo, aprox });
     };
     for (const f of carteraFacturas) {
+        if (!carteraVisible(f.nit, f.cliente)) continue;   // cliente apagado en el aging
         if ((f.dias||0) > 0 && (f.saldo_cop||0) > 0) add(f.cliente, f.nit, f.dias, f.saldo_cop, false);
     }
     for (const l of carteraLegacy) {
+        if (!carteraVisible(l.nit, l.cliente)) continue;
         const v = Number(l.saldo_cop)||0;
         if (v > 0 && LEG_DIAS[l.bucket] !== undefined) add(l.cliente, l.nit, LEG_DIAS[l.bucket], v, true);
     }
@@ -2895,11 +2951,13 @@ function renderEstadoCartera(){
     let favor = 0;
     const clasificar = (dias, v) => { const r = EST_RANGOS.find(x => x.test(dias)); if (r) acc[r.k] += v; };
     for (const f of carteraFacturas){
+        if (!carteraVisible(f.nit, f.cliente)) continue;
         const v = Number(f.saldo_cop)||0;
         if (v < 0) { favor += v; continue; }
         clasificar(Number(f.dias)||0, v);
     }
     for (const l of carteraLegacy){
+        if (!carteraVisible(l.nit, l.cliente)) continue;
         const v = Number(l.saldo_cop)||0;
         if (v < 0 || l.bucket === 'saldo_favor') { favor += v; continue; }
         const d = LEG_DIAS[l.bucket];
@@ -2959,6 +3017,7 @@ function renderCarteraDetalle(){
     };
     // Facturas vivas → rango por dias
     for (const f of carteraFacturas){
+        if (!carteraVisible(f.nit, f.cliente)) continue;   // cliente apagado en el aging
         const c = slot(f.nit, f.cliente);
         const v = Number(f.saldo_cop) || 0;
         c.saldo += v;
@@ -2966,6 +3025,7 @@ function renderCarteraDetalle(){
     }
     // Legacy (pre-2025) → su bucket fino; saldo negativo = anticipo
     for (const l of carteraLegacy){
+        if (!carteraVisible(l.nit, l.cliente)) continue;
         const c = slot(l.nit, l.cliente);
         const v = Number(l.saldo_cop) || 0;
         c.saldo += v;
@@ -3017,18 +3077,20 @@ function _renderCarteraTable() {
     document.getElementById('countCartera').textContent = rows.length + ' clientes';
     const tbody = document.getElementById('bodyCartera');
     const foot = document.getElementById('footCartera');
-    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="10">✅ Sin cartera pendiente</td></tr>'; if(foot) foot.innerHTML=''; return; }
-    // Fila de totales al pie, como en el reporte de Siigo (suma lo filtrado).
-    // Sin búsqueda usa los totales EXACTOS del backend: sumar aquí los valores ya
-    // redondeados de cada cliente daba 1 peso de más y no cuadraba con Siigo.
+    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="11">✅ Sin cartera pendiente</td></tr>'; if(foot) foot.innerHTML=''; return; }
+    // Fila de totales al pie, como en el reporte de Siigo (suma lo filtrado Y lo que
+    // esté encendido). Sin búsqueda ni clientes apagados usa los totales EXACTOS del
+    // backend: sumar aquí los valores ya redondeados daba 1 peso de más vs Siigo.
     if (foot) {
-        const completo = !q && carteraResumen;
+        const vis = rows.filter(c => carteraVisible(c.nit, c.cliente));
+        const completo = !q && carteraResumen && vis.length === carteraData.length;
         const t = k => completo
             ? (carteraResumen[k === 'deudaTotal' ? 'totalDeuda' : k] || 0)
-            : rows.reduce((s,c)=>s+(c[k]||0),0);
+            : vis.reduce((s,c)=>s+(c[k]||0),0);
         foot.innerHTML = `<tr style="border-top:2px solid var(--beige);font-weight:800;background:var(--crema)">
+            <td></td>
             <td class="td-name"><strong>Total general</strong></td>
-            <td style="font-size:12px;color:var(--gris)">${rows.length} cliente${rows.length===1?'':'s'}</td>
+            <td style="font-size:12px;color:var(--gris)">${vis.length} cliente${vis.length===1?'':'s'}</td>
             <td class="td-pts azul"><strong>${fmtCOP(t('deudaTotal'))}</strong></td>
             <td class="td-pts" style="color:#f9a825">${fmtCOP(t('v1_30'))}</td>
             <td class="td-pts" style="color:var(--naranja)">${fmtCOP(t('v31_60'))}</td>
@@ -3039,7 +3101,8 @@ function _renderCarteraTable() {
             <td style="text-align:center">${t('facturas')}</td>
         </tr>`;
     }
-    tbody.innerHTML = rows.map(c=>`<tr>
+    tbody.innerHTML = rows.map(c=>{ const k=claveCli(c.nit,c.cliente), on=carteraVisible(c.nit,c.cliente); return `<tr style="${on?'':'opacity:.4'}">
+        <td style="text-align:center"><input type="checkbox" ${on?'checked':''} onclick="carteraToggle('${esc(k).replace(/'/g,"\\'")}')" style="cursor:pointer" title="Incluir en los totales"></td>
         <td class="td-name">${esc(c.cliente)}</td>
         <td style="font-size:12px;color:var(--gris)">${esc(c.nit)}</td>
         <td class="td-pts azul">${fmtCOP(c.deudaTotal)}</td>
@@ -3050,7 +3113,7 @@ function _renderCarteraTable() {
         <td class="td-pts verde">${c.porVencer > 0 ? fmtCOP(c.porVencer) : '<span style="color:var(--gris)">—</span>'}</td>
         <td class="td-pts azul">${c.saldoFavor > 0 ? fmtCOP(c.saldoFavor) : '<span style="color:var(--gris)">—</span>'}</td>
         <td style="text-align:center">${c.facturas}</td>
-    </tr>`).join('');
+    </tr>`;}).join('');
     aplicarCarteraPlegada();   // se re-aplica: el innerHTML de arriba pisa el display
 }
 
