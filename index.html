@@ -1423,7 +1423,7 @@ const SURVEY_DEFS = {
     experiencias: { title:'Experiencias', questions: [
         {id:'JRPwosOSS2qb3aWpY2II',label:'¿Qué experiencia realizaste hoy?',type:'single',options:['Cacao Maestro','El Camino del Chocolate','Wonka por un día','Oompa Loompa por un día']},
         {id:'qfVQZ2eZoIdBpMCQ0Uxl',label:'¿Cómo calificarías tu experiencia en general?',type:'single',options:['Excelente','Muy buena','Buena','Regular','Mala']},
-        {id:'I9mUDaEH8mrGsxls75ys',label:'Frente a tus expectativas, la experiencia:',type:'single',options:['Superó las expectativas','Cumplió las expectativas','Cumplió parcialmente las expectativas','No cumplió las expectativas','No había expectativas previas']},
+        {id:'I9mUDaEH8mrGsxls75ys',label:'Frente a tus expectativas, la experiencia:',type:'single',options:['Superó las expectativas','Cumplió las expectativas','Cumplió parcialmente las expectativas','No cumplió las expectativas','No tenías expectativas previas']},
         {id:'9B4GwlZ1jMFKDH2RkhYF',label:'¿Qué parte de la experiencia te resultó más interesante?',type:'multi',options:['Conocer el proceso del cacao al chocolate','La cata o degustación','Aprender sobre la industria del chocolate','Ver la producción / la planta','La experiencia en general','Otras']},
         {id:'Diat1g5q6OLj9NIQfvPz',label:'¿Cómo conociste esta experiencia?',type:'single',options:['Búsqueda en Google','Redes sociales','Recomendación de alguien','Pasó por la tienda','Agencia, guía u operador turístico','Otras']},
         {id:'4jXb4pPqHYYgGXiBZYP1',label:'¿Recomendarías esta experiencia a alguien más?',type:'single',options:['Sin duda','Probablemente sí','No está seguro','Probablemente no','No']},
@@ -1431,8 +1431,8 @@ const SURVEY_DEFS = {
         {id:'SXK3mzzvl6tyOrWiBpGJ',label:'Si pudieras mejorar algo de la experiencia, ¿qué sería?',type:'text'}
     ]},
     chuculatologia: { title:'Chuculatología', questions: [
-        {id:'JRPwosOSS2qb3aWpY2II',label:'¿Cómo calificarías tu experiencia en general?',type:'single',options:['Excelente','Muy buena','Buena','Regular','Mala']},
-        {id:'I9mUDaEH8mrGsxls75ys',label:'Frente a tus expectativas, la experiencia:',type:'single',options:['Superó las expectativas','Cumplió las expectativas','Cumplió parcialmente las expectativas','No cumplió las expectativas','No había expectativas previas']},
+        {id:'JRPwosOSS2qb3aWpY2II',label:'¿Qué experiencia realizaste hoy?',type:'single',options:['Cacao Maestro','El Camino del Chocolate','Wonka por un día','Oompa Loompa por un día']},
+        {id:'I9mUDaEH8mrGsxls75ys',label:'Frente a tus expectativas, la experiencia:',type:'single',options:['Superó las expectativas','Cumplió las expectativas','Cumplió parcialmente las expectativas','No cumplió las expectativas','No tenías expectativas previas']},
         {id:'9B4GwlZ1jMFKDH2RkhYF',label:'¿Qué fue lo que más disfrutaste de la CHUCULATOLOGÍA?',type:'multi',options:['La personalización de la bebida','Los sabores y combinaciones','La calidad del chocolate','La presentación','El ambiente del lugar','La atención del equipo','Toda la experiencia','Otras']},
         {id:'Diat1g5q6OLj9NIQfvPz',label:'¿Cómo calificarías las opciones de personalización?',type:'single',options:['Excelentes','Muy buenas','Buenas','Regulares','Insuficientes']},
         {id:'4jXb4pPqHYYgGXiBZYP1',label:'¿Recomendarías CHUCULATOLOGÍA a alguien más?',type:'single',options:['Sin duda','Probablemente sí','No está seguro','Probablemente no','No']},
@@ -1450,19 +1450,37 @@ const SURVEY_BAR_COLORS=['var(--verde)','var(--azul)','var(--naranja)','var(--ce
 //   nota general = promedio de los 3 totales
 // Se resuelven por TEXTO y no por id: Chuculatología reutiliza el id
 // JRPwosOSS2qb3aWpY2II para "Servicio", que en Experiencias es otra pregunta.
-const SCORED_QUESTIONS = [
-    { name:'Recomendación', match:/recomendar/i },
-    { name:'Satisfacción',  match:/frente a tus expectativas/i },
-    // ojo: nada de \w cerca de tildes ("calificarías") — \w no matchea "í"
-    { name:'Servicio',      match:/tu experiencia en general/i }
-];
+// Son POR ENCUESTA: Chuculatología NO tiene "¿cómo calificarías tu experiencia en
+// general?" (ese id guarda la experiencia realizada), así que su tercera pregunta
+// calificable es la de personalización. Antes se buscaba la misma pregunta en las dos
+// y en Chuculatología no cuadraba ninguna respuesta -> esa barra salía vacía y la
+// nota se promediaba con solo 2 de 3.
+const SCORED_QUESTIONS_POR_ENCUESTA = {
+    experiencias: [
+        { name:'Recomendación', match:/recomendar/i },
+        { name:'Satisfacción',  match:/frente a tus expectativas/i },
+        // ojo: nada de \w cerca de tildes ("calificarías") — \w no matchea "í"
+        { name:'Servicio',      match:/tu experiencia en general/i }
+    ],
+    chuculatologia: [
+        { name:'Recomendación',   match:/recomendar/i },
+        { name:'Satisfacción',    match:/frente a tus expectativas/i },
+        { name:'Personalización', match:/opciones de personalizaci/i }
+    ]
+};
+const _norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/\s+/g,' ').trim();
 function scoreOf(options, answer) {
-    const i = (options||[]).indexOf(String(answer||'').trim());
+    const a = _norm(answer);
+    if (!a) return null;
+    // Comparacion normalizada: un acento o una mayuscula de diferencia hacia que la
+    // respuesta no puntuara y nadie se enteraba.
+    const i = (options||[]).findIndex(o => _norm(o) === a);
     return i < 0 ? null : 5 - i;
 }
 function computeSurveyScores(key, subs) {
     const def = SURVEY_DEFS[key];
-    const questions = SCORED_QUESTIONS.map(sq => {
+    const questions = (SCORED_QUESTIONS_POR_ENCUESTA[key] || SCORED_QUESTIONS_POR_ENCUESTA.experiencias).map(sq => {
         const q = (def.questions||[]).find(x => x.type==='single' && sq.match.test(x.label));
         if (!q) return { name:sq.name, puntaje:0, respuestas:0, total:null };
         let puntaje=0, respuestas=0;
