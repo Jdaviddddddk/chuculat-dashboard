@@ -952,7 +952,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                         <span class="table-count" id="countMora">0 clientes</span>
                     </div>
                 </div>
-                <p class="section-note">Solo saldo <strong>vencido</strong>. Cada factura con sus días exactos de mora, de la más vieja a la más reciente.</p>
+                <p class="section-note">Solo saldo <strong>vencido</strong>. Cada factura con sus días exactos de mora, de la más vieja a la más reciente. Los chips con <strong>≈</strong> son deuda anterior a jun-2025: Siigo no la expone por factura, así que los días son un estimado desde el corte del reporte.</p>
                 <div class="table-wrap">
                     <table id="tblMora"><thead><tr>
                         <th>Cliente</th><th>Deuda vencida</th><th>Mora (días · saldo)</th>
@@ -2826,7 +2826,7 @@ function sortB2BClientes(col){ b2bClientesSort.dir=b2bClientesSort.col===col?(b2
 //   · barrer las ~10.6k facturas de Siigo toma minutos: no cabe en un request.
 // Base: saldo REAL con IVA, en COP (el resto del panel va sin IVA).
 const CARTERA_URL = 'https://app.rioagencymarketing.com/webhook/get-cartera';
-let carteraData = [], carteraFacturas = [], carteraLegacy = [];
+let carteraData = [], carteraFacturas = [], carteraLegacy = [], carteraCorteLegacy = null;
 let carteraResumen = null;   // totales exactos del backend (para el pie de tabla)
 
 // La tabla de cartera se puede plegar para dejar solo los plazos y sus totales
@@ -2865,6 +2865,7 @@ async function renderCartera() {
     carteraData = d.porCliente || [];
     carteraFacturas = d.facturas || [];
     carteraLegacy = d.legacy || [];
+    carteraCorteLegacy = d.corte_legacy || null;
     document.getElementById('navBadgeCartera').textContent = carteraData.length;
     const cr = d.resumen;
     carteraResumen = cr;
@@ -2955,6 +2956,17 @@ function renderCarteraCards(){
 // se muestra como un solo bloque marcado "antigua".
 let moraData = [];
 const LEG_DIAS = { '>361':361, '181-360':181, '121-180':121, '91-120':91, '61-90':61, '31-60':31, '1-30':1 };
+// La deuda anterior a jun-2025 no tiene detalle por factura: solo el rango que traía
+// el reporte de Siigo el día del corte. Ese rango se quedaba CONGELADO — el 18-ago
+// seguía mostrando los días del corte del 22-jul (27 días de atraso sobre $17,2M,
+// el 31% de la mora) — así que se le suman los días transcurridos desde el corte.
+// Sigue siendo un piso aproximado, por eso el chip se marca con ≈.
+function diasDesdeCorte(){
+    if (!carteraCorteLegacy) return 0;
+    const c = new Date(String(carteraCorteLegacy).slice(0,10) + 'T00:00:00Z');
+    const d = Math.floor((Date.now() - c.getTime()) / 86400000);
+    return d > 0 ? d : 0;
+}
 function fmtCorto(v){
     const n = Math.abs(Number(v)||0);
     if (n >= 1e6) return '$' + (v/1e6).toLocaleString('es-CO',{minimumFractionDigits:1,maximumFractionDigits:1}) + ' M';
@@ -2990,7 +3002,7 @@ function renderMora(){
     for (const l of carteraLegacy) {
         if (!carteraVisible(l.nit, l.cliente)) continue;
         const v = Number(l.saldo_cop)||0;
-        if (v > 0 && LEG_DIAS[l.bucket] !== undefined) add(l.cliente, l.nit, LEG_DIAS[l.bucket], v, true, 'L:' + (l.nit||l.cliente) + ':' + l.bucket);
+        if (v > 0 && LEG_DIAS[l.bucket] !== undefined) add(l.cliente, l.nit, LEG_DIAS[l.bucket] + diasDesdeCorte(), v, true, 'L:' + (l.nit||l.cliente) + ':' + l.bucket);
     }
     moraData = Object.values(by).map(c => {
         c.items.sort((a,b) => b.dias - a.dias);
@@ -3007,7 +3019,7 @@ function _renderMoraTable(){
     tbody.innerHTML = rows.map(c => {
         const chips = c.items.map(i => {
             const off = moraExcluidas.has(i.key);
-            return `<span class="mora-chip ${moraClase(i.dias)}${off?' off':''}" onclick="moraToggle('${jsq(i.key)}')" title="${off?'Incluir en el total':'Excluir del total'}">${i.aprox?'+':''}${i.dias}d · ${fmtCorto(i.saldo)}</span>`;
+            return `<span class="mora-chip ${moraClase(i.dias)}${off?' off':''}" onclick="moraToggle('${jsq(i.key)}')" title="${i.aprox?'Deuda anterior a jun-2025: Siigo no la expone por factura, los días son un estimado desde el corte del reporte. ':''}${off?'Incluir en el total':'Excluir del total'}">${i.aprox?'≈':''}${i.dias}d · ${fmtCorto(i.saldo)}</span>`;
         }).join('');
         const tot = c.items.reduce((s,i)=> s + (moraExcluidas.has(i.key)?0:i.saldo), 0);
         return `<tr>
