@@ -219,6 +219,8 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 .mora-chip.m2  { color: var(--naranja); border-color: #f0b78a; } /* 31-90  */
 .mora-chip.m3  { color: #c0392b; border-color: #e3a49c; }   /* 91-180 */
 .mora-chip.m4  { color: #7a0e0e; border-color: #d59a9a; }   /* +180   */
+.mora-chip { cursor: pointer; user-select: none; transition: opacity .12s; }
+.mora-chip.off { text-decoration: line-through; opacity: .38; }
 #tblEstadoCartera td, #tblEstadoCartera th { white-space: nowrap; }
 .pct-cell { position: relative; }
 .pct-bar { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 60%;
@@ -2954,22 +2956,35 @@ function fmtCorto(v){
     return fmtCOP(v);
 }
 function moraClase(d){ return d > 180 ? 'm4' : d > 90 ? 'm3' : d > 30 ? 'm2' : 'm1'; }
+
+// ── APAGAR FACTURAS EN LA MORA (por chip) ─────────────────────────────────
+// Cada chip = una factura vencida. Clave estable: inv_id de la factura viva, o
+// 'L:nit:bucket' para la deuda legacy (que viene agregada, sin factura individual).
+// Al apagar un chip, su saldo sale del Total de ese cliente y del Total vencido del
+// pie. Se recuerda entre sesiones y el pie avisa cuántas facturas hay excluidas.
+let moraExcluidas = new Set(JSON.parse(localStorage.getItem('chuculat.moraExcluidas') || '[]'));
+const jsq = s => String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+function moraToggle(key){
+    if (moraExcluidas.has(key)) moraExcluidas.delete(key); else moraExcluidas.add(key);
+    localStorage.setItem('chuculat.moraExcluidas', JSON.stringify([...moraExcluidas]));
+    _renderMoraTable();
+}
 function renderMora(){
     const by = {};
-    const add = (cliente, nit, dias, saldo, aprox) => {
+    const add = (cliente, nit, dias, saldo, aprox, key) => {
         const k = nit || cliente;
         if (!by[k]) by[k] = { cliente, nit, total:0, items:[] };
         by[k].total += saldo;
-        by[k].items.push({ dias, saldo, aprox });
+        by[k].items.push({ dias, saldo, aprox, key });
     };
     for (const f of carteraFacturas) {
         if (!carteraVisible(f.nit, f.cliente)) continue;   // cliente apagado en el aging
-        if ((f.dias||0) > 0 && (f.saldo_cop||0) > 0) add(f.cliente, f.nit, f.dias, f.saldo_cop, false);
+        if ((f.dias||0) > 0 && (f.saldo_cop||0) > 0) add(f.cliente, f.nit, f.dias, f.saldo_cop, false, f.inv_id || f.numero);
     }
     for (const l of carteraLegacy) {
         if (!carteraVisible(l.nit, l.cliente)) continue;
         const v = Number(l.saldo_cop)||0;
-        if (v > 0 && LEG_DIAS[l.bucket] !== undefined) add(l.cliente, l.nit, LEG_DIAS[l.bucket], v, true);
+        if (v > 0 && LEG_DIAS[l.bucket] !== undefined) add(l.cliente, l.nit, LEG_DIAS[l.bucket], v, true, 'L:' + (l.nit||l.cliente) + ':' + l.bucket);
     }
     moraData = Object.values(by).map(c => {
         c.items.sort((a,b) => b.dias - a.dias);
@@ -2983,19 +2998,28 @@ function _renderMoraTable(){
     document.getElementById('countMora').textContent = rows.length + ' clientes';
     const tbody = document.getElementById('bodyMora'), foot = document.getElementById('footMora');
     if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="3">✅ Sin saldo vencido</td></tr>'; if(foot) foot.innerHTML=''; return; }
-    tbody.innerHTML = rows.map(c => `<tr>
+    tbody.innerHTML = rows.map(c => {
+        const chips = c.items.map(i => {
+            const off = moraExcluidas.has(i.key);
+            return `<span class="mora-chip ${moraClase(i.dias)}${off?' off':''}" onclick="moraToggle('${jsq(i.key)}')" title="${off?'Incluir en el total':'Excluir del total'}">${i.aprox?'+':''}${i.dias}d · ${fmtCorto(i.saldo)}</span>`;
+        }).join('');
+        const tot = c.items.reduce((s,i)=> s + (moraExcluidas.has(i.key)?0:i.saldo), 0);
+        return `<tr>
         <td class="td-name">${esc(c.cliente)}</td>
-        <td class="td-pts azul">${fmtCOP(c.total)}</td>
-        <td class="mora-list">${c.items.map(i =>
-            `<span class="mora-chip ${moraClase(i.dias)}">${i.aprox?'+':''}${i.dias}d · ${fmtCorto(i.saldo)}</span>`).join('')}</td>
-    </tr>`).join('');
+        <td class="td-pts azul">${fmtCOP(tot)}</td>
+        <td class="mora-list">${chips}</td>
+    </tr>`;
+    }).join('');
     if (foot){
-        const t = rows.reduce((s,c)=>s+c.total,0);
-        const nf = rows.reduce((s,c)=>s+c.items.length,0);
+        let t = 0, nf = 0, off = 0;
+        for (const c of rows) for (const i of c.items) {
+            if (moraExcluidas.has(i.key)) { off++; continue; }
+            t += i.saldo; nf++;
+        }
         foot.innerHTML = `<tr style="border-top:2px solid var(--beige);font-weight:800;background:var(--crema)">
             <td><strong>Total vencido</strong></td>
             <td class="td-pts azul"><strong>${fmtCOP(t)}</strong></td>
-            <td style="font-size:12px;color:var(--gris)">${nf} factura${nf===1?'':'s'} vencida${nf===1?'':'s'}</td></tr>`;
+            <td style="font-size:12px;color:var(--gris)">${nf} factura${nf===1?'':'s'} vencida${nf===1?'':'s'}${off?` · <span style="color:#ec6197;font-weight:700">${off} excluida${off===1?'':'s'}</span>`:''}</td></tr>`;
     }
 }
 
