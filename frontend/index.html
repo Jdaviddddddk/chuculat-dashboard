@@ -1165,7 +1165,14 @@ const fmtCOP = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CO');
 const esc    = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 function fmtDate(d) {
     if (!d) return '—';
-    try { const [y,m,day]=d.split('-'); return `${day} de ${MESES[parseInt(m,10)-1]} ${String(y).slice(2)}`; } catch(e){ return d; }
+    // GHL manda las fechas con hora ("2026-08-08T00:00:00.000Z"); al partir por "-"
+    // el dia salia como "08T00:00:00.000Z". Se recorta a YYYY-MM-DD antes de nada.
+    try {
+        const [y,m,day] = String(d).slice(0,10).split('-');
+        const dd = parseInt(day,10);
+        if (!y || !m || isNaN(dd)) return String(d);
+        return `${dd} de ${MESES[parseInt(m,10)-1]} ${String(y).slice(2)}`;
+    } catch(e){ return String(d); }
 }
 function fmtTime(ts) {
     if (!ts) return '—';
