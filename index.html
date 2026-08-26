@@ -2102,20 +2102,32 @@ function renderCliProductos(){
         nota.textContent = 'Escribe una cédula o nombre para ver los productos que ha comprado, con cantidad y valor.';
         return;
     }
-    // Agrupa las coincidencias por CLIENTE (clave = cédula si existe, si no el nombre).
-    const byClient = new Map();
-    for (const p of (d.clientesPorProducto || [])) {
-        for (const c of (p.clientes || [])) {
+    // Detalle COMPLETO por cliente: clienteProductos trae TODO lo que compró cada cliente
+    // B2C (no solo el top de Destacadas). Si el payload aún no lo trae, se cae al top.
+    if (d.clienteProductos) {
+        for (const c of d.clienteProductos) {
             const nm = String(c.name || '').toLowerCase();
             const cd = String(c.ced || '').toLowerCase();
             if (!cd.includes(q) && !nm.includes(q)) continue;
-            const key = (c.ced || c.name || '¿?').toString();
-            let g = byClient.get(key);
-            if (!g) { g = { key, name: c.name || '(sin nombre)', ced: c.ced || '', filas: [] }; byClient.set(key, g); }
-            g.filas.push({ producto: p.name, code: p.code, qty: c.qty, subtotal: c.subtotal });
+            cliMatches.push({ key: (c.ced || c.name || '¿?').toString(), name: c.name || '(sin nombre)', ced: c.ced || '',
+                filas: (c.prods || []).map(p => ({ producto: p.name, code: p.code, qty: p.qty, subtotal: p.subtotal })) });
         }
+    } else {
+        // Respaldo: arma desde el top (clientesPorProducto) agrupando por cliente.
+        const byClient = new Map();
+        for (const p of (d.clientesPorProducto || [])) {
+            for (const c of (p.clientes || [])) {
+                const nm = String(c.name || '').toLowerCase();
+                const cd = String(c.ced || '').toLowerCase();
+                if (!cd.includes(q) && !nm.includes(q)) continue;
+                const key = (c.ced || c.name || '¿?').toString();
+                let g = byClient.get(key);
+                if (!g) { g = { key, name: c.name || '(sin nombre)', ced: c.ced || '', filas: [] }; byClient.set(key, g); }
+                g.filas.push({ producto: p.name, code: p.code, qty: c.qty, subtotal: c.subtotal });
+            }
+        }
+        cliMatches = [...byClient.values()];
     }
-    cliMatches = [...byClient.values()];
     // Total gastado por cliente (para ordenar el selector) + orden de sus productos.
     cliMatches.forEach(g => {
         g.filas.sort((a,b)=>b.subtotal-a.subtotal);
@@ -2126,7 +2138,7 @@ function renderCliProductos(){
     if (!cliMatches.length) {
         selWrap.hidden = true;
         tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gris);padding:20px">Sin resultados para «' + esc(q) + '» en el período.</td></tr>';
-        nota.textContent = 'Sin coincidencias. Ojo: solo aparecen los productos del top de Compras Destacadas.';
+        nota.textContent = 'Sin coincidencias para «' + esc(q) + '» en el período seleccionado.';
         return;
     }
     // Selector visible solo cuando hay más de un cliente que coincide.
