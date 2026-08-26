@@ -1209,6 +1209,8 @@ function isB2BLog(e) {
 // ── SEGMENT ──────────────────────────────────────────────────────────────
 let currentSegment = 'b2c';
 let b2bLoaded = false;
+let ventasLoadedAt = 0;               // marca de tiempo de la última carga de ventasData
+const VENTAS_TTL_MS = 3 * 60 * 1000;  // Destacadas/Tablas/B2B se refrescan solos si al abrirlos los datos ya tienen más de esto
 
 function setSegment(seg) {
     currentSegment = seg;
@@ -1222,10 +1224,16 @@ function setSegment(seg) {
     document.getElementById('panelB2B').classList.toggle('show', seg==='b2b');
     document.getElementById('panelTablas').classList.toggle('show', seg==='tablas');
     document.getElementById('panelDestacadas').classList.toggle('show', seg==='destacadas');
-    // Ventas, Tablas y Destacadas comparten los datos de get-ventas
-    if ((seg==='b2b' || seg==='tablas' || seg==='destacadas') && !b2bLoaded) { b2bLoaded=true; loadB2B(); }
-    if (seg==='tablas' && ventasData) { document.getElementById('loadingTablas').style.display='none'; document.getElementById('tablasContent').style.display='block'; renderTablas(); }
-    if (seg==='destacadas' && ventasData) { document.getElementById('loadingDest').style.display='none'; document.getElementById('destContent').style.display='block'; renderDestacadas(); }
+    // Ventas, Tablas y Destacadas comparten los datos de get-ventas. Se recargan si no
+    // se han cargado nunca, o si ya están viejos (VENTAS_TTL_MS) para que "se refresquen
+    // solos" al volver a abrirlos, sin tener que recargar toda la página.
+    const ventasViejo = b2bLoaded && (Date.now() - ventasLoadedAt) > VENTAS_TTL_MS;
+    if ((seg==='b2b' || seg==='tablas' || seg==='destacadas') && (!b2bLoaded || ventasViejo)) {
+        b2bLoaded=true; loadB2B();
+    } else {
+        if (seg==='tablas' && ventasData) { document.getElementById('loadingTablas').style.display='none'; document.getElementById('tablasContent').style.display='block'; renderTablas(); }
+        if (seg==='destacadas' && ventasData) { document.getElementById('loadingDest').style.display='none'; document.getElementById('destContent').style.display='block'; renderDestacadas(); }
+    }
     // Botón flotante de filtro: solo en Ventas y Destacadas
     const ff = document.getElementById('floatFilter');
     if (ff){ ff.hidden = !(seg==='b2b' || seg==='destacadas'); closeFloatFilter(); ffSegment = seg; }
@@ -1940,6 +1948,7 @@ async function loadB2B() {
         const data = await res.json();
         if (!data.meta) throw new Error('Respuesta inválida');
         ventasData = data;
+        ventasLoadedAt = Date.now();
         // La primera carga usa el rango por defecto (1-ene → hoy) = base sin filtro
         if (!ventasFull) { ventasFull = data; loadVentasAllTime(); }
         document.getElementById('loadingB2B').style.display='none';
@@ -2005,7 +2014,8 @@ let destChartProdMes=null, destChartNR=null;
 function renderDestacadas(){
     const d = ventasData && ventasData.destacadas;
     if (!d) return;
-    document.getElementById('destPeriodLabel').textContent = fmtDate(ventasData.meta.dateStart) + ' → ' + fmtDate(ventasData.meta.dateEnd);
+    const horaDatos = ventasLoadedAt ? ' · datos ' + new Date(ventasLoadedAt).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}) : '';
+    document.getElementById('destPeriodLabel').textContent = fmtDate(ventasData.meta.dateStart) + ' → ' + fmtDate(ventasData.meta.dateEnd) + horaDatos;
     renderDestProdMes(d);
     renderDestProdSelect(d);
     renderDestClientes();
