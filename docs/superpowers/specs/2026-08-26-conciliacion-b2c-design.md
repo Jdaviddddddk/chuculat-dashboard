@@ -30,7 +30,9 @@ Etapas siguientes: C3, C4, C7, C8, C9, C10.
 - **Lado A (Siigo, fresco):** subtotal neto B2C del mes computado en vivo desde Siigo con la
   MISMA lógica que compute_stats: `itemSubtotal = price*qty − descuento`, `× fx`; NC netadas
   por fecha de NC; canal `cost_center 168` = B2C (con `isCompany` → B2B). Desglose
-  informativo **POS vs Web** (Web = facturas originadas en WooCommerce).
+  informativo **POS vs Web**, distinguido por la **serie / tipo de documento** de la
+  factura: la serie que genera la integración WooCommerce = **Web**; el resto = **POS**.
+  (La serie exacta se confirma en el prototipo leyendo el workflow WooCommerce-Siigo.)
 - **Lado B (dashboard):** ventas netas B2C que muestra `get-ventas` para ese mes.
 - **Cuadra** si `|A−B| ≤ $1` (redondeo). **Detecta:** bug de cómputo del panel,
   `ventas_items` desactualizado, facturas fantasma, fx de exportación.
@@ -54,7 +56,8 @@ Etapas siguientes: C3, C4, C7, C8, C9, C10.
 
 ### C6 — Puntos redimidos
 - **Lado A:** eventos de **redención** en `puntos_log` del periodo (tipo resta/redención).
-- **Lado B:** redenciones registradas en **GHL** (workflow `Redimir Puntos` / movimiento de saldo).
+- **Lado B:** los puntos redimidos **tal como ya los computa el dashboard** para su KPI
+  "Redimidos" (misma fuente/lógica que hoy alimenta esa tarjeta), acotado al periodo.
 - **Cuadra** si coinciden. **Detecta:** histórico mezclado con el periodo.
 - **Detalle:** redenciones no conciliadas.
 
@@ -68,12 +71,11 @@ Etapas siguientes: C3, C4, C7, C8, C9, C10.
 - **Supabase:** `puntos_log`.
 - **GHL:** contacts (histórico/saldo), workflows de puntos/redención.
 
-## Abiertos a confirmar en la revisión del spec
-1. **POS vs Web en Siigo:** cómo se distingue el canal Web del POS — ¿serie de documento,
-   `observaciones` (donde se guarda la fuente IG/directo/Woo), o centro de costo? (Solo afecta
-   el desglose informativo de C1; el neto total no depende de esto.)
-2. **C6 redimidos:** confirmar que el lado A = `puntos_log` tipo redención y el lado B = saldo/
-   evento de GHL es suficiente, o si hay otra fuente de redención.
+## Decisiones confirmadas
+1. **POS vs Web (C1):** se distingue por la **serie / tipo de documento** de la factura
+   (serie de WooCommerce = Web; el resto = POS). Solo afecta el desglose informativo de C1.
+2. **C6 redimidos:** el lado B usa **la misma fuente/lógica que el dashboard ya usa** para el
+   KPI "Redimidos".
 
 ## Método de entrega
 Local primero: prototipo/validación con Node → revisar cifras contigo → montar
