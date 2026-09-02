@@ -2848,7 +2848,7 @@ function sortB2BClientes(col){ b2bClientesSort.dir=b2bClientesSort.col===col?(b2
 //   · barrer las ~10.6k facturas de Siigo toma minutos: no cabe en un request.
 // Base: saldo REAL con IVA, en COP (el resto del panel va sin IVA).
 const CARTERA_URL = 'https://app.rioagencymarketing.com/webhook/get-cartera';
-let carteraData = [], carteraFacturas = [], carteraLegacy = [], carteraCorteLegacy = null;
+let carteraData = [], carteraFacturas = [], carteraLegacy = [], carteraAjustes = [], carteraCorteLegacy = null;
 let carteraResumen = null;   // totales exactos del backend (para el pie de tabla)
 
 // La tabla de cartera se puede plegar para dejar solo los plazos y sus totales
@@ -2887,6 +2887,7 @@ async function renderCartera() {
     carteraData = d.porCliente || [];
     carteraFacturas = d.facturas || [];
     carteraLegacy = d.legacy || [];
+    carteraAjustes = d.ajustes || [];
     carteraCorteLegacy = d.corte_legacy || null;
     document.getElementById('navBadgeCartera').textContent = carteraData.length;
     const cr = d.resumen;
@@ -3026,6 +3027,10 @@ function renderMora(){
         const v = Number(l.saldo_cop)||0;
         if (v > 0 && LEG_DIAS[l.bucket] !== undefined) add(l.cliente, l.nit, LEG_DIAS[l.bucket] + diasDesdeCorte(), v, true, 'L:' + (l.nit||l.cliente) + ':' + l.bucket);
     }
+    for (const a of carteraAjustes) {   // entradas manuales (no factura): mismo trato que legacy
+        if (!carteraVisible(a.nit, a.cliente)) continue;
+        if ((a.saldo_cop||0) > 0) add(a.cliente, a.nit, Number(a.dias)||0, a.saldo_cop, true, 'A:' + (a.nit||a.cliente));
+    }
     moraData = Object.values(by).map(c => {
         c.items.sort((a,b) => b.dias - a.dias);
         return c;
@@ -3091,6 +3096,12 @@ function renderEstadoCartera(){
         if (v < 0 || l.bucket === 'saldo_favor') { favor += v; continue; }
         const d = LEG_DIAS[l.bucket];
         clasificar(d === undefined ? 0 : d, v);
+    }
+    for (const a of carteraAjustes){   // entradas manuales (no factura)
+        if (!carteraVisible(a.nit, a.cliente)) continue;
+        const v = Number(a.saldo_cop)||0;
+        if (v < 0 || a.bucket === 'saldoFavor') { favor += v; continue; }
+        clasificar(Number(a.dias)||0, v);
     }
     const total = EST_RANGOS.reduce((s,r)=>s+acc[r.k],0) + favor;
     const tbody = document.getElementById('bodyEstadoCartera'), foot = document.getElementById('footEstadoCartera');
@@ -3161,6 +3172,13 @@ function renderCarteraDetalle(){
         if (v < 0 || l.bucket === 'saldo_favor') c.anticipo += v;
         else if (CARTERA_DET_COLS.includes(l.bucket)) c[l.bucket] += v;
         else c['>361'] += v;   // fallback: legacy siempre es vieja
+    }
+    for (const a of carteraAjustes){   // entradas manuales (no factura)
+        if (!carteraVisible(a.nit, a.cliente)) continue;
+        const c = slot(a.nit, a.cliente);
+        const v = Number(a.saldo_cop) || 0;
+        c.saldo += v;
+        if (v < 0 || a.bucket === 'saldoFavor') c.anticipo += v; else c[_bucketDias(a.dias)] += v;
     }
     carteraDetalle = Object.values(byCli).sort((a,b) => b.saldo - a.saldo);
     _renderCarteraDetalleTable();
