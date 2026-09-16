@@ -763,7 +763,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             <div class="table-header"><h2>📆 Cumplimiento mes a mes</h2><span class="table-count" id="metaYearLabel">—</span></div>
             <div class="table-wrap">
                 <table><thead><tr>
-                    <th>Mes</th><th>% Part.</th><th>Meta Base</th><th>Meta Ajustada</th><th>Real</th><th>Desglose por centro</th><th>Cumplimiento</th><th>Estado</th>
+                    <th>Mes</th><th>% Part.</th><th>Meta Ajustada</th><th>Real</th><th>Crec. vs año pasado</th><th>Desglose por centro</th><th>Cumplimiento</th>
                 </tr></thead><tbody id="bodyMeta"></tbody></table>
             </div>
         </div>
@@ -2318,6 +2318,14 @@ function renderMeta() {
         realMesCCFac.b2b[mi]    = m.b2b_fac || 0;
         realMesCCFac.export[mi] = m.export_fac || 0;
     }
+    // Real del AÑO PASADO por mes (para el crecimiento interanual). Sale del histórico completo.
+    const prevYear = String(parseInt(year,10) - 1);
+    const realMesPrev = {};
+    const _hist = (typeof ventasAllTime !== 'undefined' && ventasAllTime && ventasAllTime.meses) ? ventasAllTime : VD;
+    for (const pm of (_hist.meses || [])) {
+        const [py, pmo] = pm.mes.split('-');
+        if (py === prevYear) realMesPrev[parseInt(pmo,10)] = pm.total;
+    }
     // Mes actual (si el año consultado es el año en curso; si es pasado, todos cerrados)
     const now = new Date();
     const curYear = now.getFullYear();
@@ -2360,23 +2368,33 @@ function renderMeta() {
     // Tabla
     const tbody = document.getElementById('bodyMeta');
     tbody.innerHTML = rows.map(r=>{
-        let estado, color;
-        if (!r.closed && r.real===0) { estado='Pendiente'; color='var(--gris)'; }
-        else if (r.pct>=100) { estado='✅ Cumplida'; color='var(--verde)'; }
-        else if (r.pct>=70)  { estado='🟡 En camino'; color='#f9a825'; }
-        else                 { estado='🔴 Bajo meta'; color='var(--cereza)'; }
+        let color;
+        if (!r.closed && r.real===0) color='var(--gris)';
+        else if (r.pct>=100) color='var(--verde)';
+        else if (r.pct>=70)  color='#f9a825';
+        else                 color='var(--cereza)';
         const barW = Math.min(r.pct,100);
         const redistrib = (!r.closed && Math.abs(r.adj-r.base)>1) ? ` <small style="color:var(--naranja)">${r.adj>r.base?'▲':'▼'}</small>` : '';
         const desglose = r.real ? `<small style="line-height:1.5;display:inline-block">
             <span style="color:var(--cereza)">B2C ${fmtCOP(realMesCC.b2c[r.m]||0)}</span> ·
             <span style="color:var(--naranja)">B2B ${fmtCOP(realMesCC.b2b[r.m]||0)}</span> ·
             <span style="color:var(--morado)">Export ${fmtCOP(realMesCC.export[r.m]||0)}</span></small>` : '<span style="color:var(--gris)">—</span>';
+        // Crecimiento vs mismo mes del año pasado (solo meses cerrados + el actual)
+        const prev = realMesPrev[r.m] || 0;
+        let crecCell;
+        if (!(r.closed || r.isCur) || !r.real) crecCell = '<span style="color:var(--beige)">—</span>';
+        else if (prev <= 0) crecCell = `<span style="color:var(--gris);font-size:11px">sin base ${prevYear}</span>`;
+        else {
+            const g = (r.real - prev) / prev * 100;
+            const gc = g >= 0 ? 'var(--verde)' : 'var(--cereza)';
+            crecCell = `<span style="font-weight:800;color:${gc}">${g>=0?'▲ +':'▼ '}${g.toFixed(1)}%</span><br><small style="color:var(--gris)">vs ${fmtCOP(prev)}${r.isCur?' · mes en curso':''}</small>`;
+        }
         return `<tr style="${r.isCur?'background:rgba(0,171,225,.05)':''}">
             <td class="td-name">${MESES[r.m-1]}${r.isCur?' <small style="color:var(--azul)">· actual</small>':''}</td>
             <td>${(META_PCT[r.m]*100).toFixed(1)}%</td>
-            <td style="color:var(--gris)">${fmtCOP(Math.round(r.base))}</td>
             <td class="td-pts azul">${fmtCOP(Math.round(r.adj))}${redistrib}</td>
             <td class="td-pts verde">${r.real?fmtCOP(r.real):'—'}</td>
+            <td style="min-width:120px">${crecCell}</td>
             <td style="min-width:190px;font-size:11px">${desglose}</td>
             <td style="min-width:130px">
                 <div style="display:flex;align-items:center;gap:8px">
@@ -2386,7 +2404,6 @@ function renderMeta() {
                     <span style="font-weight:700;font-size:12px;color:${color}">${r.pct}%</span>
                 </div>
             </td>
-            <td><span style="font-size:12px;font-weight:600;color:${color}">${estado}</span></td>
         </tr>`;
     }).join('');
 
