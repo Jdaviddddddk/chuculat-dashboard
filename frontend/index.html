@@ -2318,14 +2318,6 @@ function renderMeta() {
         realMesCCFac.b2b[mi]    = m.b2b_fac || 0;
         realMesCCFac.export[mi] = m.export_fac || 0;
     }
-    // Real del AÑO PASADO por mes (para el crecimiento interanual). Sale del histórico completo.
-    const prevYear = String(parseInt(year,10) - 1);
-    const realMesPrev = {};
-    const _hist = (typeof ventasAllTime !== 'undefined' && ventasAllTime && ventasAllTime.meses) ? ventasAllTime : VD;
-    for (const pm of (_hist.meses || [])) {
-        const [py, pmo] = pm.mes.split('-');
-        if (py === prevYear) realMesPrev[parseInt(pmo,10)] = pm.total;
-    }
     // Mes actual (si el año consultado es el año en curso; si es pasado, todos cerrados)
     const now = new Date();
     const curYear = now.getFullYear();
@@ -2379,15 +2371,17 @@ function renderMeta() {
             <span style="color:var(--cereza)">B2C ${fmtCOP(realMesCC.b2c[r.m]||0)}</span> ·
             <span style="color:var(--naranja)">B2B ${fmtCOP(realMesCC.b2b[r.m]||0)}</span> ·
             <span style="color:var(--morado)">Export ${fmtCOP(realMesCC.export[r.m]||0)}</span></small>` : '<span style="color:var(--gris)">—</span>';
-        // Crecimiento vs mismo mes del año pasado (solo meses cerrados + el actual)
-        const prev = realMesPrev[r.m] || 0;
+        // Crecimiento vs mismo mes del año pasado — MISMA lógica que la barra "Acumulado
+        // vs año anterior": base = VENTAS_ANIO_PREV (año pasado completo) y % = diferencia/año ACTUAL.
+        // El mes en curso entra parcial contra el mes completo del año pasado (como la barra).
+        const prev = VENTAS_ANIO_PREV.meses[r.m] || 0;
         let crecCell;
         if (!(r.closed || r.isCur) || !r.real) crecCell = '<span style="color:var(--beige)">—</span>';
-        else if (prev <= 0) crecCell = `<span style="color:var(--gris);font-size:11px">sin base ${prevYear}</span>`;
+        else if (prev <= 0) crecCell = `<span style="color:var(--gris);font-size:11px">sin base ${VENTAS_ANIO_PREV.anio}</span>`;
         else {
-            const g = (r.real - prev) / prev * 100;
+            const g = (r.real - prev) / r.real * 100;
             const gc = g >= 0 ? 'var(--verde)' : 'var(--cereza)';
-            crecCell = `<span style="font-weight:800;color:${gc}">${g>=0?'▲ +':'▼ '}${g.toFixed(1)}%</span><br><small style="color:var(--gris)">vs ${fmtCOP(prev)}${r.isCur?' · mes en curso':''}</small>`;
+            crecCell = `<span style="font-weight:800;color:${gc}">${g>=0?'▲ +':'▼ '}${g.toFixed(1)}%</span><br><small style="color:var(--gris)">vs ${fmtCOP(prev)} (${VENTAS_ANIO_PREV.anio})${r.isCur?' · mes en curso':''}</small>`;
         }
         return `<tr style="${r.isCur?'background:rgba(0,171,225,.05)':''}">
             <td class="td-name">${MESES[r.m-1]}${r.isCur?' <small style="color:var(--azul)">· actual</small>':''}</td>
