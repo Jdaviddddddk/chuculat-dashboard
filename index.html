@@ -266,6 +266,11 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 .page-btn.active { background: var(--chocolate); border-color: var(--chocolate); color: var(--blanco); }
 .page-btn:disabled { opacity: .35; cursor: default; }
 .page-ellipsis { color: var(--gris); font-size: 13px; padding: 0 4px; }
+.pager-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.pager-nav { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pager-meta { display: flex; align-items: center; gap: 12px; }
+.pager-info { color: var(--gris); font-size: 12px; font-weight: 600; }
+.pager-size { border: 2px solid var(--beige); border-radius: 8px; background: var(--blanco); color: var(--chocolate); font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 600; padding: 6px 8px; cursor: pointer; }
 
 /* ── HISTORIAL ── */
 .tl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
@@ -531,6 +536,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                     <th onclick="sortRepurchase('puntosOtorgados')" data-col="puntosOtorgados">Pts.    <i class="si">⇅</i></th>
                 </tr></thead><tbody id="bodyRepurchase"></tbody></table>
             </div>
+            <div class="pager-bar" id="repPager" style="display:none"></div>
         </div>
     </section>
 
@@ -565,6 +571,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                     <th onclick="sortContador('puntos')"       data-col="puntos">      Pts.      <i class="si">⇅</i></th>
                 </tr></thead><tbody id="bodyContador"></tbody></table>
             </div>
+            <div class="pager-bar" id="contPager" style="display:none"></div>
         </div>
     </section>
 
@@ -581,6 +588,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             <div class="table-wrap"><table id="tableRed"><thead><tr>
                 <th>Fecha</th><th>Cliente</th><th>Productos redimidos</th><th style="text-align:right">Puntos</th>
             </tr></thead><tbody id="bodyRed"></tbody></table></div>
+            <div class="pager-bar" id="redPager" style="display:none"></div>
         </div>
     </section>
 
@@ -629,6 +637,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                 <table><thead><tr><th>Fecha / Hora</th><th>Tipo</th><th>Cliente</th><th>Teléfono</th><th>Puntos</th><th>Fuente</th></tr></thead>
                 <tbody id="bodyLogs"></tbody></table>
             </div>
+            <div class="pager-bar" id="logsPager" style="display:none"></div>
             <div class="dash-loading" id="loadingLogs"><div class="loading-spinner"></div><p>Cargando eventos...</p></div>
         </div>
     </section>
@@ -636,6 +645,14 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
     <!-- Encuestas -->
     <section class="dash-section" id="sec-encuestas">
         <div class="section-title">📝 Encuestas de Experiencia<span id="surveyTotalBadge">0</span></div>
+        <div class="kpi-filter-bar">
+            <label>Desde</label><input type="date" id="surveyFrom">
+            <label>Hasta</label><input type="date" id="surveyTo">
+            <button class="btn-filter" onclick="applySurveyDateFilter()">Aplicar</button>
+            <button class="btn-filter secondary" onclick="clearSurveyDateFilter()">Todo el tiempo</button>
+            <span class="kpi-filter-period" id="surveyPeriodLabel">Todo el tiempo</span>
+            <p class="kpi-filter-note">📅 Filtra las estadísticas por fecha de respuesta</p>
+        </div>
         <div class="dash-loading" id="loadingSurveys"><div class="loading-spinner"></div><p>Cargando encuestas...</p></div>
         <div class="survey-grid" id="surveyGrid" style="display:none">
             <div class="survey-card" id="cardExperiencias">
@@ -1316,7 +1333,41 @@ function clearKpiFilter(){ document.getElementById('kpiDateFrom').value=''; docu
 // ── COMPRAS CON PUNTOS (redenciones) ─────────────────────────────────────
 // Se alimenta de puntos_log (tipo=redencion). El detalle de productos viene en
 // items[], que manda el sitio de redención; las redenciones viejas no lo traen.
+// ── Paginador genérico reutilizable ──────────────────────────────────────
+// Uso: const paged = pagePrep(key, rows);  ...pintar paged...  pagerBar(key, barId);
+// Cualquier llamada que no venga de navegación (búsqueda, filtro, recarga) vuelve a página 1.
+const _pg = {};                 // key -> {page, size, nav, _start, _total}
+const _pgRender = {};           // key -> función de render (para re-render al navegar)
+const PG_UMBRAL = 15;           // solo pagina si hay más de estas filas
+function _pgState(key){ if(!_pg[key]) _pg[key] = { page:1, size:30, nav:false }; return _pg[key]; }
+function pagePrep(key, rows){
+    const st = _pgState(key);
+    if(!st.nav) st.page = 1;
+    st.nav = false;
+    const total = rows.length, totalPages = Math.max(1, Math.ceil(total/st.size));
+    if(st.page > totalPages) st.page = totalPages;
+    if(st.page < 1) st.page = 1;
+    st._start = (st.page-1)*st.size; st._total = total;
+    return rows.slice(st._start, st._start + st.size);
+}
+function pagerBar(key, barId){
+    const st = _pg[key], bar = document.getElementById(barId); if(!bar) return;
+    const total = st._total||0, size = st.size, start = st._start||0;
+    if(total <= PG_UMBRAL){ bar.style.display='none'; bar.innerHTML=''; return; }
+    const totalPages = Math.max(1, Math.ceil(total/size));
+    bar.style.display = 'flex';
+    const prev = `<button class="page-btn" ${st.page===1?'disabled':''} onclick="pgGo('${key}',${st.page-1})">‹</button>`;
+    const next = `<button class="page-btn" ${st.page===totalPages?'disabled':''} onclick="pgGo('${key}',${st.page+1})">›</button>`;
+    let btns=''; for(let p=1;p<=totalPages;p++){ if(p===1||p===totalPages||(p>=st.page-2&&p<=st.page+2)) btns+=`<button class="page-btn ${p===st.page?'active':''}" onclick="pgGo('${key}',${p})">${p}</button>`; else if(p===st.page-3||p===st.page+3) btns+='<span class="page-ellipsis">…</span>'; }
+    const info = `<span class="pager-info">${start+1}–${Math.min(start+size,total)} de ${fmt(total)}</span>`;
+    const sizeSel = `<select class="pager-size" onchange="pgSize('${key}',this.value)">${[15,30,50,100].map(n=>`<option value="${n}" ${n===size?'selected':''}>${n} filas</option>`).join('')}</select>`;
+    bar.innerHTML = `<div class="pager-nav">${prev}${btns}${next}</div><div class="pager-meta">${info}${sizeSel}</div>`;
+}
+function pgGo(key,p){ const st=_pgState(key); st.page=p; st.nav=true; const f=_pgRender[key]; if(f) f(); }
+function pgSize(key,v){ const st=_pgState(key); st.size=parseInt(v); st.page=1; const f=_pgRender[key]; if(f) f(); }
+
 function renderRedenciones(){
+    _pgRender['red'] = renderRedenciones;
     const tb = document.getElementById('bodyRed');
     if(!tb) return;
     const q = (document.getElementById('searchRed')?.value || '').toLowerCase().trim();
@@ -1333,9 +1384,11 @@ function renderRedenciones(){
     document.getElementById('countRed').textContent  = reds.length + (reds.length===1?' redención':' redenciones');
     if(!reds.length){
         tb.innerHTML = '<tr class="empty-row"><td colspan="4">Sin compras con puntos en el período.</td></tr>';
+        const _b=document.getElementById('redPager'); if(_b){_b.style.display='none';_b.innerHTML='';}
         return;
     }
-    tb.innerHTML = reds.map(e => {
+    const _pagedRed = pagePrep('red', reds);
+    tb.innerHTML = _pagedRed.map(e => {
         const items = Array.isArray(e.items) ? e.items : [];
         const prods = items.length
             ? items.map(i => `<div style="padding:2px 0">
@@ -1352,6 +1405,7 @@ function renderRedenciones(){
             <td class="td-pts" style="text-align:right;color:var(--cereza)">${e.points}</td>
         </tr>`;
     }).join('');
+    pagerBar('red', 'redPager');
 }
 
 async function loadLogs() {
@@ -1400,9 +1454,11 @@ function renderRepurchaseTable() {
     document.getElementById('navBadgeRecompras').textContent=rows.length;
     document.getElementById('kpiRecompras').textContent=rows.length;
     document.getElementById('kpiRecomprasSub').textContent=repFromDate&&repToDate?`${fmtDate(repFromDate)} → ${fmtDate(repToDate)}`:'Clientes con más de 1 compra';
+    _pgRender['rep']=renderRepurchaseTable;
     const tbody=document.getElementById('bodyRepurchase');
-    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="6">🍫 Sin recompras en el período</td></tr>'; return; }
-    tbody.innerHTML=rows.map(c=>`<tr><td class="td-name">${esc(c.contactName)}</td><td>${esc(c.phone)}</td><td><span class="badge-recompra">🔁 ${c.compras}</span></td><td>${fmtDate(c.ultimaCompra)}</td><td>${fmtDate(c.primeraCompra)}</td><td class="td-pts azul">${fmt(c.puntosOtorgados)}</td></tr>`).join('');
+    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="6">🍫 Sin recompras en el período</td></tr>'; const _b=document.getElementById('repPager'); if(_b){_b.style.display='none';_b.innerHTML='';} return; }
+    tbody.innerHTML=pagePrep('rep', rows).map(c=>`<tr><td class="td-name">${esc(c.contactName)}</td><td>${esc(c.phone)}</td><td><span class="badge-recompra">🔁 ${c.compras}</span></td><td>${fmtDate(c.ultimaCompra)}</td><td>${fmtDate(c.primeraCompra)}</td><td class="td-pts azul">${fmt(c.puntosOtorgados)}</td></tr>`).join('');
+    pagerBar('rep', 'repPager');
 }
 function sortRepurchase(col){ sortDirR=sortColR===col?(sortDirR==='asc'?'desc':'asc'):'desc'; sortColR=col;
     document.querySelectorAll('#wrapRepurchase th[data-col]').forEach(th=>{ th.classList.remove('sort-asc','sort-desc'); const si=th.querySelector('.si'); if(th.dataset.col===col){th.classList.add(sortDirR==='asc'?'sort-asc':'sort-desc');si.textContent=sortDirR==='asc'?'↑':'↓';}else si.textContent='⇅'; });
@@ -1476,10 +1532,12 @@ function renderLogTable() {
     const type=document.getElementById('logTypeFilter').value;
     const rows=filteredLogs.filter(e=>{ if(type&&e.type!==type) return false; if(q&&!(e.contactName+' '+e.type+' '+e.phone).toLowerCase().includes(q)) return false; return true; });
     document.getElementById('logCount').textContent=rows.length+' eventos';
+    _pgRender['logs']=renderLogTable;
     const tbody=document.getElementById('bodyLogs');
-    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="6">Sin eventos para los filtros aplicados</td></tr>'; return; }
-    tbody.innerHTML=rows.map(e=>{ const hora=fmtTime(e.timestamp); const badge=e.type==='suma_puntos'?`<span class="log-badge-suma">🏅 Suma</span>`:`<span class="log-badge-redencion">🎁 Redención</span>`;
+    if(!rows.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="6">Sin eventos para los filtros aplicados</td></tr>'; const _b=document.getElementById('logsPager'); if(_b){_b.style.display='none';_b.innerHTML='';} return; }
+    tbody.innerHTML=pagePrep('logs', rows).map(e=>{ const hora=fmtTime(e.timestamp); const badge=e.type==='suma_puntos'?`<span class="log-badge-suma">🏅 Suma</span>`:`<span class="log-badge-redencion">🎁 Redención</span>`;
         return `<tr><td>${fmtDate(e.date)} <span style="color:var(--gris);font-size:11px">${hora}</span></td><td>${badge}</td><td class="td-name">${esc(e.contactName||'—')}</td><td>${esc(e.phone||'—')}</td><td class="td-pts ${e.type==='suma_puntos'?'azul':'cereza'}">${fmt(e.points)}</td><td style="color:var(--gris);font-size:12px">${esc(e.source||'—')}</td></tr>`; }).join('');
+    pagerBar('logs', 'logsPager');
 }
 
 // Encuestas
@@ -1650,12 +1708,33 @@ async function loadSurveys() {
         const chu=(data.chuculatologia||[]).filter(s=>!BLOCKED_CONTACT_IDS.has(String(s.contactId||'')));
         document.getElementById('loadingSurveys').style.display='none';
         document.getElementById('surveyGrid').style.display='grid';
-        const total=exp.length+chu.length;
-        document.getElementById('surveyTotalBadge').textContent=total;
-        document.getElementById('navBadgeEncuestas').textContent=total;
-        renderSurveyCard('experiencias',exp,'bodyExperiencias','countExperiencias','respExperiencias');
-        renderSurveyCard('chuculatologia',chu,'bodyChuculatologia','countChuculatologia','respChuculatologia');
+        surveyExpAll = exp; surveyChuAll = chu;
+        renderSurveysFiltered();
     } catch(e) { document.getElementById('loadingSurveys').innerHTML='<p style="color:var(--gris);padding:20px;text-align:center">Sin datos de encuestas aún.</p>'; }
+}
+let surveyExpAll=[], surveyChuAll=[];
+function _filterSurveyByDate(arr){
+    const f=document.getElementById('surveyFrom')?.value, t=document.getElementById('surveyTo')?.value;
+    if(!f && !t) return arr;
+    return arr.filter(s=>{ const d=String(s.date||'').slice(0,10); return (!f||d>=f) && (!t||d<=t); });
+}
+function renderSurveysFiltered(){
+    const exp=_filterSurveyByDate(surveyExpAll), chu=_filterSurveyByDate(surveyChuAll);
+    const total=exp.length+chu.length;
+    const tb=document.getElementById('surveyTotalBadge'); if(tb) tb.textContent=total;
+    const nb=document.getElementById('navBadgeEncuestas'); if(nb) nb.textContent=total;
+    renderSurveyCard('experiencias',exp,'bodyExperiencias','countExperiencias','respExperiencias');
+    renderSurveyCard('chuculatologia',chu,'bodyChuculatologia','countChuculatologia','respChuculatologia');
+}
+function applySurveyDateFilter(){
+    const f=document.getElementById('surveyFrom').value, t=document.getElementById('surveyTo').value;
+    document.getElementById('surveyPeriodLabel').textContent=(f||t)?((f?fmtDate(f):'…')+' → '+(t?fmtDate(t):'…')):'Todo el tiempo';
+    renderSurveysFiltered();
+}
+function clearSurveyDateFilter(){
+    document.getElementById('surveyFrom').value=''; document.getElementById('surveyTo').value='';
+    document.getElementById('surveyPeriodLabel').textContent='Todo el tiempo';
+    renderSurveysFiltered();
 }
 function renderSurveyCard(key,subs,bodyId,countId,respId) {
     const def=SURVEY_DEFS[key]; const body=document.getElementById(bodyId);
@@ -3315,9 +3394,10 @@ function _renderContadorTable(){
         return typeof av==='number' ? (contadorSort.dir==='asc'?av-bv:bv-av)
              : (contadorSort.dir==='asc'?String(av).localeCompare(String(bv),'es'):String(bv).localeCompare(String(av),'es')); });
     document.getElementById('countContador').textContent = rows.length + (rows.length===1?' cliente':' clientes');
+    _pgRender['cont'] = _renderContadorTable;
     const tbody = document.getElementById('bodyContador');
-    if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Aún no hay clientes con compras contadas</td></tr>'; return; }
-    tbody.innerHTML = rows.map(c=>{
+    if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Aún no hay clientes con compras contadas</td></tr>'; const _b=document.getElementById('contPager'); if(_b){_b.style.display='none';_b.innerHTML='';} return; }
+    tbody.innerHTML = pagePrep('cont', rows).map(c=>{
         const ok = c.compras >= contadorMeta;
         const faltan = Math.max(0, contadorMeta - c.compras);
         const dots = Array.from({length:Math.max(contadorMeta,c.compras)},(_,i)=>
@@ -3332,6 +3412,7 @@ function _renderContadorTable(){
             <td>${c.ultimaCompra ? fmtDate(c.ultimaCompra) : '—'}</td>
             <td class="td-pts azul" style="text-align:right">${fmt(c.puntos||0)}</td>
         </tr>`;}).join('');
+    pagerBar('cont', 'contPager');
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────────────────────
