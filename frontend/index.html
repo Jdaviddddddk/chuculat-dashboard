@@ -542,7 +542,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                 <div class="kpi-card tasa"><div class="kpi-icon">🎟️</div><div class="kpi-label">Comprobantes</div><div class="kpi-value" id="b2cExpComp">—</div><div class="kpi-sub">facturas con experiencia</div></div>
                 <div class="kpi-card recompras"><div class="kpi-icon">💰</div><div class="kpi-label">Ventas de experiencia</div><div class="kpi-value" id="b2cExpVal">—</div><div class="kpi-sub" id="b2cExpValSub">del B2C neto</div></div>
                 <div class="kpi-card redimidos"><div class="kpi-icon">📝</div><div class="kpi-label">Tasa de respuesta encuesta</div><div class="kpi-value" id="b2cExpTasa">—</div><div class="kpi-sub" id="b2cExpTasaSub">encuestas ÷ experiencias</div></div>
-                <div class="kpi-card"><div class="kpi-icon">⚠️</div><div class="kpi-label">Quejas</div><div class="kpi-value" id="b2cExpQuejas">N/D</div><div class="kpi-sub">sin fuente de datos aún</div></div>
+                <div class="kpi-card"><div class="kpi-icon">⭐</div><div class="kpi-label">Reputación Google</div><div class="kpi-value" id="b2cExpRep">N/D</div><div class="kpi-sub" id="b2cExpRepSub">calificación · reseñas</div></div>
             </div>
             <div id="b2cExpDesglose" style="margin-top:14px"></div>
         </div>
@@ -3514,6 +3514,15 @@ async function loadB2CKpis(from,to){
     b2cKpisData=d; renderB2CKpis(d);
     loadCrmKpis(from,to);
 }
+const REPUTACION_URL = 'https://app.rioagencymarketing.com/webhook/get-reputation';
+async function loadReputacion(){
+    const el=document.getElementById('b2cExpRep'); if(!el) return;
+    const sub=document.getElementById('b2cExpRepSub');
+    let d=null; try{ d=await (await fetch(REPUTACION_URL)).json(); }catch(e){}
+    if(!d || typeof d.rating==='undefined'){ el.textContent='N/D'; if(sub) sub.textContent='pendiente de conexión'; return; }
+    el.textContent='⭐ '+(d.rating||0);
+    if(sub) sub.textContent=fmt(d.total||0)+' reseñas'+(typeof d.nuevas!=='undefined'?(' · '+fmt(d.nuevas)+' nuevas'):'');
+}
 const CRM_KPIS_URL = 'https://app.rioagencymarketing.com/webhook/get-crm-kpis';
 async function loadCrmKpis(from,to){
     const el=document.getElementById('crmBaseFinal'); if(el) el.textContent='…';
@@ -3587,6 +3596,7 @@ loadData();
 loadLogs();
 loadSurveys();
 b2cKpisMesActual();
+loadReputacion();
 </script>
 </body>
 </html>
