@@ -462,7 +462,9 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         <button class="seg-btn"        id="segDest" onclick="setSegment('destacadas')">⭐ Destacadas</button>
     </div>
     <nav class="topbar-nav nav-b2c show" id="navB2C">
-        <a class="nav-item active" href="#sec-kpis"      onclick="b2cNav(this)"><span class="nav-icon">📊</span> KPIs</a>
+        <a class="nav-item active" href="#sec-b2c-com"   onclick="b2cNav(this)"><span class="nav-icon">🍫</span> Centro B2C</a>
+        <a class="nav-item" href="#sec-b2c-crm"          onclick="b2cNav(this)"><span class="nav-icon">👥</span> CRM</a>
+        <a class="nav-item" href="#sec-kpis"             onclick="b2cNav(this)"><span class="nav-icon">📊</span> KPIs</a>
         <a class="nav-item" href="#sec-recompras"        onclick="b2cNav(this)"><span class="nav-icon">🔁</span> Recompras <span class="nav-badge" id="navBadgeRecompras">0</span></a>
         <a class="nav-item" href="#sec-contador"         onclick="b2cNav(this)"><span class="nav-icon">🎯</span> Contador <span class="nav-badge" id="navBadgeContador">0</span></a>
         <a class="nav-item" href="#sec-historial"        onclick="b2cNav(this)"><span class="nav-icon">📅</span> Actividad</a>
@@ -488,6 +490,79 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 
 <!-- ══════════════════ PANEL B2C ══════════════════ -->
 <div class="panel show" id="panelB2C">
+
+    <!-- ===== KPIs B2C (matriz) · Fase 1: Ventas · Identificación · Ticket ===== -->
+    <section class="dash-section" id="sec-b2c-com">
+        <div class="section-title">🍫 Ventas Centro B2C <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· POS + Web · subtotal sin IVA · NC restan</small></div>
+        <div class="kpi-filter-bar">
+            <label>Desde</label><input type="date" id="b2cFrom">
+            <label>Hasta</label><input type="date" id="b2cTo">
+            <button class="btn-filter" onclick="applyB2CKpis()">Aplicar</button>
+            <button class="btn-filter secondary" onclick="b2cKpisMesActual()">Mes actual</button>
+            <span class="kpi-filter-period" id="b2cPeriodLabel">Mes actual</span>
+            <p class="kpi-filter-note">📄 Fuente: Siigo · centro de costo 168 (POS salón + WooCommerce)</p>
+        </div>
+        <div class="kpi-grid">
+            <div class="kpi-card otorgados"><div class="kpi-icon">🍫</div><div class="kpi-label">Ventas netas centro B2C</div><div class="kpi-value" id="b2cNeto">—</div><div class="kpi-sub" id="b2cNetoSub">POS + Web</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">🧾</div><div class="kpi-label">Comprobantes</div><div class="kpi-value" id="b2cComprob">—</div><div class="kpi-sub">Facturas positivas (excl. NC)</div></div>
+            <div class="kpi-card redimidos"><div class="kpi-icon">✅</div><div class="kpi-label">% Identificadas</div><div class="kpi-value" id="b2cPctId">—</div><div class="kpi-sub" id="b2cIdSub">Personas + empresas</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">🎟️</div><div class="kpi-label">Ticket personas naturales</div><div class="kpi-value" id="b2cTkNat">—</div><div class="kpi-sub">Ticket principal del dashboard</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:18px">
+            <div style="background:var(--blanco);border:1px solid var(--beige);border-radius:12px;padding:14px">
+                <div style="font-weight:700;color:var(--chocolate);font-size:.85rem;margin-bottom:10px">🧩 Composición del ingreso B2C</div>
+                <div style="height:280px"><canvas id="b2cChartComp"></canvas></div>
+            </div>
+            <div style="background:var(--blanco);border:1px solid var(--beige);border-radius:12px;padding:14px">
+                <div style="font-weight:700;color:var(--chocolate);font-size:.85rem;margin-bottom:10px">🎟️ Ticket promedio por segmento</div>
+                <div style="height:280px"><canvas id="b2cChartTicket"></canvas></div>
+            </div>
+        </div>
+        <div class="kpi-grid" style="margin-top:18px">
+            <div class="kpi-card"><div class="kpi-icon">🏪</div><div class="kpi-label">POS salón</div><div class="kpi-value" id="b2cPos">—</div><div class="kpi-sub" id="b2cPosSub">—</div></div>
+            <div class="kpi-card"><div class="kpi-icon">🛒</div><div class="kpi-label">Web WooCommerce</div><div class="kpi-value" id="b2cWeb">—</div><div class="kpi-sub" id="b2cWebSub">—</div></div>
+            <div class="kpi-card"><div class="kpi-icon">🧑</div><div class="kpi-label">Personas naturales</div><div class="kpi-value" id="b2cNat">—</div><div class="kpi-sub" id="b2cNatSub">—</div></div>
+            <div class="kpi-card"><div class="kpi-icon">🏢</div><div class="kpi-label">Empresas / jurídicas</div><div class="kpi-value" id="b2cEmp">—</div><div class="kpi-sub" id="b2cEmpSub">—</div></div>
+            <div class="kpi-card"><div class="kpi-icon">💵</div><div class="kpi-label">Genérico 222</div><div class="kpi-value" id="b2c222">—</div><div class="kpi-sub" id="b2c222Sub">Consumidor final nacional</div></div>
+            <div class="kpi-card"><div class="kpi-icon">🌐</div><div class="kpi-label">Extranjero 7777</div><div class="kpi-value" id="b2c7777">—</div><div class="kpi-sub" id="b2c7777Sub">Genérico internacional</div></div>
+        </div>
+        <div style="margin-top:22px;padding-top:16px;border-top:2px dashed var(--beige)">
+            <div style="font-weight:700;color:var(--chocolate);font-size:.9rem;margin-bottom:4px">🔁 Fidelización / Recompra <small style="font-weight:600;color:var(--gris);text-transform:none">· solo personas naturales · recurrente = 2+ comprobantes en el período</small></div>
+            <div class="kpi-grid" style="margin-top:12px">
+                <div class="kpi-card recompras"><div class="kpi-icon">🔁</div><div class="kpi-label">Clientes recurrentes</div><div class="kpi-value" id="b2cRec">—</div><div class="kpi-sub" id="b2cRecSub">2+ compras</div></div>
+                <div class="kpi-card tasa"><div class="kpi-icon">📊</div><div class="kpi-label">% Recurrentes</div><div class="kpi-value" id="b2cRecPct">—</div><div class="kpi-sub">de personas naturales</div></div>
+                <div class="kpi-card otorgados"><div class="kpi-icon">💰</div><div class="kpi-label">Ventas por recompra</div><div class="kpi-value" id="b2cRecVal">—</div><div class="kpi-sub">de clientes recurrentes</div></div>
+                <div class="kpi-card redimidos"><div class="kpi-icon">📈</div><div class="kpi-label">% Ventas por recompra</div><div class="kpi-value" id="b2cRecValPct">—</div><div class="kpi-sub">sobre ventas netas B2C</div></div>
+            </div>
+        </div>
+        <div style="margin-top:22px;padding-top:16px;border-top:2px dashed var(--beige)">
+            <div style="font-weight:700;color:var(--chocolate);font-size:.9rem;margin-bottom:4px">🎭 Experiencia <small style="font-weight:600;color:var(--gris);text-transform:none">· servicios EXP (Wonka, Camino del Chocolate, Cacao Maestro…) del centro B2C</small></div>
+            <div class="kpi-grid" style="margin-top:12px">
+                <div class="kpi-card otorgados"><div class="kpi-icon">🎭</div><div class="kpi-label">Experiencias vendidas</div><div class="kpi-value" id="b2cExpUnid">—</div><div class="kpi-sub" id="b2cExpUnidSub">entradas · unidades</div></div>
+                <div class="kpi-card tasa"><div class="kpi-icon">🎟️</div><div class="kpi-label">Comprobantes</div><div class="kpi-value" id="b2cExpComp">—</div><div class="kpi-sub">facturas con experiencia</div></div>
+                <div class="kpi-card recompras"><div class="kpi-icon">💰</div><div class="kpi-label">Ventas de experiencia</div><div class="kpi-value" id="b2cExpVal">—</div><div class="kpi-sub" id="b2cExpValSub">del B2C neto</div></div>
+                <div class="kpi-card redimidos"><div class="kpi-icon">📝</div><div class="kpi-label">Tasa de respuesta encuesta</div><div class="kpi-value" id="b2cExpTasa">—</div><div class="kpi-sub" id="b2cExpTasaSub">encuestas ÷ experiencias</div></div>
+                <div class="kpi-card"><div class="kpi-icon">⚠️</div><div class="kpi-label">Quejas</div><div class="kpi-value" id="b2cExpQuejas">N/D</div><div class="kpi-sub">sin fuente de datos aún</div></div>
+            </div>
+            <div id="b2cExpDesglose" style="margin-top:14px"></div>
+        </div>
+    </section>
+
+    <!-- ===== CRM · Base de contactos (GHL) ===== -->
+    <section class="dash-section" id="sec-b2c-crm">
+        <div class="section-title">👥 CRM · Base de contactos <small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· Go High Level · por fecha de creación</small></div>
+        <div class="kpi-filter-bar">
+            <span class="kpi-filter-period" id="crmPeriodLabel">Mes actual</span>
+            <p class="kpi-filter-note">📇 Usa el mismo rango del panel B2C · base inicial = carga masiva 6-7 may 2026</p>
+        </div>
+        <div class="kpi-grid">
+            <div class="kpi-card otorgados"><div class="kpi-icon">👥</div><div class="kpi-label">Base final</div><div class="kpi-value" id="crmBaseFinal">—</div><div class="kpi-sub">contactos totales hoy</div></div>
+            <div class="kpi-card"><div class="kpi-icon">📦</div><div class="kpi-label">Base inicial</div><div class="kpi-value" id="crmBaseInicial">—</div><div class="kpi-sub" id="crmBaseInicialSub">carga masiva inicial</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">📈</div><div class="kpi-label">Nuevos del período</div><div class="kpi-value" id="crmNuevosPeriodo">—</div><div class="kpi-sub" id="crmNuevosPeriodoSub">creados en el rango</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">🆕</div><div class="kpi-label">Nuevos 7 días</div><div class="kpi-value" id="crmNuevos7">—</div><div class="kpi-sub" id="crmNuevos7Sub">última semana</div></div>
+            <div class="kpi-card redimidos"><div class="kpi-icon">🚀</div><div class="kpi-label">Crecimiento</div><div class="kpi-value" id="crmCrecimiento">—</div><div class="kpi-sub">desde la migración</div></div>
+        </div>
+    </section>
 
     <!-- KPIs -->
     <section class="dash-section" id="sec-kpis">
@@ -1725,6 +1800,7 @@ function renderSurveysFiltered(){
     const nb=document.getElementById('navBadgeEncuestas'); if(nb) nb.textContent=total;
     renderSurveyCard('experiencias',exp,'bodyExperiencias','countExperiencias','respExperiencias');
     renderSurveyCard('chuculatologia',chu,'bodyChuculatologia','countChuculatologia','respChuculatologia');
+    if(typeof b2cKpisData!=='undefined' && b2cKpisData) renderExperiencia(b2cKpisData);
 }
 function applySurveyDateFilter(){
     const f=document.getElementById('surveyFrom').value, t=document.getElementById('surveyTo').value;
@@ -3426,11 +3502,91 @@ function _renderContadorTable(){
     pagerBar('cont', 'contPager');
 }
 
+// ===== KPIs B2C (matriz) · Ventas · Identificación · Ticket =====
+const B2C_KPIS_URL = 'https://app.rioagencymarketing.com/webhook/get-b2c-kpis';
+let b2cChartComp=null, b2cChartTicket=null, b2cKpisData=null;
+function b2cMonthRange(){ const n=new Date(); const y=n.getFullYear(), mo=n.getMonth(); const p=x=>String(x).padStart(2,'0'); return { from:`${y}-${p(mo+1)}-01`, to:`${y}-${p(mo+1)}-${p(n.getDate())}` }; }
+async function loadB2CKpis(from,to){
+    const url = B2C_KPIS_URL + (from||to ? '?date_start='+(from||'')+(to?'&date_end='+to:'') : '');
+    const neto = document.getElementById('b2cNeto'); if(neto) neto.textContent='…';
+    let d=null; try{ d = await (await fetch(url)).json(); }catch(e){}
+    if(!d || !d.ventas){ if(neto) neto.textContent='—'; return; }
+    b2cKpisData=d; renderB2CKpis(d);
+    loadCrmKpis(from,to);
+}
+const CRM_KPIS_URL = 'https://app.rioagencymarketing.com/webhook/get-crm-kpis';
+async function loadCrmKpis(from,to){
+    const el=document.getElementById('crmBaseFinal'); if(el) el.textContent='…';
+    const url = CRM_KPIS_URL + (from||to ? '?date_start='+(from||'')+(to?'&date_end='+to:'') : '');
+    let d=null; try{ d = await (await fetch(url)).json(); }catch(e){}
+    const S=(k,val)=>{const x=document.getElementById(k); if(x) x.textContent=val;};
+    if(!d || typeof d.base_final==='undefined'){ if(el) el.textContent='—'; return; }
+    S('crmBaseFinal', fmt(d.base_final));
+    S('crmBaseInicial', fmt(d.base_inicial)); S('crmBaseInicialSub', 'antes de '+fmtDate(d.migracion_cut));
+    S('crmNuevosPeriodo', fmt(d.nuevos_periodo)); S('crmNuevosPeriodoSub', fmtDate(d.periodo.desde)+' → '+fmtDate(d.periodo.hasta));
+    S('crmNuevos7', fmt(d.nuevos_7dias)); S('crmNuevos7Sub', fmtDate(d.ventana_7d.desde)+' → '+fmtDate(d.ventana_7d.hasta));
+    S('crmCrecimiento', '+'+(d.crecimiento_pct||0)+'%');
+    const lbl=document.getElementById('crmPeriodLabel'); if(lbl) lbl.textContent=fmtDate(d.periodo.desde)+' → '+fmtDate(d.periodo.hasta);
+}
+function renderB2CKpis(d){
+    const v=d.ventas, id=d.identificacion, tk=d.ticket;
+    const S=(k,val)=>{const el=document.getElementById(k); if(el) el.textContent=val;};
+    S('b2cNeto', fmtCOP(v.b2c_neto));
+    S('b2cNetoSub', 'POS '+fmtCOP(v.pos)+' · Web '+fmtCOP(v.web));
+    S('b2cComprob', fmt(v.comprobantes));
+    S('b2cPctId', id.pct_identificadas+'%');
+    S('b2cIdSub', fmtCOP(id.identificadas)+' identificadas');
+    S('b2cTkNat', fmtCOP(tk.naturales));
+    S('b2cPos', fmtCOP(v.pos)); S('b2cPosSub', fmt(v.comprobantes_pos)+' comprob.');
+    S('b2cWeb', fmtCOP(v.web)); S('b2cWebSub', fmt(v.comprobantes_web)+' comprob. · ticket '+fmtCOP(tk.web));
+    S('b2cNat', fmtCOP(id.naturales)); S('b2cNatSub', (id.pct_naturales||0)+'% del centro · '+fmt(id.comp_naturales)+' comprob.');
+    S('b2cEmp', fmtCOP(id.empresas)); S('b2cEmpSub', fmt(id.comp_empresas)+' comprob. · ticket '+fmtCOP(tk.empresas));
+    S('b2c222', fmtCOP(id.g222)); S('b2c222Sub', 'Consumidor final nacional · '+fmt(id.comp_222)+' comprob.');
+    S('b2c7777', fmtCOP(id.g7777)); S('b2c7777Sub', 'Genérico internacional · '+fmt(id.comp_7777)+' comprob.');
+    const fi=d.fidelizacion||{};
+    S('b2cRec', fmt(fi.recurrentes||0)); S('b2cRecSub', 'de '+fmt(fi.clientes_naturales||0)+' clientes · 2+ compras');
+    S('b2cRecPct', (fi.pct_recurrentes||0)+'%');
+    S('b2cRecVal', fmtCOP(fi.ventas_recompra||0));
+    S('b2cRecValPct', (fi.pct_ventas_recompra||0)+'%');
+    renderExperiencia(d);
+    renderB2CCharts(d);
+}
+// Experiencia — usa d.experiencias del endpoint + encuestas de experiencia (surveyExpAll) del mismo período
+function b2cCurrentRange(){ const r=b2cMonthRange(); return { from:(document.getElementById('b2cFrom')&&document.getElementById('b2cFrom').value)||r.from, to:(document.getElementById('b2cTo')&&document.getElementById('b2cTo').value)||r.to }; }
+function renderExperiencia(d){
+    const S=(k,val)=>{const el=document.getElementById(k); if(el) el.textContent=val;};
+    const e=(d&&d.experiencias)||{unidades:0,comprobantes:0,ventas:0,pct_ventas:0,desglose:[]};
+    S('b2cExpUnid', fmt(e.unidades||0)); S('b2cExpUnidSub', (e.desglose||[]).length+' productos · entradas');
+    S('b2cExpComp', fmt(e.comprobantes||0));
+    S('b2cExpVal', fmtCOP(e.ventas||0)); S('b2cExpValSub', (e.pct_ventas||0)+'% del B2C neto');
+    // tasa de respuesta = encuestas de experiencia del período ÷ experiencias vendidas (unidades)
+    const rg=b2cCurrentRange();
+    const encuestas=(typeof surveyExpAll!=='undefined'?surveyExpAll:[]).filter(s=>{const dd=String(s.date||'').slice(0,10); return dd>=rg.from && dd<=rg.to;}).length;
+    const denom=Number(e.unidades||0);
+    S('b2cExpTasa', denom? Math.round(encuestas/denom*100)+'%' : '—');
+    S('b2cExpTasaSub', fmt(encuestas)+' encuestas ÷ '+fmt(denom)+' exp.');
+    const box=document.getElementById('b2cExpDesglose');
+    if(box){ const ds=(e.desglose||[]); box.innerHTML = ds.length ? '<div style="display:flex;flex-wrap:wrap;gap:8px">'+ds.map(p=>'<span style="background:var(--crema);border:1px solid var(--beige);border-radius:50px;padding:5px 12px;font-size:12px;color:var(--chocolate)"><b>'+esc(p.nombre)+'</b> · '+fmt(p.unidades)+' und · '+fmtCOP(p.ventas)+'</span>').join('') + '</div>' : ''; }
+}
+function renderB2CCharts(d){
+    if(typeof Chart==='undefined') return;
+    const id=d.identificacion, tk=d.ticket;
+    const c1=document.getElementById('b2cChartComp');
+    if(c1){ if(b2cChartComp) b2cChartComp.destroy();
+        b2cChartComp=new Chart(c1,{type:'doughnut',data:{labels:['Personas naturales','Empresas','222 nacional','7777 extranjero'],datasets:[{data:[id.naturales,id.empresas,id.g222,id.g7777],backgroundColor:['#00abe1','#7d4b2b','#f39200','#9aa0a6'],borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11}}},tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmtCOP(ctx.parsed)}}}}}); }
+    const c2=document.getElementById('b2cChartTicket');
+    if(c2){ if(b2cChartTicket) b2cChartTicket.destroy();
+        b2cChartTicket=new Chart(c2,{type:'bar',data:{labels:['Naturales','General','Web','Empresas'],datasets:[{data:[tk.naturales,tk.general,tk.web,tk.empresas],backgroundColor:['#00abe1','#7d4b2b','#f39200','#4caf50'],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmtCOP(ctx.parsed.y)}}},scales:{y:{ticks:{callback:v=>fmtCOP(v)}}}}}); }
+}
+function applyB2CKpis(){ const r=b2cMonthRange(); const from=document.getElementById('b2cFrom').value||r.from, to=document.getElementById('b2cTo').value||r.to; document.getElementById('b2cPeriodLabel').textContent=fmtDate(from)+' → '+fmtDate(to); loadB2CKpis(from,to); }
+function b2cKpisMesActual(){ const r=b2cMonthRange(); document.getElementById('b2cFrom').value=r.from; document.getElementById('b2cTo').value=r.to; document.getElementById('b2cPeriodLabel').textContent='Mes actual'; loadB2CKpis(r.from,r.to); }
+
 // ── ARRANQUE ──────────────────────────────────────────────────────────────
 loadContador();
 loadData();
 loadLogs();
 loadSurveys();
+b2cKpisMesActual();
 </script>
 </body>
 </html>
