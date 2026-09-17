@@ -141,8 +141,7 @@ body { font-family: 'Montserrat', Arial, sans-serif; background: var(--crema); }
 .kpi-card.tasa      .kpi-value, .kpi-card.meta .kpi-value   { color: var(--verde); }
 .kpi-card.recompras .kpi-value, .kpi-card.b2b-kpi .kpi-value{ color: var(--naranja); }
 .kpi-card.export-kpi .kpi-value { color: var(--morado); }
-.kpi-sub { color: var(--gris); font-size: 11px; margin-top: 6px; font-weight: 500; }
-.kpi-rtag { position: absolute; top: 7px; left: 7px; background: var(--chocolate); color: #fff; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 50px; letter-spacing: .5px; z-index: 2; opacity: .82; }
+.kpi-sub { color: var(--gris); font-size: 11px; margin-top: 6px; font-weight: 500; }
 .tbl-tag { display: inline-block; font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 50px; text-transform: uppercase; letter-spacing: .5px; vertical-align: middle; margin-left: 8px; }
 .tbl-tag.fecha { background: #e1f3fb; color: #0277a8; }
 .tbl-tag.consol { background: #fff3e0; color: #c77700; }
@@ -507,10 +506,10 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             <p class="kpi-filter-note">📄 Fuente: Siigo · centro de costo 168 (POS salón + WooCommerce)</p>
         </div>
         <div class="kpi-grid">
-            <div class="kpi-card otorgados"><div class="kpi-rtag">R1</div><div class="kpi-icon">🍫</div><div class="kpi-label">Ventas netas centro B2C</div><div class="kpi-value" id="b2cNeto">—</div><div class="kpi-sub" id="b2cNetoSub">POS + Web</div></div>
-            <div class="kpi-card tasa"><div class="kpi-rtag">R2</div><div class="kpi-icon">🧾</div><div class="kpi-label">Comprobantes</div><div class="kpi-value" id="b2cComprob">—</div><div class="kpi-sub">Facturas positivas (excl. NC)</div></div>
-            <div class="kpi-card redimidos"><div class="kpi-rtag">R4</div><div class="kpi-icon">✅</div><div class="kpi-label">% Identificadas</div><div class="kpi-value" id="b2cPctId">—</div><div class="kpi-sub" id="b2cIdSub">Personas + empresas</div></div>
-            <div class="kpi-card recompras"><div class="kpi-rtag">R3</div><div class="kpi-icon">🎟️</div><div class="kpi-label">Ticket personas naturales</div><div class="kpi-value" id="b2cTkNat">—</div><div class="kpi-sub">Ticket principal del dashboard</div></div>
+            <div class="kpi-card otorgados"><div class="kpi-icon">🍫</div><div class="kpi-label">Ventas netas centro B2C</div><div class="kpi-value" id="b2cNeto">—</div><div class="kpi-sub" id="b2cNetoSub">POS + Web</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">🧾</div><div class="kpi-label">Comprobantes</div><div class="kpi-value" id="b2cComprob">—</div><div class="kpi-sub">Facturas positivas (excl. NC)</div></div>
+            <div class="kpi-card redimidos"><div class="kpi-icon">✅</div><div class="kpi-label">% Identificadas</div><div class="kpi-value" id="b2cPctId">—</div><div class="kpi-sub" id="b2cIdSub">Personas + empresas</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">🎟️</div><div class="kpi-label">Ticket personas naturales</div><div class="kpi-value" id="b2cTkNat">—</div><div class="kpi-sub">Ticket principal del dashboard</div></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:18px">
             <div style="background:var(--blanco);border:1px solid var(--beige);border-radius:12px;padding:14px">
@@ -523,29 +522,29 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             </div>
         </div>
         <div class="kpi-grid" style="margin-top:18px">
-            <div class="kpi-card"><div class="kpi-rtag">R1</div><div class="kpi-icon">🏪</div><div class="kpi-label">POS salón</div><div class="kpi-value" id="b2cPos">—</div><div class="kpi-sub" id="b2cPosSub">—</div></div>
-            <div class="kpi-card"><div class="kpi-rtag">R1</div><div class="kpi-icon">🛒</div><div class="kpi-label">Web WooCommerce</div><div class="kpi-value" id="b2cWeb">—</div><div class="kpi-sub" id="b2cWebSub">—</div></div>
-            <div class="kpi-card"><div class="kpi-rtag">R3</div><div class="kpi-icon">🧑</div><div class="kpi-label">Personas naturales</div><div class="kpi-value" id="b2cNat">—</div><div class="kpi-sub" id="b2cNatSub">—</div></div>
-            <div class="kpi-card"><div class="kpi-rtag">R5</div><div class="kpi-icon">🏢</div><div class="kpi-label">Empresas / jurídicas</div><div class="kpi-value" id="b2cEmp">—</div><div class="kpi-sub" id="b2cEmpSub">—</div></div>
-            <div class="kpi-card"><div class="kpi-rtag">R6</div><div class="kpi-icon">💵</div><div class="kpi-label">Genérico 222</div><div class="kpi-value" id="b2c222">—</div><div class="kpi-sub" id="b2c222Sub">Consumidor final nacional</div></div>
-            <div class="kpi-card"><div class="kpi-rtag">R6</div><div class="kpi-icon">🌐</div><div class="kpi-label">Extranjero 7777</div><div class="kpi-value" id="b2c7777">—</div><div class="kpi-sub" id="b2c7777Sub">Genérico internacional</div></div>
+            <div class="kpi-card"><div class="kpi-icon">🏪</div><div class="kpi-label">POS salón</div><div class="kpi-value" id="b2cPos">—</div><div class="kpi-sub" id="b2cPosSub">—</div></div>
+            <div class="kpi-card"><div class="kpi-icon">🛒</div><div class="kpi-label">Web WooCommerce</div><div class="kpi-value" id="b2cWeb">—</div><div class="kpi-sub" id="b2cWebSub">—</div></div>
+            <div class="kpi-card"><div class="kpi-icon">🧑</div><div class="kpi-label">Personas naturales</div><div class="kpi-value" id="b2cNat">—</div><div class="kpi-sub" id="b2cNatSub">—</div></div>
+            <div class="kpi-card"><div class="kpi-icon">🏢</div><div class="kpi-label">Empresas / jurídicas</div><div class="kpi-value" id="b2cEmp">—</div><div class="kpi-sub" id="b2cEmpSub">—</div></div>
+            <div class="kpi-card"><div class="kpi-icon">💵</div><div class="kpi-label">Genérico 222</div><div class="kpi-value" id="b2c222">—</div><div class="kpi-sub" id="b2c222Sub">Consumidor final nacional</div></div>
+            <div class="kpi-card"><div class="kpi-icon">🌐</div><div class="kpi-label">Extranjero 7777</div><div class="kpi-value" id="b2c7777">—</div><div class="kpi-sub" id="b2c7777Sub">Genérico internacional</div></div>
         </div>
         <div style="margin-top:22px;padding-top:16px;border-top:2px dashed var(--beige)">
             <div style="font-weight:700;color:var(--chocolate);font-size:.9rem;margin-bottom:4px">🔁 Fidelización / Recompra <span class="tbl-tag fecha">Por fechas</span><small style="font-weight:600;color:var(--gris);text-transform:none">· solo personas naturales · recurrente = 2+ comprobantes en el período</small></div>
             <div class="kpi-grid" style="margin-top:12px">
-                <div class="kpi-card recompras"><div class="kpi-rtag">R7</div><div class="kpi-icon">🔁</div><div class="kpi-label">Clientes recurrentes</div><div class="kpi-value" id="b2cRec">—</div><div class="kpi-sub" id="b2cRecSub">2+ compras</div></div>
-                <div class="kpi-card tasa"><div class="kpi-rtag">R7</div><div class="kpi-icon">📊</div><div class="kpi-label">% Recurrentes</div><div class="kpi-value" id="b2cRecPct">—</div><div class="kpi-sub">de personas naturales</div></div>
-                <div class="kpi-card otorgados"><div class="kpi-rtag">R8</div><div class="kpi-icon">💰</div><div class="kpi-label">Ventas por recompra</div><div class="kpi-value" id="b2cRecVal">—</div><div class="kpi-sub">de clientes recurrentes</div></div>
-                <div class="kpi-card redimidos"><div class="kpi-rtag">R8</div><div class="kpi-icon">📈</div><div class="kpi-label">% Ventas por recompra</div><div class="kpi-value" id="b2cRecValPct">—</div><div class="kpi-sub">sobre ventas netas B2C</div></div>
+                <div class="kpi-card recompras"><div class="kpi-icon">🔁</div><div class="kpi-label">Clientes recurrentes</div><div class="kpi-value" id="b2cRec">—</div><div class="kpi-sub" id="b2cRecSub">2+ compras</div></div>
+                <div class="kpi-card tasa"><div class="kpi-icon">📊</div><div class="kpi-label">% Recurrentes</div><div class="kpi-value" id="b2cRecPct">—</div><div class="kpi-sub">de personas naturales</div></div>
+                <div class="kpi-card otorgados"><div class="kpi-icon">💰</div><div class="kpi-label">Ventas por recompra</div><div class="kpi-value" id="b2cRecVal">—</div><div class="kpi-sub">de clientes recurrentes</div></div>
+                <div class="kpi-card redimidos"><div class="kpi-icon">📈</div><div class="kpi-label">% Ventas por recompra</div><div class="kpi-value" id="b2cRecValPct">—</div><div class="kpi-sub">sobre ventas netas B2C</div></div>
             </div>
         </div>
         <div style="margin-top:22px;padding-top:16px;border-top:2px dashed var(--beige)">
             <div style="font-weight:700;color:var(--chocolate);font-size:.9rem;margin-bottom:4px">🎭 Experiencia <span class="tbl-tag fecha">Por fechas</span><small style="font-weight:600;color:var(--gris);text-transform:none">· servicios EXP (Wonka, Camino del Chocolate, Cacao Maestro…) del centro B2C</small></div>
             <div class="kpi-grid" style="margin-top:12px">
-                <div class="kpi-card otorgados"><div class="kpi-rtag">R12</div><div class="kpi-icon">🎭</div><div class="kpi-label">Experiencias vendidas</div><div class="kpi-value" id="b2cExpUnid">—</div><div class="kpi-sub" id="b2cExpUnidSub">entradas · unidades</div></div>
-                <div class="kpi-card tasa"><div class="kpi-rtag">R2</div><div class="kpi-icon">🎟️</div><div class="kpi-label">Comprobantes</div><div class="kpi-value" id="b2cExpComp">—</div><div class="kpi-sub">facturas con experiencia</div></div>
-                <div class="kpi-card recompras"><div class="kpi-rtag">R1</div><div class="kpi-icon">💰</div><div class="kpi-label">Ventas de experiencia</div><div class="kpi-value" id="b2cExpVal">—</div><div class="kpi-sub" id="b2cExpValSub">del B2C neto</div></div>
-                <div class="kpi-card redimidos"><div class="kpi-rtag">R12</div><div class="kpi-icon">📝</div><div class="kpi-label">Tasa de respuesta encuesta</div><div class="kpi-value" id="b2cExpTasa">—</div><div class="kpi-sub" id="b2cExpTasaSub">encuestas ÷ experiencias</div></div>
+                <div class="kpi-card otorgados"><div class="kpi-icon">🎭</div><div class="kpi-label">Experiencias vendidas</div><div class="kpi-value" id="b2cExpUnid">—</div><div class="kpi-sub" id="b2cExpUnidSub">entradas · unidades</div></div>
+                <div class="kpi-card tasa"><div class="kpi-icon">🎟️</div><div class="kpi-label">Comprobantes</div><div class="kpi-value" id="b2cExpComp">—</div><div class="kpi-sub">facturas con experiencia</div></div>
+                <div class="kpi-card recompras"><div class="kpi-icon">💰</div><div class="kpi-label">Ventas de experiencia</div><div class="kpi-value" id="b2cExpVal">—</div><div class="kpi-sub" id="b2cExpValSub">del B2C neto</div></div>
+                <div class="kpi-card redimidos"><div class="kpi-icon">📝</div><div class="kpi-label">Tasa de respuesta encuesta</div><div class="kpi-value" id="b2cExpTasa">—</div><div class="kpi-sub" id="b2cExpTasaSub">encuestas ÷ experiencias</div></div>
                 <div class="kpi-card"><div class="kpi-icon">⭐</div><div class="kpi-label">Reputación Google</div><div class="kpi-value" id="b2cExpRep">N/D</div><div class="kpi-sub" id="b2cExpRepSub">calificación · reseñas</div></div>
             </div>
             <div id="b2cExpDesglose" style="margin-top:14px"></div>
@@ -560,11 +559,11 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             <p class="kpi-filter-note">📇 Base final/inicial = consolidado · "Nuevos del período" responde al rango del panel B2C · base inicial = carga masiva 6-7 may 2026</p>
         </div>
         <div class="kpi-grid">
-            <div class="kpi-card otorgados"><div class="kpi-rtag">R11</div><div class="kpi-icon">👥</div><div class="kpi-label">Base final</div><div class="kpi-value" id="crmBaseFinal">—</div><div class="kpi-sub">contactos totales hoy</div></div>
-            <div class="kpi-card"><div class="kpi-rtag">R11</div><div class="kpi-icon">📦</div><div class="kpi-label">Base inicial</div><div class="kpi-value" id="crmBaseInicial">—</div><div class="kpi-sub" id="crmBaseInicialSub">carga masiva inicial</div></div>
-            <div class="kpi-card recompras"><div class="kpi-rtag">R11</div><div class="kpi-icon">📈</div><div class="kpi-label">Nuevos del período <span class="tbl-tag fecha" style="margin-left:4px">Por fechas</span></div><div class="kpi-value" id="crmNuevosPeriodo">—</div><div class="kpi-sub" id="crmNuevosPeriodoSub">creados en el rango</div></div>
-            <div class="kpi-card tasa"><div class="kpi-rtag">R11</div><div class="kpi-icon">🆕</div><div class="kpi-label">Nuevos 7 días</div><div class="kpi-value" id="crmNuevos7">—</div><div class="kpi-sub" id="crmNuevos7Sub">última semana</div></div>
-            <div class="kpi-card redimidos"><div class="kpi-rtag">R11</div><div class="kpi-icon">🚀</div><div class="kpi-label">Crecimiento</div><div class="kpi-value" id="crmCrecimiento">—</div><div class="kpi-sub">desde la migración</div></div>
+            <div class="kpi-card otorgados"><div class="kpi-icon">👥</div><div class="kpi-label">Base final</div><div class="kpi-value" id="crmBaseFinal">—</div><div class="kpi-sub">contactos totales hoy</div></div>
+            <div class="kpi-card"><div class="kpi-icon">📦</div><div class="kpi-label">Base inicial</div><div class="kpi-value" id="crmBaseInicial">—</div><div class="kpi-sub" id="crmBaseInicialSub">carga masiva inicial</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">📈</div><div class="kpi-label">Nuevos del período <span class="tbl-tag fecha" style="margin-left:4px">Por fechas</span></div><div class="kpi-value" id="crmNuevosPeriodo">—</div><div class="kpi-sub" id="crmNuevosPeriodoSub">creados en el rango</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">🆕</div><div class="kpi-label">Nuevos 7 días</div><div class="kpi-value" id="crmNuevos7">—</div><div class="kpi-sub" id="crmNuevos7Sub">última semana</div></div>
+            <div class="kpi-card redimidos"><div class="kpi-icon">🚀</div><div class="kpi-label">Crecimiento</div><div class="kpi-value" id="crmCrecimiento">—</div><div class="kpi-sub">desde la migración</div></div>
         </div>
     </section>
 
