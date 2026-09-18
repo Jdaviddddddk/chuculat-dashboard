@@ -573,17 +573,28 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
 
     <!-- ===== CRM · Base de contactos (GHL) ===== -->
     <section class="dash-section" id="sec-b2c-crm">
-        <div class="section-title">👥 CRM · Base de contactos <span class="tbl-tag consol">Consolidado</span><small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· Go High Level · por fecha de creación</small></div>
+        <div class="section-title">👥 CRM · Base de contactos <span class="tbl-tag consol">Consolidado</span><small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· Go High Level · solo contactos con puntos + cédula</small></div>
         <div class="kpi-filter-bar">
             <span class="kpi-filter-period" id="crmPeriodLabel">Mes actual</span>
-            <p class="kpi-filter-note">📇 Base final/inicial = consolidado · "Nuevos del período" responde al rango del panel B2C · base inicial = carga masiva 6-7 may 2026</p>
+            <p class="kpi-filter-note">📇 Cuentan solo contactos con Puntos Acumulados + Número de Identificación (los demás leads no entran en ningún indicador)</p>
         </div>
-        <div class="kpi-grid">
-            <div class="kpi-card otorgados"><div class="kpi-icon">👥</div><div class="kpi-label">Base final</div><div class="kpi-value" id="crmBaseFinal">—</div><div class="kpi-sub">contactos totales hoy</div></div>
-            <div class="kpi-card"><div class="kpi-icon">📦</div><div class="kpi-label">Base inicial</div><div class="kpi-value" id="crmBaseInicial">—</div><div class="kpi-sub" id="crmBaseInicialSub">carga masiva inicial</div></div>
-            <div class="kpi-card recompras"><div class="kpi-icon">📈</div><div class="kpi-label">Nuevos del período <span class="tbl-tag fecha" style="margin-left:4px">Por fechas</span></div><div class="kpi-value" id="crmNuevosPeriodo">—</div><div class="kpi-sub" id="crmNuevosPeriodoSub">creados en el rango</div></div>
-            <div class="kpi-card tasa"><div class="kpi-icon">🆕</div><div class="kpi-label">Nuevos 7 días</div><div class="kpi-value" id="crmNuevos7">—</div><div class="kpi-sub" id="crmNuevos7Sub">última semana</div></div>
-            <div class="kpi-card redimidos"><div class="kpi-icon">🚀</div><div class="kpi-label">Crecimiento</div><div class="kpi-value" id="crmCrecimiento">—</div><div class="kpi-sub">desde la migración</div></div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(2,minmax(220px,1fr));max-width:640px">
+            <div class="kpi-card otorgados"><div class="kpi-icon">👥</div><div class="kpi-label">Base actual (consolidada)</div><div class="kpi-value" id="crmBaseActual">—</div><div class="kpi-sub">contactos con puntos + cédula</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">🆕</div><div class="kpi-label">Clientes nuevos <span class="tbl-tag fecha" style="margin-left:4px">Por fechas</span></div><div class="kpi-value" id="crmNuevosPeriodo">—</div><div class="kpi-sub" id="crmNuevosPeriodoSub">creados en el rango</div></div>
+        </div>
+        <div style="margin-top:22px">
+            <div style="font-weight:700;color:var(--chocolate);font-size:.9rem;margin-bottom:10px">📈 Variación de la base activa <small style="font-weight:600;color:var(--gris);text-transform:none">· cierre de cada mes desde mayo 2026</small></div>
+            <div style="overflow-x:auto;background:var(--blanco);border:1px solid var(--beige);border-radius:12px">
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead><tr style="background:var(--crema);color:var(--chocolate);text-align:left">
+                        <th style="padding:10px 14px">Mes</th>
+                        <th style="padding:10px 14px;text-align:right">Base activa</th>
+                        <th style="padding:10px 14px;text-align:right">Nuevos</th>
+                        <th style="padding:10px 14px;text-align:right">% crecimiento</th>
+                    </tr></thead>
+                    <tbody id="crmVariacionBody"><tr><td colspan="4" style="padding:14px;color:var(--gris)">Cargando…</td></tr></tbody>
+                </table>
+            </div>
         </div>
     </section>
 
@@ -3537,28 +3548,25 @@ async function loadB2CKpis(from,to){
     b2cKpisData=d; renderB2CKpis(d);
     loadCrmKpis(from,to);
 }
-const REPUTACION_URL = 'https://app.rioagencymarketing.com/webhook/get-reputation';
-async function loadReputacion(){
-    const el=document.getElementById('b2cExpRep'); if(!el) return;
-    const sub=document.getElementById('b2cExpRepSub');
-    let d=null; try{ d=await (await fetch(REPUTACION_URL)).json(); }catch(e){}
-    if(!d || typeof d.rating==='undefined'){ el.textContent='N/D'; if(sub) sub.textContent='pendiente de conexión'; return; }
-    el.textContent='⭐ '+(d.rating||0);
-    if(sub) sub.textContent=fmt(d.total||0)+' reseñas'+(typeof d.nuevas!=='undefined'?(' · '+fmt(d.nuevas)+' nuevas'):'');
-}
 const CRM_KPIS_URL = 'https://app.rioagencymarketing.com/webhook/get-crm-kpis';
 async function loadCrmKpis(from,to){
-    const el=document.getElementById('crmBaseFinal'); if(el) el.textContent='…';
+    const el=document.getElementById('crmBaseActual'); if(el) el.textContent='…';
+    const body=document.getElementById('crmVariacionBody'); if(body) body.innerHTML='<tr><td colspan="4" style="padding:14px;color:var(--gris)">Cargando…</td></tr>';
     const url = CRM_KPIS_URL + (from||to ? '?date_start='+(from||'')+(to?'&date_end='+to:'') : '');
     let d=null; try{ d = await (await fetch(url)).json(); }catch(e){}
     const S=(k,val)=>{const x=document.getElementById(k); if(x) x.textContent=val;};
-    if(!d || typeof d.base_final==='undefined'){ if(el) el.textContent='—'; return; }
-    S('crmBaseFinal', fmt(d.base_final));
-    S('crmBaseInicial', fmt(d.base_inicial)); S('crmBaseInicialSub', 'antes de '+fmtDate(d.migracion_cut));
+    if(!d || typeof d.base_actual==='undefined'){ if(el) el.textContent='—'; if(body) body.innerHTML='<tr><td colspan="4" style="padding:14px;color:var(--gris)">Sin datos</td></tr>'; return; }
+    S('crmBaseActual', fmt(d.base_actual));
     S('crmNuevosPeriodo', fmt(d.nuevos_periodo)); S('crmNuevosPeriodoSub', fmtDate(d.periodo.desde)+' → '+fmtDate(d.periodo.hasta));
-    S('crmNuevos7', fmt(d.nuevos_7dias)); S('crmNuevos7Sub', fmtDate(d.ventana_7d.desde)+' → '+fmtDate(d.ventana_7d.hasta));
-    S('crmCrecimiento', '+'+(d.crecimiento_pct||0)+'%');
     const lbl=document.getElementById('crmPeriodLabel'); if(lbl) lbl.textContent=fmtDate(d.periodo.desde)+' → '+fmtDate(d.periodo.hasta);
+    if(body){
+        const rows=(d.variacion||[]);
+        body.innerHTML = rows.length ? rows.map(v=>{
+            const pct = (v.pct_crecimiento==null) ? '—' : ((v.pct_crecimiento>=0?'+':'')+v.pct_crecimiento+'%');
+            const col = (v.pct_crecimiento==null) ? 'var(--gris)' : (v.pct_crecimiento>=0?'var(--verde)':'var(--cereza)');
+            return '<tr style="border-top:1px solid var(--beige)"><td style="padding:9px 14px;font-weight:600;color:var(--chocolate);text-transform:capitalize">'+esc(v.label)+'</td><td style="padding:9px 14px;text-align:right;color:var(--chocolate)">'+fmt(v.base_acumulada)+'</td><td style="padding:9px 14px;text-align:right">'+(v.nuevos>=0?'+':'')+fmt(v.nuevos)+'</td><td style="padding:9px 14px;text-align:right;font-weight:700;color:'+col+'">'+pct+'</td></tr>';
+        }).join('') : '<tr><td colspan="4" style="padding:14px;color:var(--gris)">Sin datos</td></tr>';
+    }
 }
 function renderB2CKpis(d){
     const v=d.ventas, id=d.identificacion, tk=d.ticket;
