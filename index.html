@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Chuculat - Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>try{ if(window.Chart && window.ChartDataLabels) Chart.unregister(ChartDataLabels); }catch(e){}</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
 
@@ -141,7 +143,7 @@ body { font-family: 'Montserrat', Arial, sans-serif; background: var(--crema); }
 .kpi-card.tasa      .kpi-value, .kpi-card.meta .kpi-value   { color: var(--verde); }
 .kpi-card.recompras .kpi-value, .kpi-card.b2b-kpi .kpi-value{ color: var(--naranja); }
 .kpi-card.export-kpi .kpi-value { color: var(--morado); }
-.kpi-sub { color: var(--gris); font-size: 11px; margin-top: 6px; font-weight: 500; }
+.kpi-sub { color: var(--gris); font-size: 11px; margin-top: 6px; font-weight: 500; }
 .tbl-tag { display: inline-block; font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 50px; text-transform: uppercase; letter-spacing: .5px; vertical-align: middle; margin-left: 8px; }
 .tbl-tag.fecha { background: #e1f3fb; color: #0277a8; }
 .tbl-tag.consol { background: #fff3e0; color: #c77700; }
@@ -535,19 +537,37 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                 <div class="kpi-card recompras"><div class="kpi-icon">🔁</div><div class="kpi-label">Clientes recurrentes</div><div class="kpi-value" id="b2cRec">—</div><div class="kpi-sub" id="b2cRecSub">2+ compras</div></div>
                 <div class="kpi-card tasa"><div class="kpi-icon">📊</div><div class="kpi-label">% Recurrentes</div><div class="kpi-value" id="b2cRecPct">—</div><div class="kpi-sub">de personas naturales</div></div>
                 <div class="kpi-card otorgados"><div class="kpi-icon">💰</div><div class="kpi-label">Ventas por recompra</div><div class="kpi-value" id="b2cRecVal">—</div><div class="kpi-sub">de clientes recurrentes</div></div>
-                <div class="kpi-card redimidos"><div class="kpi-icon">📈</div><div class="kpi-label">% Ventas por recompra</div><div class="kpi-value" id="b2cRecValPct">—</div><div class="kpi-sub">sobre ventas netas B2C</div></div>
+                <div class="kpi-card redimidos"><div class="kpi-icon">📈</div><div class="kpi-label">% Ventas por recompra</div><div class="kpi-value" id="b2cRecValPct">—</div><div class="kpi-sub" id="b2cRecValPctSub">sobre ventas netas B2C</div></div>
             </div>
         </div>
-        <div style="margin-top:22px;padding-top:16px;border-top:2px dashed var(--beige)">
-            <div style="font-weight:700;color:var(--chocolate);font-size:.9rem;margin-bottom:4px">🎭 Experiencia <span class="tbl-tag fecha">Por fechas</span><small style="font-weight:600;color:var(--gris);text-transform:none">· servicios EXP (Wonka, Camino del Chocolate, Cacao Maestro…) del centro B2C</small></div>
-            <div class="kpi-grid" style="margin-top:12px">
-                <div class="kpi-card otorgados"><div class="kpi-icon">🎭</div><div class="kpi-label">Experiencias vendidas</div><div class="kpi-value" id="b2cExpUnid">—</div><div class="kpi-sub" id="b2cExpUnidSub">entradas · unidades</div></div>
-                <div class="kpi-card tasa"><div class="kpi-icon">🎟️</div><div class="kpi-label">Comprobantes</div><div class="kpi-value" id="b2cExpComp">—</div><div class="kpi-sub">facturas con experiencia</div></div>
-                <div class="kpi-card recompras"><div class="kpi-icon">💰</div><div class="kpi-label">Ventas de experiencia</div><div class="kpi-value" id="b2cExpVal">—</div><div class="kpi-sub" id="b2cExpValSub">del B2C neto</div></div>
-                <div class="kpi-card redimidos"><div class="kpi-icon">📝</div><div class="kpi-label">Tasa de respuesta encuesta</div><div class="kpi-value" id="b2cExpTasa">—</div><div class="kpi-sub" id="b2cExpTasaSub">encuestas ÷ experiencias</div></div>
-                <div class="kpi-card"><div class="kpi-icon">⭐</div><div class="kpi-label">Reputación Google</div><div class="kpi-value" id="b2cExpRep">N/D</div><div class="kpi-sub" id="b2cExpRepSub">calificación · reseñas</div></div>
+    </section>
+
+    <!-- ===== Satisfacción del cliente (Experiencias + Chuculatología) ===== -->
+    <section class="dash-section" id="sec-b2c-satis">
+        <div class="section-title">😊 Satisfacción del cliente <span class="tbl-tag fecha">Por fechas</span><small style="font-weight:600;color:var(--gris);text-transform:none;letter-spacing:0">· venta, tasa de respuesta y encuesta promediada</small></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px">
+            <div style="background:var(--blanco);border:1px solid var(--beige);border-radius:14px;padding:18px 18px 16px;box-shadow:0 4px 16px rgba(63,32,33,.07)">
+                <div style="font-weight:800;color:var(--chocolate);font-size:1rem;margin-bottom:2px">🎭 Experiencias</div>
+                <div style="color:var(--gris);font-size:11px;margin-bottom:14px">Oompa Loompa · Wonka · Camino del Chocolate · Cacao Maestro</div>
+                <div class="kpi-grid" style="grid-template-columns:repeat(2,1fr);gap:12px">
+                    <div class="kpi-card otorgados"><div class="kpi-icon">🎭</div><div class="kpi-label">Experiencias vendidas</div><div class="kpi-value" id="b2cExpUnid">—</div><div class="kpi-sub" id="b2cExpUnidSub">unidades</div></div>
+                    <div class="kpi-card recompras"><div class="kpi-icon">💰</div><div class="kpi-label">Venta en experiencias</div><div class="kpi-value" id="b2cExpVal">—</div><div class="kpi-sub" id="b2cExpValSub">del B2C neto</div></div>
+                    <div class="kpi-card tasa"><div class="kpi-icon">📝</div><div class="kpi-label">Tasa de respuesta</div><div class="kpi-value" id="b2cExpTasa">—</div><div class="kpi-sub" id="b2cExpTasaSub">encuestas ÷ vendidas</div></div>
+                    <div class="kpi-card redimidos"><div class="kpi-icon">⭐</div><div class="kpi-label">Satisfacción</div><div class="kpi-value" id="b2cExpSatis">—</div><div class="kpi-sub" id="b2cExpSatisSub">encuesta promediada</div></div>
+                </div>
+                <div id="b2cExpDesglose" style="margin-top:12px"></div>
             </div>
-            <div id="b2cExpDesglose" style="margin-top:14px"></div>
+            <div style="background:var(--blanco);border:1px solid var(--beige);border-radius:14px;padding:18px 18px 16px;box-shadow:0 4px 16px rgba(63,32,33,.07)">
+                <div style="font-weight:800;color:var(--chocolate);font-size:1rem;margin-bottom:2px">☕ Chuculatología</div>
+                <div style="color:var(--gris);font-size:11px;margin-bottom:14px">Chocolate Caliente · Chocolate Frío · Malteada</div>
+                <div class="kpi-grid" style="grid-template-columns:repeat(2,1fr);gap:12px">
+                    <div class="kpi-card otorgados"><div class="kpi-icon">☕</div><div class="kpi-label">Tazas vendidas</div><div class="kpi-value" id="b2cChuUnid">—</div><div class="kpi-sub" id="b2cChuUnidSub">unidades</div></div>
+                    <div class="kpi-card recompras"><div class="kpi-icon">💰</div><div class="kpi-label">Venta en tazas</div><div class="kpi-value" id="b2cChuVal">—</div><div class="kpi-sub" id="b2cChuValSub">del B2C neto</div></div>
+                    <div class="kpi-card tasa"><div class="kpi-icon">📝</div><div class="kpi-label">Tasa de respuesta</div><div class="kpi-value" id="b2cChuTasa">—</div><div class="kpi-sub" id="b2cChuTasaSub">encuestas ÷ tazas</div></div>
+                    <div class="kpi-card redimidos"><div class="kpi-icon">⭐</div><div class="kpi-label">Satisfacción</div><div class="kpi-value" id="b2cChuSatis">—</div><div class="kpi-sub" id="b2cChuSatisSub">encuesta promediada</div></div>
+                </div>
+                <div id="b2cChuDesglose" style="margin-top:12px"></div>
+            </div>
         </div>
     </section>
 
@@ -1803,7 +1823,7 @@ function renderSurveysFiltered(){
     const nb=document.getElementById('navBadgeEncuestas'); if(nb) nb.textContent=total;
     renderSurveyCard('experiencias',exp,'bodyExperiencias','countExperiencias','respExperiencias');
     renderSurveyCard('chuculatologia',chu,'bodyChuculatologia','countChuculatologia','respChuculatologia');
-    if(typeof b2cKpisData!=='undefined' && b2cKpisData) renderExperiencia(b2cKpisData);
+    if(typeof b2cKpisData!=='undefined' && b2cKpisData) renderSatisfaccion(b2cKpisData);
 }
 function applySurveyDateFilter(){
     const f=document.getElementById('surveyFrom').value, t=document.getElementById('surveyTo').value;
@@ -3549,46 +3569,61 @@ function renderB2CKpis(d){
     S('b2cPctId', id.pct_identificadas+'%');
     S('b2cIdSub', fmtCOP(id.identificadas)+' identificadas');
     S('b2cTkNat', fmtCOP(tk.naturales));
-    S('b2cPos', fmtCOP(v.pos)); S('b2cPosSub', fmt(v.comprobantes_pos)+' comprob.');
-    S('b2cWeb', fmtCOP(v.web)); S('b2cWebSub', fmt(v.comprobantes_web)+' comprob. · ticket '+fmtCOP(tk.web));
-    S('b2cNat', fmtCOP(id.naturales)); S('b2cNatSub', (id.pct_naturales||0)+'% del centro · '+fmt(id.comp_naturales)+' comprob.');
-    S('b2cEmp', fmtCOP(id.empresas)); S('b2cEmpSub', fmt(id.comp_empresas)+' comprob. · ticket '+fmtCOP(tk.empresas));
-    S('b2c222', fmtCOP(id.g222)); S('b2c222Sub', 'Consumidor final nacional · '+fmt(id.comp_222)+' comprob.');
-    S('b2c7777', fmtCOP(id.g7777)); S('b2c7777Sub', 'Genérico internacional · '+fmt(id.comp_7777)+' comprob.');
+    // Convención en recuadros de distribución: # = comprobantes · $ = ticket promedio · % = del centro B2C
+    const neto=Number(v.b2c_neto)||0;
+    const pctOf=x=>neto?Math.round(x/neto*100):0;
+    const conv=(comp,ticket,share)=>'# '+fmt(comp)+' · $ '+fmt(Math.round(ticket))+' · '+share+'%';
+    S('b2cPos', fmtCOP(v.pos)); S('b2cPosSub', conv(v.comprobantes_pos, tk.pos, pctOf(v.pos)));
+    S('b2cWeb', fmtCOP(v.web)); S('b2cWebSub', conv(v.comprobantes_web, tk.web, pctOf(v.web)));
+    S('b2cNat', fmtCOP(id.naturales)); S('b2cNatSub', conv(id.comp_naturales, tk.naturales, pctOf(id.naturales)));
+    S('b2cEmp', fmtCOP(id.empresas)); S('b2cEmpSub', conv(id.comp_empresas, tk.empresas, pctOf(id.empresas)));
+    S('b2c222', fmtCOP(id.g222)); S('b2c222Sub', conv(id.comp_222, tk.g222, pctOf(id.g222)));
+    S('b2c7777', fmtCOP(id.g7777)); S('b2c7777Sub', conv(id.comp_7777, tk.g7777, pctOf(id.g7777)));
     const fi=d.fidelizacion||{};
     S('b2cRec', fmt(fi.recurrentes||0)); S('b2cRecSub', 'de '+fmt(fi.clientes_naturales||0)+' clientes · 2+ compras');
     S('b2cRecPct', (fi.pct_recurrentes||0)+'%');
     S('b2cRecVal', fmtCOP(fi.ventas_recompra||0));
     S('b2cRecValPct', (fi.pct_ventas_recompra||0)+'%');
-    renderExperiencia(d);
+    S('b2cRecValPctSub', (fi.pct_ventas_recompra_total||0)+'% sobre total (todos los centros)');
+    renderSatisfaccion(d);
     renderB2CCharts(d);
 }
-// Experiencia — usa d.experiencias del endpoint + encuestas de experiencia (surveyExpAll) del mismo período
+// Satisfacción del cliente — experiencias (d.experiencias) + chuculatología (d.chuculatologia)
 function b2cCurrentRange(){ const r=b2cMonthRange(); return { from:(document.getElementById('b2cFrom')&&document.getElementById('b2cFrom').value)||r.from, to:(document.getElementById('b2cTo')&&document.getElementById('b2cTo').value)||r.to }; }
-function renderExperiencia(d){
+function _desgloseChips(arr,unidLbl){ return (arr&&arr.length) ? '<div style="display:flex;flex-wrap:wrap;gap:8px">'+arr.map(p=>'<span style="background:var(--crema);border:1px solid var(--beige);border-radius:50px;padding:5px 12px;font-size:12px;color:var(--chocolate)"><b>'+esc(p.nombre)+'</b> · '+fmt(p.unidades)+' '+unidLbl+' · '+fmtCOP(p.ventas)+'</span>').join('')+'</div>' : ''; }
+function _satisBlock(data, surveys, surveyKey, unidLbl, ids){
     const S=(k,val)=>{const el=document.getElementById(k); if(el) el.textContent=val;};
-    const e=(d&&d.experiencias)||{unidades:0,comprobantes:0,ventas:0,pct_ventas:0,desglose:[]};
-    S('b2cExpUnid', fmt(e.unidades||0)); S('b2cExpUnidSub', (e.desglose||[]).length+' productos · entradas');
-    S('b2cExpComp', fmt(e.comprobantes||0));
-    S('b2cExpVal', fmtCOP(e.ventas||0)); S('b2cExpValSub', (e.pct_ventas||0)+'% del B2C neto');
-    // tasa de respuesta = encuestas de experiencia del período ÷ experiencias vendidas (unidades)
+    const e=data||{unidades:0,ventas:0,pct_ventas:0,desglose:[]};
+    S(ids.unid, fmt(e.unidades||0)); S(ids.unidSub, (e.desglose||[]).length+' productos · '+unidLbl);
+    S(ids.val, fmtCOP(e.ventas||0)); S(ids.valSub, (e.pct_ventas||0)+'% del B2C neto');
     const rg=b2cCurrentRange();
-    const encuestas=(typeof surveyExpAll!=='undefined'?surveyExpAll:[]).filter(s=>{const dd=String(s.date||'').slice(0,10); return dd>=rg.from && dd<=rg.to;}).length;
+    const subs=(surveys||[]).filter(s=>{const dd=String(s.date||'').slice(0,10); return dd>=rg.from && dd<=rg.to;});
     const denom=Number(e.unidades||0);
-    S('b2cExpTasa', denom? Math.round(encuestas/denom*100)+'%' : '—');
-    S('b2cExpTasaSub', fmt(encuestas)+' encuestas ÷ '+fmt(denom)+' exp.');
-    const box=document.getElementById('b2cExpDesglose');
-    if(box){ const ds=(e.desglose||[]); box.innerHTML = ds.length ? '<div style="display:flex;flex-wrap:wrap;gap:8px">'+ds.map(p=>'<span style="background:var(--crema);border:1px solid var(--beige);border-radius:50px;padding:5px 12px;font-size:12px;color:var(--chocolate)"><b>'+esc(p.nombre)+'</b> · '+fmt(p.unidades)+' und · '+fmtCOP(p.ventas)+'</span>').join('') + '</div>' : ''; }
+    S(ids.tasa, denom? Math.round(subs.length/denom*100)+'%' : '—');
+    S(ids.tasaSub, fmt(subs.length)+' encuestas ÷ '+fmt(denom)+' '+unidLbl);
+    // satisfacción promedio (nota 1-5) reutilizando el scoring de las encuestas
+    let nota=null; try{ nota=computeSurveyScores(surveyKey, subs).nota; }catch(err){}
+    S(ids.satis, (nota!=null)? nota.toFixed(1)+' /5' : '—');
+    S(ids.satisSub, (nota!=null)? fmt(subs.length)+' encuestas promediadas' : 'sin encuestas en el rango');
+    const box=document.getElementById(ids.desglose); if(box) box.innerHTML=_desgloseChips(e.desglose, unidLbl);
+}
+function renderSatisfaccion(d){
+    _satisBlock(d&&d.experiencias, (typeof surveyExpAll!=='undefined'?surveyExpAll:[]), 'experiencias', 'exp.',
+        {unid:'b2cExpUnid',unidSub:'b2cExpUnidSub',val:'b2cExpVal',valSub:'b2cExpValSub',tasa:'b2cExpTasa',tasaSub:'b2cExpTasaSub',satis:'b2cExpSatis',satisSub:'b2cExpSatisSub',desglose:'b2cExpDesglose'});
+    _satisBlock(d&&d.chuculatologia, (typeof surveyChuAll!=='undefined'?surveyChuAll:[]), 'chuculatologia', 'tazas',
+        {unid:'b2cChuUnid',unidSub:'b2cChuUnidSub',val:'b2cChuVal',valSub:'b2cChuValSub',tasa:'b2cChuTasa',tasaSub:'b2cChuTasaSub',satis:'b2cChuSatis',satisSub:'b2cChuSatisSub',desglose:'b2cChuDesglose'});
 }
 function renderB2CCharts(d){
     if(typeof Chart==='undefined') return;
+    const DL=(typeof ChartDataLabels!=='undefined')?[ChartDataLabels]:[];
+    const pctFmt=(val,ctx)=>{const arr=ctx.chart.data.datasets[0].data;const tot=arr.reduce((a,b)=>a+Number(b||0),0);const p=tot?val/tot*100:0;return p>=3?Math.round(p)+'%':'';};
     const id=d.identificacion, tk=d.ticket;
     const c1=document.getElementById('b2cChartComp');
     if(c1){ if(b2cChartComp) b2cChartComp.destroy();
-        b2cChartComp=new Chart(c1,{type:'doughnut',data:{labels:['Personas naturales','Empresas','222 nacional','7777 extranjero'],datasets:[{data:[id.naturales,id.empresas,id.g222,id.g7777],backgroundColor:['#00abe1','#7d4b2b','#f39200','#9aa0a6'],borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11}}},tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmtCOP(ctx.parsed)}}}}}); }
+        b2cChartComp=new Chart(c1,{type:'doughnut',plugins:DL,data:{labels:['Personas naturales','Empresas','222 nacional','7777 extranjero'],datasets:[{data:[id.naturales,id.empresas,id.g222,id.g7777],backgroundColor:['#00abe1','#7d4b2b','#f39200','#9aa0a6'],borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11}}},tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmtCOP(ctx.parsed)}},datalabels:{color:'#fff',font:{weight:'bold',size:13},formatter:pctFmt}}}}); }
     const c2=document.getElementById('b2cChartTicket');
     if(c2){ if(b2cChartTicket) b2cChartTicket.destroy();
-        b2cChartTicket=new Chart(c2,{type:'bar',data:{labels:['Naturales','General','Web','Empresas'],datasets:[{data:[tk.naturales,tk.general,tk.web,tk.empresas],backgroundColor:['#00abe1','#7d4b2b','#f39200','#4caf50'],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmtCOP(ctx.parsed.y)}}},scales:{y:{ticks:{callback:v=>fmtCOP(v)}}}}}); }
+        b2cChartTicket=new Chart(c2,{type:'bar',plugins:DL,data:{labels:['Naturales','General','Web','Empresas'],datasets:[{data:[tk.naturales,tk.general,tk.web,tk.empresas],backgroundColor:['#00abe1','#7d4b2b','#f39200','#4caf50'],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmtCOP(ctx.parsed.y)}},datalabels:{anchor:'end',align:'end',color:'#7d4b2b',font:{weight:'bold',size:12},formatter:(val,ctx)=>{const arr=ctx.chart.data.datasets[0].data;const tot=arr.reduce((a,b)=>a+Number(b||0),0);return tot?Math.round(val/tot*100)+'%':'';}}}},scales:{y:{ticks:{callback:v=>fmtCOP(v)}}}}); }
 }
 function applyB2CKpis(){ const r=b2cMonthRange(); const from=document.getElementById('b2cFrom').value||r.from, to=document.getElementById('b2cTo').value||r.to; document.getElementById('b2cPeriodLabel').textContent=fmtDate(from)+' → '+fmtDate(to); loadB2CKpis(from,to); }
 function b2cKpisMesActual(){ const r=b2cMonthRange(); document.getElementById('b2cFrom').value=r.from; document.getElementById('b2cTo').value=r.to; document.getElementById('b2cPeriodLabel').textContent='Mes actual'; loadB2CKpis(r.from,r.to); }
@@ -3599,7 +3634,6 @@ loadData();
 loadLogs();
 loadSurveys();
 b2cKpisMesActual();
-loadReputacion();
 </script>
 </body>
 </html>
