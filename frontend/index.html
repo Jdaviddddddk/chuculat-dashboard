@@ -525,7 +525,8 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         </div>
         <div class="kpi-grid" style="margin-top:18px">
             <div class="kpi-card"><div class="kpi-icon">🏪</div><div class="kpi-label">POS salón</div><div class="kpi-value" id="b2cPos">—</div><div class="kpi-sub" id="b2cPosSub">—</div></div>
-            <div class="kpi-card"><div class="kpi-icon">🛒</div><div class="kpi-label">Web WooCommerce</div><div class="kpi-value" id="b2cWeb">—</div><div class="kpi-sub" id="b2cWebSub">—</div></div>
+            <div class="kpi-card"><div class="kpi-icon">🛒</div><div class="kpi-label">Página web</div><div class="kpi-value" id="b2cWeb">—</div><div class="kpi-sub" id="b2cWebSub">—</div></div>
+            <div class="kpi-card"><div class="kpi-icon">📅</div><div class="kpi-label">Site de agendas</div><div class="kpi-value" id="b2cAgendas">—</div><div class="kpi-sub" id="b2cAgendasSub">—</div></div>
             <div class="kpi-card"><div class="kpi-icon">🧑</div><div class="kpi-label">Personas naturales</div><div class="kpi-value" id="b2cNat">—</div><div class="kpi-sub" id="b2cNatSub">—</div></div>
             <div class="kpi-card"><div class="kpi-icon">🏢</div><div class="kpi-label">Empresas / jurídicas</div><div class="kpi-value" id="b2cEmp">—</div><div class="kpi-sub" id="b2cEmpSub">—</div></div>
             <div class="kpi-card"><div class="kpi-icon">💵</div><div class="kpi-label">Genérico 222</div><div class="kpi-value" id="b2c222">—</div><div class="kpi-sub" id="b2c222Sub">Consumidor final nacional</div></div>
@@ -3577,12 +3578,13 @@ function renderB2CKpis(d){
     S('b2cPctId', id.pct_identificadas+'%');
     S('b2cIdSub', fmtCOP(id.identificadas)+' identificadas');
     S('b2cTkNat', fmtCOP(tk.naturales));
-    // Convención en recuadros de distribución: # = comprobantes · $ = ticket promedio · % = del centro B2C
-    const neto=Number(v.b2c_neto)||0;
-    const pctOf=x=>neto?Math.round(x/neto*100):0;
+    // Convención en recuadros de distribución: # = comprobantes · $ = ticket promedio · % = de la composición (suman 100%)
+    const bruto=Number(v.total_bruto)||(Number(v.pos)+Number(v.web))||0;
+    const pctOf=x=>bruto?Math.round(x/bruto*100):0;
     const conv=(comp,ticket,share)=>'# '+fmt(comp)+' · $ '+fmt(Math.round(ticket))+' · '+share+'%';
     S('b2cPos', fmtCOP(v.pos)); S('b2cPosSub', conv(v.comprobantes_pos, tk.pos, pctOf(v.pos)));
-    S('b2cWeb', fmtCOP(v.web)); S('b2cWebSub', conv(v.comprobantes_web, tk.web, pctOf(v.web)));
+    S('b2cWeb', fmtCOP(v.web_pagina)); S('b2cWebSub', conv(v.comprobantes_web_pagina, tk.web_pagina, pctOf(v.web_pagina)));
+    S('b2cAgendas', fmtCOP(v.web_agendas)); S('b2cAgendasSub', conv(v.comprobantes_web_agendas, tk.web_agendas, pctOf(v.web_agendas)));
     S('b2cNat', fmtCOP(id.naturales)); S('b2cNatSub', conv(id.comp_naturales, tk.naturales, pctOf(id.naturales)));
     S('b2cEmp', fmtCOP(id.empresas)); S('b2cEmpSub', conv(id.comp_empresas, tk.empresas, pctOf(id.empresas)));
     S('b2c222', fmtCOP(id.g222)); S('b2c222Sub', conv(id.comp_222, tk.g222, pctOf(id.g222)));
