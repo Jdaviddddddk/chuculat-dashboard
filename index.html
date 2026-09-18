@@ -3563,9 +3563,12 @@ async function loadCrmKpis(from,to){
     if(body){
         const rows=(d.variacion||[]);
         body.innerHTML = rows.length ? rows.map(v=>{
+            const inicial = (v.nuevos==null);
             const pct = (v.pct_crecimiento==null) ? '—' : ((v.pct_crecimiento>=0?'+':'')+v.pct_crecimiento+'%');
             const col = (v.pct_crecimiento==null) ? 'var(--gris)' : (v.pct_crecimiento>=0?'var(--verde)':'var(--cereza)');
-            return '<tr style="border-top:1px solid var(--beige)"><td style="padding:9px 14px;font-weight:600;color:var(--chocolate);text-transform:capitalize">'+esc(v.label)+'</td><td style="padding:9px 14px;text-align:right;color:var(--chocolate)">'+fmt(v.base_acumulada)+'</td><td style="padding:9px 14px;text-align:right">'+(v.nuevos>=0?'+':'')+fmt(v.nuevos)+'</td><td style="padding:9px 14px;text-align:right;font-weight:700;color:'+col+'">'+pct+'</td></tr>';
+            const nuevos = inicial ? '—' : ((v.nuevos>=0?'+':'')+fmt(v.nuevos));
+            const bg = inicial ? 'background:var(--crema);' : '';
+            return '<tr style="border-top:1px solid var(--beige);'+bg+'"><td style="padding:9px 14px;font-weight:'+(inicial?'800':'600')+';color:var(--chocolate);text-transform:capitalize">'+esc(v.label)+'</td><td style="padding:9px 14px;text-align:right;font-weight:'+(inicial?'800':'600')+';color:var(--chocolate)">'+fmt(v.base_activa)+'</td><td style="padding:9px 14px;text-align:right">'+nuevos+'</td><td style="padding:9px 14px;text-align:right;font-weight:700;color:'+col+'">'+pct+'</td></tr>';
         }).join('') : '<tr><td colspan="4" style="padding:14px;color:var(--gris)">Sin datos</td></tr>';
     }
 }
