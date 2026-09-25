@@ -465,6 +465,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         <button class="seg-btn"        id="segB2B" onclick="setSegment('b2b')">🏢 Ventas</button>
         <button class="seg-btn"        id="segTab" onclick="setSegment('tablas')">🧮 Tablas</button>
         <button class="seg-btn"        id="segDest" onclick="setSegment('destacadas')">⭐ Destacadas</button>
+        <button class="seg-btn"        id="segWeb" onclick="setSegment('web')">🌐 Web</button>
     </div>
     <nav class="topbar-nav nav-b2c show" id="navB2C">
         <a class="nav-item active" href="#sec-b2c-com"   onclick="b2cNav(this)"><span class="nav-icon">🍫</span> Centro B2C</a>
@@ -539,6 +540,15 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                 <div class="kpi-card tasa"><div class="kpi-icon">📊</div><div class="kpi-label">% Recurrentes</div><div class="kpi-value" id="b2cRecPct">—</div><div class="kpi-sub">de personas naturales</div></div>
                 <div class="kpi-card otorgados"><div class="kpi-icon">💰</div><div class="kpi-label">Ventas por recompra</div><div class="kpi-value" id="b2cRecVal">—</div><div class="kpi-sub">de clientes recurrentes</div></div>
                 <div class="kpi-card redimidos"><div class="kpi-icon">📈</div><div class="kpi-label">% Ventas por recompra</div><div class="kpi-value" id="b2cRecValPct">—</div><div class="kpi-sub" id="b2cRecValPctSub">sobre ventas netas B2C</div></div>
+            </div>
+        </div>
+        <div style="margin-top:22px;padding-top:16px;border-top:2px dashed var(--beige)">
+            <div style="font-weight:700;color:var(--chocolate);font-size:.9rem;margin-bottom:4px">🤖 Ventas del bot <small style="font-weight:600;color:var(--gris);text-transform:none">· pedidos que cierra el bot conversacional · desde 24-sep · marcador en factura Siigo</small></div>
+            <div class="kpi-grid" style="margin-top:12px">
+                <div class="kpi-card otorgados"><div class="kpi-icon">🤖</div><div class="kpi-label">Pedidos del bot</div><div class="kpi-value" id="botb2cTotal">—</div><div class="kpi-sub" id="botb2cTotalSub">total</div></div>
+                <div class="kpi-card recompras"><div class="kpi-icon">💰</div><div class="kpi-label">Monto</div><div class="kpi-value" id="botb2cMonto">—</div><div class="kpi-sub">de esos pedidos</div></div>
+                <div class="kpi-card tasa"><div class="kpi-icon">🛍️</div><div class="kpi-label">Productos</div><div class="kpi-value" id="botb2cProd">—</div><div class="kpi-sub" id="botb2cProdSub">—</div></div>
+                <div class="kpi-card redimidos"><div class="kpi-icon">🎭</div><div class="kpi-label">Experiencias</div><div class="kpi-value" id="botb2cExp">—</div><div class="kpi-sub" id="botb2cExpSub">—</div></div>
             </div>
         </div>
     </section>
@@ -1247,6 +1257,164 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
     </div>
 </div><!-- /panelDestacadas -->
 
+<!-- ══════════════════ PANEL WEB (Meta Pixel + Ads) ══════════════════ -->
+<div class="panel" id="panelWeb">
+
+    <section class="dash-section" id="sec-web">
+        <div class="section-title">🌐 Web · Meta Pixel + Anuncios <span class="tbl-tag fecha">Por fechas</span></div>
+        <div class="kpi-filter-bar">
+            <label>Desde</label><input type="date" id="webFrom">
+            <label>Hasta</label><input type="date" id="webTo">
+            <button class="btn-filter" onclick="applyWebKpis()">Aplicar</button>
+            <button class="btn-filter secondary" onclick="webKpisUltimos30()">Últimos 30 días</button>
+            <span class="kpi-filter-period" id="webPeriodLabel">Últimos 30 días</span>
+            <p class="kpi-filter-note">📊 Pixel <b id="webPixelId">1380092323013231</b> · cuenta de anuncios Meta · <span id="webPixelEstado">—</span></p>
+        </div>
+        <div style="background:#e1f3fb;border:1px solid #b6e0f2;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#0277a8">
+            🌐 <b>Combinado · 4 superficies</b>: el pixel es el mismo en <b>tienda</b> (chuculat.com), <b>landing</b>, <b>agenda</b> y <b>chai</b>, y Meta no permite separarlos por sitio en estos números — son la <b>suma de los cuatro</b>. (El desglose por sitio queda pendiente de un tag por superficie.)
+        </div>
+        <div style="background:#fff8e1;border:1px solid #ffe0a3;border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:12.5px;color:#8a6d00">
+            ⚠️ <b>Corte 19–20 sep 2026</b>: hasta esa fecha los eventos venían del sitio viejo (WordPress) y desde entonces del sitio nuevo. La serie es continua pero <b>no es comparable</b> a ambos lados del corte.
+        </div>
+
+        <!-- Embudo de conversión (pixel) -->
+        <div style="font-weight:700;color:var(--chocolate);font-size:.95rem;margin-bottom:10px">🔻 Embudo de conversión <small style="font-weight:600;color:var(--gris);text-transform:none">· eventos del pixel en el período · <b>Compras = tienda + agenda</b> (experiencias reportan compra a Meta desde 23-sep)</small></div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+            <div class="kpi-card otorgados"><div class="kpi-icon">👀</div><div class="kpi-label">Visitas</div><div class="kpi-value" id="webVisitas">—</div><div class="kpi-sub" id="webVisitasSub">PageView</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">🔎</div><div class="kpi-label">Vieron producto</div><div class="kpi-value" id="webViewC">—</div><div class="kpi-sub" id="webViewCSub">de las visitas</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">🛒</div><div class="kpi-label">Al carrito</div><div class="kpi-value" id="webCart">—</div><div class="kpi-sub" id="webCartSub">de los que vieron</div></div>
+            <div class="kpi-card redimidos"><div class="kpi-icon">💳</div><div class="kpi-label">Checkout</div><div class="kpi-value" id="webCheckout">—</div><div class="kpi-sub" id="webCheckoutSub">del carrito</div></div>
+            <div class="kpi-card otorgados"><div class="kpi-icon">✅</div><div class="kpi-label">Compras</div><div class="kpi-value" id="webPurch">—</div><div class="kpi-sub" id="webPurchSub">del checkout</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">📈</div><div class="kpi-label">Conversión global</div><div class="kpi-value" id="webConv">—</div><div class="kpi-sub">compras ÷ visitas</div></div>
+        </div>
+        <div style="background:var(--blanco);border:1px solid var(--beige);border-radius:12px;padding:14px;margin-top:16px">
+            <div style="font-weight:700;color:var(--chocolate);font-size:.85rem;margin-bottom:10px">🔻 Embudo</div>
+            <div style="height:300px"><canvas id="webChartEmbudo"></canvas></div>
+        </div>
+
+        <!-- Conversiones por superficie (Lead landing / Schedule agenda) -->
+        <div style="font-weight:700;color:var(--chocolate);font-size:.95rem;margin:22px 0 10px">🎯 Conversiones por superficie <small style="font-weight:600;color:var(--gris);text-transform:none">· eventos propios de landing y agenda (no son parte del embudo de la tienda)</small></div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));max-width:640px">
+            <div class="kpi-card recompras"><div class="kpi-icon">🧲</div><div class="kpi-label">Interesados landing</div><div class="kpi-value" id="webLead">—</div><div class="kpi-sub" id="webLeadSub">evento Lead · click a la tienda</div></div>
+            <div class="kpi-card otorgados"><div class="kpi-icon">📅</div><div class="kpi-label">Reservas agenda</div><div class="kpi-value" id="webSchedule">—</div><div class="kpi-sub" id="webScheduleSub">evento Schedule · experiencia agendada</div></div>
+        </div>
+
+        <!-- Vistas por superficie (beacon propio → Supabase) -->
+        <div style="font-weight:700;color:var(--chocolate);font-size:.95rem;margin:24px 0 6px">👣 Vistas por superficie <small style="font-weight:600;color:var(--gris);text-transform:none">· contador propio (beacon) · el split real que el pixel no da</small></div>
+        <div style="background:#f3e5f5;border:1px solid #e1bee7;border-radius:10px;padding:9px 14px;margin-bottom:12px;font-size:12px;color:#6a1b9a">
+            🧭 Estas vistas vienen de un <b>beacon propio</b> (tabla en Supabase), no del pixel — por eso sí se separan por sitio y no las cortan los adblockers, así que el total puede diferir del PageView de Meta. El <b>tiempo</b> es activo (se pausa al perder foco) y solo promedia las vistas con cierre registrado (<span id="vistCierreNota">—</span>). <b>chai</b> solo cuenta la 1ª vista por sesión.
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+            <div class="kpi-card otorgados"><div class="kpi-icon">🍫</div><div class="kpi-label">Tienda</div><div class="kpi-value" id="vistTienda">—</div><div class="kpi-sub" id="vistTiendaSub">chuculat.com</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">🧲</div><div class="kpi-label">Landing</div><div class="kpi-value" id="vistLanding">—</div><div class="kpi-sub" id="vistLandingSub">landing.chuculat.com</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">📅</div><div class="kpi-label">Agenda</div><div class="kpi-value" id="vistAgenda">—</div><div class="kpi-sub" id="vistAgendaSub">agendas.chuculat.com</div></div>
+            <div class="kpi-card redimidos"><div class="kpi-icon">🫖</div><div class="kpi-label">Chai</div><div class="kpi-value" id="vistChai">—</div><div class="kpi-sub" id="vistChaiSub">chai.chuculat.com</div></div>
+            <div class="kpi-card"><div class="kpi-icon">Σ</div><div class="kpi-label">Total vistas</div><div class="kpi-value" id="vistTotal">—</div><div class="kpi-sub">beacon</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-top:14px">
+            <div style="overflow-x:auto;background:var(--blanco);border:1px solid var(--beige);border-radius:12px">
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead><tr style="background:var(--crema);color:var(--chocolate);text-align:left">
+                        <th style="padding:10px 14px">Superficie</th><th style="padding:10px 14px">Página</th><th style="padding:10px 14px;text-align:right">Vistas</th><th style="padding:10px 14px;text-align:right">Tiempo prom.</th>
+                    </tr></thead>
+                    <tbody id="vistPaginasBody"><tr><td colspan="4" style="padding:14px;color:var(--gris)">Cargando…</td></tr></tbody>
+                </table>
+            </div>
+            <div style="overflow-x:auto;background:var(--blanco);border:1px solid var(--beige);border-radius:12px">
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead><tr style="background:var(--crema);color:var(--chocolate);text-align:left">
+                        <th style="padding:10px 14px">Fuente (utm_source)</th><th style="padding:10px 14px;text-align:right">Vistas</th>
+                    </tr></thead>
+                    <tbody id="vistSourceBody"><tr><td colspan="2" style="padding:14px;color:var(--gris)">Cargando…</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Anuncios -->
+        <div style="font-weight:700;color:var(--chocolate);font-size:.95rem;margin:22px 0 10px">📣 Anuncios (Meta Ads) <small style="font-weight:600;color:var(--gris);text-transform:none">· vs período anterior</small></div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+            <div class="kpi-card otorgados"><div class="kpi-icon">👥</div><div class="kpi-label">Alcance</div><div class="kpi-value" id="webReach">—</div><div class="kpi-sub" id="webReachSub">usuarios únicos</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">📺</div><div class="kpi-label">Impresiones</div><div class="kpi-value" id="webImpr">—</div><div class="kpi-sub" id="webImprSub">—</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">🖱️</div><div class="kpi-label">Clics</div><div class="kpi-value" id="webClicks">—</div><div class="kpi-sub" id="webClicksSub">—</div></div>
+            <div class="kpi-card redimidos"><div class="kpi-icon">🎯</div><div class="kpi-label">CTR</div><div class="kpi-value" id="webCtr">—</div><div class="kpi-sub">clics ÷ impresiones</div></div>
+            <div class="kpi-card otorgados"><div class="kpi-icon">💰</div><div class="kpi-label">Gasto</div><div class="kpi-value" id="webSpend">—</div><div class="kpi-sub" id="webSpendSub">—</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">🏷️</div><div class="kpi-label">CPC</div><div class="kpi-value" id="webCpc">—</div><div class="kpi-sub" id="webCpcSub">costo por clic</div></div>
+        </div>
+
+        <!-- Series diarias -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:22px">
+            <div style="background:var(--blanco);border:1px solid var(--beige);border-radius:12px;padding:14px">
+                <div style="font-weight:700;color:var(--chocolate);font-size:.85rem;margin-bottom:10px">📈 Visitas vs Compras (pixel) por día</div>
+                <div style="height:260px"><canvas id="webChartPixel"></canvas></div>
+            </div>
+            <div style="background:var(--blanco);border:1px solid var(--beige);border-radius:12px;padding:14px">
+                <div style="font-weight:700;color:var(--chocolate);font-size:.85rem;margin-bottom:10px">💰 Gasto y alcance (ads) por día</div>
+                <div style="height:260px"><canvas id="webChartAds"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Campañas -->
+        <div style="font-weight:700;color:var(--chocolate);font-size:.95rem;margin:22px 0 10px">🎯 Por campaña <small style="font-weight:600;color:var(--gris);text-transform:none">· desglose de la pauta activa</small></div>
+        <div style="overflow-x:auto;background:var(--blanco);border:1px solid var(--beige);border-radius:12px">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+                <thead><tr style="background:var(--crema);color:var(--chocolate);text-align:left">
+                    <th style="padding:10px 14px">Campaña</th>
+                    <th style="padding:10px 14px;text-align:right">Alcance</th>
+                    <th style="padding:10px 14px;text-align:right">Impresiones</th>
+                    <th style="padding:10px 14px;text-align:right">Clics</th>
+                    <th style="padding:10px 14px;text-align:right">Gasto</th>
+                </tr></thead>
+                <tbody id="webCampanasBody"><tr><td colspan="5" style="padding:14px;color:var(--gris)">Cargando…</td></tr></tbody>
+            </table>
+        </div>
+
+        <!-- Ventas por canal (GHL, independiente de Meta) -->
+        <div style="font-weight:700;color:var(--chocolate);font-size:.95rem;margin:26px 0 6px">🧭 Ventas por canal <small style="font-weight:600;color:var(--gris);text-transform:none">· pedidos de la tienda desde GHL (UTM de primer toque) · independiente de Meta</small></div>
+        <div style="background:#e8f5e9;border:1px solid #b6e0bb;border-radius:10px;padding:9px 14px;margin-bottom:12px;font-size:12px;color:#2e7d32">
+            ℹ️ El canal (UTM) se empezó a guardar en los pedidos el <b>23‑sep‑2026</b>. Los pedidos anteriores salen como <b>"sin utm"</b>; a medida que entren ventas nuevas se irá separando por fuente y campaña. Sirve para cruzar contra Meta y detectar cuánto subestima el pixel.
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(3,minmax(160px,1fr));max-width:640px">
+            <div class="kpi-card otorgados"><div class="kpi-icon">📦</div><div class="kpi-label">Pedidos web</div><div class="kpi-value" id="canalPedidos">—</div><div class="kpi-sub">pipeline PEDIDOS WEB</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">💵</div><div class="kpi-label">Monto</div><div class="kpi-value" id="canalMonto">—</div><div class="kpi-sub">de esos pedidos</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">🧭</div><div class="kpi-label">Con canal identificado</div><div class="kpi-value" id="canalConUtm">—</div><div class="kpi-sub" id="canalConUtmSub">tienen UTM</div></div>
+        </div>
+        <div style="overflow-x:auto;background:var(--blanco);border:1px solid var(--beige);border-radius:12px;margin-top:14px">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+                <thead><tr style="background:var(--crema);color:var(--chocolate);text-align:left">
+                    <th style="padding:10px 14px">Fuente (utm_source)</th>
+                    <th style="padding:10px 14px;text-align:right">Pedidos</th>
+                    <th style="padding:10px 14px;text-align:right">Monto</th>
+                </tr></thead>
+                <tbody id="canalSourceBody"><tr><td colspan="3" style="padding:14px;color:var(--gris)">Cargando…</td></tr></tbody>
+            </table>
+        </div>
+        <div style="overflow-x:auto;background:var(--blanco);border:1px solid var(--beige);border-radius:12px;margin-top:12px">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+                <thead><tr style="background:var(--crema);color:var(--chocolate);text-align:left">
+                    <th style="padding:10px 14px">Campaña (utm_campaign)</th>
+                    <th style="padding:10px 14px;text-align:right">Pedidos</th>
+                    <th style="padding:10px 14px;text-align:right">Monto</th>
+                </tr></thead>
+                <tbody id="canalCampanaBody"><tr><td colspan="3" style="padding:14px;color:var(--gris)">Cargando…</td></tr></tbody>
+            </table>
+        </div>
+
+        <!-- Ventas del bot -->
+        <div style="font-weight:700;color:var(--chocolate);font-size:.95rem;margin:26px 0 6px">🤖 Ventas del bot <small style="font-weight:600;color:var(--gris);text-transform:none">· pedidos que cierra el bot conversacional (WhatsApp/IG/FB) · desde 24-sep</small></div>
+        <div style="background:#ede7f6;border:1px solid #d1c4e9;border-radius:10px;padding:9px 14px;margin-bottom:12px;font-size:12px;color:#4527a0">
+            🤖 Marcador en la factura Siigo (<b>Fuente: Bot</b> productos · <b>Origen: bot</b> experiencias). Solo cuenta ventas del bot <b>desde el 24-sep-2026</b>; lo anterior es indistinguible de una venta web.
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+            <div class="kpi-card otorgados"><div class="kpi-icon">🤖</div><div class="kpi-label">Pedidos del bot</div><div class="kpi-value" id="botwebTotal">—</div><div class="kpi-sub" id="botwebTotalSub">total</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">💰</div><div class="kpi-label">Monto</div><div class="kpi-value" id="botwebMonto">—</div><div class="kpi-sub">de esos pedidos</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">🛍️</div><div class="kpi-label">Productos</div><div class="kpi-value" id="botwebProd">—</div><div class="kpi-sub" id="botwebProdSub">—</div></div>
+            <div class="kpi-card redimidos"><div class="kpi-icon">🎭</div><div class="kpi-label">Experiencias</div><div class="kpi-value" id="botwebExp">—</div><div class="kpi-sub" id="botwebExpSub">—</div></div>
+        </div>
+        <div id="botwebCanal" style="margin-top:12px"></div>
+    </section>
+
+</div><!-- /panelWeb -->
+
 </main>
 </div><!-- /app -->
 
@@ -1337,6 +1505,7 @@ function isB2BLog(e) {
 // ── SEGMENT ──────────────────────────────────────────────────────────────
 let currentSegment = 'b2c';
 let b2bLoaded = false;
+let webLoaded = false;
 let ventasLoadedAt = 0;               // marca de tiempo de la última carga de ventasData
 const VENTAS_TTL_MS = 3 * 60 * 1000;  // Destacadas/Tablas/B2B se refrescan solos si al abrirlos los datos ya tienen más de esto
 
@@ -1346,12 +1515,15 @@ function setSegment(seg) {
     document.getElementById('segB2B').classList.toggle('active', seg==='b2b');
     document.getElementById('segTab').classList.toggle('active', seg==='tablas');
     document.getElementById('segDest').classList.toggle('active', seg==='destacadas');
+    document.getElementById('segWeb').classList.toggle('active', seg==='web');
     document.getElementById('navB2C').classList.toggle('show', seg==='b2c');
     document.getElementById('navB2B').classList.toggle('show', seg==='b2b');
     document.getElementById('panelB2C').classList.toggle('show', seg==='b2c');
     document.getElementById('panelB2B').classList.toggle('show', seg==='b2b');
     document.getElementById('panelTablas').classList.toggle('show', seg==='tablas');
     document.getElementById('panelDestacadas').classList.toggle('show', seg==='destacadas');
+    document.getElementById('panelWeb').classList.toggle('show', seg==='web');
+    if (seg==='web' && !webLoaded) { webLoaded=true; webKpisUltimos30(); }
     // Ventas, Tablas y Destacadas comparten los datos de get-ventas. Se recargan si no
     // se han cargado nunca, o si ya están viejos (VENTAS_TTL_MS) para que "se refresquen
     // solos" al volver a abrirlos, sin tener que recargar toda la página.
@@ -3549,6 +3721,7 @@ async function loadB2CKpis(from,to){
     if(!d || !d.ventas){ if(neto) neto.textContent='—'; return; }
     b2cKpisData=d; renderB2CKpis(d);
     loadCrmKpis(from,to);
+    loadVentasBot('b2c',from,to);
 }
 const CRM_KPIS_URL = 'https://app.rioagencymarketing.com/webhook/get-crm-kpis';
 async function loadCrmKpis(from,to){
@@ -3644,6 +3817,137 @@ function renderB2CCharts(d){
 }
 function applyB2CKpis(){ const r=b2cMonthRange(); const from=document.getElementById('b2cFrom').value||r.from, to=document.getElementById('b2cTo').value||r.to; document.getElementById('b2cPeriodLabel').textContent=fmtDate(from)+' → '+fmtDate(to); loadB2CKpis(from,to); }
 function b2cKpisMesActual(){ const r=b2cMonthRange(); document.getElementById('b2cFrom').value=r.from; document.getElementById('b2cTo').value=r.to; document.getElementById('b2cPeriodLabel').textContent='Mes actual'; loadB2CKpis(r.from,r.to); }
+
+// ── WEB (Meta Pixel + Ads) ────────────────────────────────────────────────
+const WEB_KPIS_URL = 'https://app.rioagencymarketing.com/webhook/get-web-kpis';
+let webChartEmbudo=null, webChartPixel=null, webChartAds=null, webKpisData=null;
+function web30Range(){ const n=new Date(); const p=x=>String(x).padStart(2,'0'); const to=`${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`; const s=new Date(n); s.setDate(s.getDate()-29); const from=`${s.getFullYear()}-${p(s.getMonth()+1)}-${p(s.getDate())}`; return {from,to}; }
+async function loadWebKpis(from,to){
+    const el=document.getElementById('webVisitas'); if(el) el.textContent='…';
+    document.getElementById('webCampanasBody').innerHTML='<tr><td colspan="5" style="padding:14px;color:var(--gris)">Cargando…</td></tr>';
+    const url=WEB_KPIS_URL+'?date_start='+from+'&date_end='+to;
+    let d=null; try{ d=await (await fetch(url)).json(); }catch(e){}
+    if(!d || !d.pixel){ if(el) el.textContent='—'; return; }
+    webKpisData=d; renderWebKpis(d);
+    loadVentasCanal(from,to);
+    loadWebVistas(from,to);
+    loadVentasBot('web',from,to);
+}
+const VENTAS_BOT_URL='https://app.rioagencymarketing.com/webhook/get-ventas-bot';
+async function loadVentasBot(pfx,from,to){
+    const G=k=>document.getElementById('bot'+pfx+k);
+    const S=(k,v)=>{const el=G(k); if(el) el.textContent=v;};
+    const t=G('Total'); if(t) t.textContent='…';
+    let d=null; try{ d=await (await fetch(VENTAS_BOT_URL+'?date_start='+from+'&date_end='+to)).json(); }catch(e){}
+    if(!d || typeof d.total_pedidos==='undefined'){ S('Total','—'); return; }
+    S('Total', fmt(d.total_pedidos)); const ts=G('TotalSub'); if(ts) ts.textContent = d.total_pedidos? 'total' : 'sin ventas del bot aún';
+    S('Monto', fmtCOP(d.total_monto));
+    S('Prod', fmt(d.productos.pedidos)); const ps=G('ProdSub'); if(ps) ps.textContent=fmtCOP(d.productos.monto);
+    S('Exp', fmt(d.experiencias.pedidos)); const es=G('ExpSub'); if(es) es.textContent=fmtCOP(d.experiencias.monto);
+    const cbox=G('Canal');
+    if(cbox){ const cs=(d.por_canal||[]); cbox.innerHTML = cs.length ? '<div style="display:flex;flex-wrap:wrap;gap:8px">'+cs.map(c=>'<span style="background:var(--crema);border:1px solid var(--beige);border-radius:50px;padding:5px 12px;font-size:12px;color:var(--chocolate)">🤖 <b>'+esc(c.canal)+'</b> · '+fmt(c.pedidos)+' ped · '+fmtCOP(c.monto)+'</span>').join('')+'</div>' : ''; }
+}
+const WEB_VISTAS_URL = 'https://app.rioagencymarketing.com/webhook/get-web-vistas';
+async function loadWebVistas(from,to){
+    const S=(k,v)=>{const el=document.getElementById(k); if(el) el.textContent=v;};
+    const pb=document.getElementById('vistPaginasBody'), sb=document.getElementById('vistSourceBody');
+    if(pb) pb.innerHTML='<tr><td colspan="3" style="padding:14px;color:var(--gris)">Cargando…</td></tr>';
+    let d=null; try{ d=await (await fetch(WEB_VISTAS_URL+'?date_start='+from+'&date_end='+to)).json(); }catch(e){}
+    if(!d || typeof d.total==='undefined'){ S('vistTotal','—'); if(pb) pb.innerHTML='<tr><td colspan="4" style="padding:14px;color:var(--gris)">Sin datos</td></tr>'; return; }
+    const _seg=s=>(s==null)?'—':(s>=60?(Math.floor(s/60)+'m '+(s%60)+'s'):(s+'s'));
+    const bs={}; (d.por_superficie||[]).forEach(x=>bs[x.surface]=x);
+    const setSurf=(idv,ids,key,dom)=>{ const o=bs[key]||{vistas:0}; S(idv, fmt(o.vistas||0)); S(ids, dom+' · '+_seg(o.seg_prom)+' prom'); };
+    setSurf('vistTienda','vistTiendaSub','tienda','chuculat.com');
+    setSurf('vistLanding','vistLandingSub','landing','landing.chuculat.com');
+    setSurf('vistAgenda','vistAgendaSub','agenda','agendas.chuculat.com');
+    setSurf('vistChai','vistChaiSub','chai','chai.chuculat.com');
+    S('vistTotal', fmt(d.total||0));
+    const cn=document.getElementById('vistCierreNota'); if(cn) cn.textContent=fmt(d.con_cierre||0)+' de '+fmt(d.total||0)+' vistas';
+    // etiquetas bonitas de landing (path -> nombre)
+    const LAND_LBL={'/home':'Home landing','/landing-navidad-logistica-800142':'Navidad · Logística','/landing-regalo-universal-navidad':'Navidad · Regalo Universal'};
+    const ico={tienda:'🍫',landing:'🧲',agenda:'📅',chai:'🫖'};
+    const pgName=(r)=> (r.surface==='landing' && LAND_LBL[r.path]) ? (LAND_LBL[r.path]+' <span style="color:var(--gris);font-size:11px">'+esc(r.path)+'</span>') : esc(r.path);
+    if(pb) pb.innerHTML = (d.top_paginas||[]).length ? (d.top_paginas||[]).map(r=>'<tr style="border-top:1px solid var(--beige)"><td style="padding:9px 14px;white-space:nowrap">'+(ico[r.surface]||'')+' '+esc(r.surface)+'</td><td style="padding:9px 14px;color:var(--chocolate)">'+pgName(r)+'</td><td style="padding:9px 14px;text-align:right;font-weight:700;color:var(--chocolate)">'+fmt(r.vistas)+'</td><td style="padding:9px 14px;text-align:right;color:var(--gris)">'+_seg(r.seg_prom)+'</td></tr>').join('') : '<tr><td colspan="4" style="padding:14px;color:var(--gris)">Sin vistas en el período</td></tr>';
+    if(sb) sb.innerHTML = (d.por_source||[]).length ? (d.por_source||[]).map(r=>'<tr style="border-top:1px solid var(--beige)"><td style="padding:9px 14px;color:var(--chocolate)">'+esc(r.source)+'</td><td style="padding:9px 14px;text-align:right;font-weight:700;color:var(--chocolate)">'+fmt(r.vistas)+'</td></tr>').join('') : '<tr><td colspan="2" style="padding:14px;color:var(--gris)">—</td></tr>';
+}
+const CANAL_URL = 'https://app.rioagencymarketing.com/webhook/get-ventas-canal';
+async function loadVentasCanal(from,to){
+    const S=(k,v)=>{const el=document.getElementById(k); if(el) el.textContent=v;};
+    const sb=document.getElementById('canalSourceBody'), cb=document.getElementById('canalCampanaBody');
+    if(sb) sb.innerHTML='<tr><td colspan="3" style="padding:14px;color:var(--gris)">Cargando…</td></tr>';
+    let d=null; try{ d=await (await fetch(CANAL_URL+'?date_start='+from+'&date_end='+to)).json(); }catch(e){}
+    if(!d || typeof d.total_pedidos==='undefined'){ S('canalPedidos','—'); if(sb) sb.innerHTML='<tr><td colspan="3" style="padding:14px;color:var(--gris)">Sin datos</td></tr>'; return; }
+    S('canalPedidos', fmt(d.total_pedidos));
+    S('canalMonto', fmtCOP(d.total_monto));
+    S('canalConUtm', d.total_pedidos? Math.round(d.con_utm/d.total_pedidos*100)+'%':'0%');
+    S('canalConUtmSub', fmt(d.con_utm)+' de '+fmt(d.total_pedidos)+' con UTM');
+    const rowsHtml=(arr,key)=> arr.length ? arr.map(r=>'<tr style="border-top:1px solid var(--beige)"><td style="padding:9px 14px;color:var(--chocolate)">'+esc(r[key])+'</td><td style="padding:9px 14px;text-align:right">'+fmt(r.pedidos)+'</td><td style="padding:9px 14px;text-align:right;font-weight:700;color:var(--chocolate)">'+fmtCOP(r.monto)+'</td></tr>').join('') : '<tr><td colspan="3" style="padding:14px;color:var(--gris)">Sin pedidos en el período</td></tr>';
+    if(sb) sb.innerHTML=rowsHtml(d.por_source||[], 'source');
+    if(cb) cb.innerHTML=rowsHtml(d.por_campana||[], 'campana');
+}
+function _deltaHtml(v){ if(v==null) return ''; const up=v>=0; const col=up?'var(--verde)':'var(--cereza)'; const arrow=up?'▲':'▼'; return ' <span style="color:'+col+';font-weight:700">'+arrow+' '+Math.abs(v)+'%</span>'; }
+function renderWebKpis(d){
+    const S=(k,v)=>{const el=document.getElementById(k); if(el) el.innerHTML=v;};
+    const px=d.pixel, ads=d.ads, e=px.eventos, emb=px.embudo;
+    const rate=(paso)=>{const x=emb.find(s=>s.evento===paso); return x&&x.tasa_del_paso_anterior!=null? x.tasa_del_paso_anterior+'%':'—';};
+    S('webVisitas', fmt(e.PageView)); S('webVisitasSub', 'PageView'+_deltaHtml(px.delta&&px.delta.PageView));
+    S('webViewC', fmt(e.ViewContent)); S('webViewCSub', rate('ViewContent')+' de las visitas');
+    S('webCart', fmt(e.AddToCart)); S('webCartSub', rate('AddToCart')+' de los que vieron'+_deltaHtml(px.delta&&px.delta.AddToCart));
+    S('webCheckout', fmt(e.InitiateCheckout)); S('webCheckoutSub', rate('InitiateCheckout')+' del carrito');
+    S('webPurch', fmt(e.Purchase)); S('webPurchSub', rate('Purchase')+' · tienda + agenda'+_deltaHtml(px.delta&&px.delta.Purchase));
+    S('webLead', fmt(e.Lead||0)); S('webLeadSub', 'evento Lead · click a la tienda'+_deltaHtml(px.delta&&px.delta.Lead));
+    S('webSchedule', fmt(e.Schedule||0)); S('webScheduleSub', 'evento Schedule · experiencia agendada'+_deltaHtml(px.delta&&px.delta.Schedule));
+    S('webConv', px.conversion_global+'%');
+    S('webReach', fmt(ads.reach)); S('webReachSub', 'usuarios únicos'+_deltaHtml(ads.delta&&ads.delta.reach));
+    S('webImpr', fmt(ads.impressions)); S('webImprSub', _deltaHtml(ads.delta&&ads.delta.impressions)||'&nbsp;');
+    S('webClicks', fmt(ads.clicks)); S('webClicksSub', _deltaHtml(ads.delta&&ads.delta.clicks)||'&nbsp;');
+    S('webCtr', ads.ctr+'%');
+    S('webSpend', fmtCOP(ads.spend)); S('webSpendSub', 'en el período'+_deltaHtml(ads.delta&&ads.delta.spend));
+    S('webCpc', fmtCOP(ads.cpc)); S('webCpcSub', 'CPM '+fmtCOP(ads.cpm));
+    const est=document.getElementById('webPixelEstado'); if(est) est.innerHTML = px.last_fired ? ('pixel activo · último evento '+fmtDate(String(px.last_fired).slice(0,10))) : 'sin datos del pixel';
+    // tabla campañas
+    const body=document.getElementById('webCampanasBody');
+    const cs=(ads.campanas||[]);
+    body.innerHTML = cs.length ? cs.map(c=>'<tr style="border-top:1px solid var(--beige)"><td style="padding:9px 14px;font-weight:600;color:var(--chocolate)">'+esc(c.nombre)+'</td><td style="padding:9px 14px;text-align:right">'+fmt(c.reach)+'</td><td style="padding:9px 14px;text-align:right">'+fmt(c.impressions)+'</td><td style="padding:9px 14px;text-align:right">'+fmt(c.clicks)+'</td><td style="padding:9px 14px;text-align:right;font-weight:700;color:var(--chocolate)">'+fmtCOP(c.spend)+'</td></tr>').join('') : '<tr><td colspan="5" style="padding:14px;color:var(--gris)">Sin campañas en el período</td></tr>';
+    renderWebCharts(d);
+}
+// Plugin: línea vertical del corte 19-20 sep (WordPress→sitio nuevo)
+const webCutLine = {
+    id:'webCutLine',
+    afterDatasetsDraw(chart){
+        const o=chart.config.options.plugins&&chart.config.options.plugins.webCutLine;
+        if(!o || o.index==null || o.index<0) return;
+        const x=chart.scales.x.getPixelForValue(o.index); const {top,bottom}=chart.chartArea; const ctx=chart.ctx;
+        ctx.save(); ctx.strokeStyle='#c0392b'; ctx.setLineDash([5,4]); ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.moveTo(x,top); ctx.lineTo(x,bottom); ctx.stroke();
+        ctx.setLineDash([]); ctx.fillStyle='#c0392b'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
+        ctx.fillText('corte 20-sep', x, top+9); ctx.restore();
+    }
+};
+function _cutIdx(serie){ return (serie||[]).findIndex(p=>p.fecha==='2026-09-20'); }
+function renderWebCharts(d){
+    if(typeof Chart==='undefined') return;
+    const px=d.pixel, ads=d.ads;
+    const c1=document.getElementById('webChartEmbudo');
+    if(c1){ if(webChartEmbudo) webChartEmbudo.destroy();
+        webChartEmbudo=new Chart(c1,{type:'bar',data:{labels:px.embudo.map(s=>s.label),datasets:[{data:px.embudo.map(s=>s.valor),backgroundColor:['#00abe1','#7d4b2b','#f39200','#9c27b0','#4caf50'],borderRadius:6}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmt(ctx.parsed.x)}}},scales:{x:{ticks:{callback:v=>fmt(v)}}}}}); }
+    const c2=document.getElementById('webChartPixel');
+    if(c2){ if(webChartPixel) webChartPixel.destroy();
+        const labs=px.serie.map(p=>fmtDate(p.fecha));
+        webChartPixel=new Chart(c2,{type:'line',plugins:[webCutLine],data:{labels:labs,datasets:[
+            {label:'Visitas',data:px.serie.map(p=>p.PageView),borderColor:'#00abe1',backgroundColor:'rgba(0,171,225,.1)',yAxisID:'y',tension:.3,fill:true},
+            {label:'Compras',data:px.serie.map(p=>p.Purchase),borderColor:'#4caf50',yAxisID:'y1',tension:.3}
+        ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},webCutLine:{index:_cutIdx(px.serie)}},scales:{y:{position:'left',ticks:{callback:v=>fmt(v)}},y1:{position:'right',grid:{drawOnChartArea:false}}}}}); }
+    const c3=document.getElementById('webChartAds');
+    if(c3){ if(webChartAds) webChartAds.destroy();
+        const labs=ads.serie.map(p=>fmtDate(p.fecha));
+        webChartAds=new Chart(c3,{type:'line',plugins:[webCutLine],data:{labels:labs,datasets:[
+            {label:'Gasto',data:ads.serie.map(p=>p.spend),borderColor:'#f39200',backgroundColor:'rgba(243,146,0,.1)',yAxisID:'y',tension:.3,fill:true},
+            {label:'Alcance',data:ads.serie.map(p=>p.reach),borderColor:'#7d4b2b',yAxisID:'y1',tension:.3}
+        ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},webCutLine:{index:_cutIdx(ads.serie)},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+(ctx.dataset.label==='Gasto'?fmtCOP(ctx.parsed.y):fmt(ctx.parsed.y))}}},scales:{y:{position:'left',ticks:{callback:v=>fmtCOP(v)}},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fmt(v)}}}}}); }
+}
+function applyWebKpis(){ const r=web30Range(); const from=document.getElementById('webFrom').value||r.from, to=document.getElementById('webTo').value||r.to; document.getElementById('webPeriodLabel').textContent=fmtDate(from)+' → '+fmtDate(to); loadWebKpis(from,to); }
+function webKpisUltimos30(){ const r=web30Range(); document.getElementById('webFrom').value=r.from; document.getElementById('webTo').value=r.to; document.getElementById('webPeriodLabel').textContent='Últimos 30 días'; loadWebKpis(r.from,r.to); }
 
 // ── ARRANQUE ──────────────────────────────────────────────────────────────
 loadContador();
