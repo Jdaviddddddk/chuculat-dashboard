@@ -1719,7 +1719,7 @@ function clearRepurchaseFilter(){ const to=new Date(), from=new Date(); from.set
     document.getElementById('repDateFrom').value=from.toISOString().split('T')[0]; document.getElementById('repDateTo').value=to.toISOString().split('T')[0]; applyRepurchaseFilter(); }
 
 function calcRepurchases() {
-    const eventos=allLogs.filter(e=>{ if(e.type!=='suma_puntos') return false; if(repFromDate&&e.date<repFromDate) return false; if(repToDate&&e.date>repToDate) return false; return true; });
+    const eventos=allLogs.filter(e=>{ if(e.type!=='suma_puntos') return false; if(e.anulada) return false; if(repFromDate&&e.date<repFromDate) return false; if(repToDate&&e.date>repToDate) return false; return true; });
     const map={};
     for (const e of eventos) { const key=e.contactId||e.phone||e.contactName; if(!key) continue;
         if(!map[key]) map[key]={contactId:e.contactId||'',contactName:e.contactName||'—',phone:e.phone||'—',compras:0,puntosOtorgados:0,ultimaCompra:'',primeraCompra:''};
