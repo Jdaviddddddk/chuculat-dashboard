@@ -1271,7 +1271,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             <p class="kpi-filter-note">📊 Pixel <b id="webPixelId">1380092323013231</b> · cuenta de anuncios Meta · <span id="webPixelEstado">—</span></p>
         </div>
         <div style="background:#e1f3fb;border:1px solid #b6e0f2;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#0277a8">
-            🌐 <b>Combinado · 4 superficies</b>: el pixel es el mismo en <b>tienda</b> (chuculat.com), <b>landing</b>, <b>agenda</b> y <b>chai</b>, y Meta no permite separarlos por sitio en estos números — son la <b>suma de los cuatro</b>. (El desglose por sitio queda pendiente de un tag por superficie.)
+            🌐 <b>Combinado · 5 superficies</b>: el pixel es el mismo en <b>tienda</b> (chuculat.com), <b>landing</b>, <b>agenda</b>, <b>chai</b> y <b>chocolate blanco</b>, y Meta no permite separarlos por sitio en estos números — son la <b>suma de los cinco</b>. (El desglose real por sitio está abajo, en "Vistas por superficie", vía beacon.)
         </div>
         <div style="background:#fff8e1;border:1px solid #ffe0a3;border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:12.5px;color:#8a6d00">
             ⚠️ <b>Corte 19–20 sep 2026</b>: hasta esa fecha los eventos venían del sitio viejo (WordPress) y desde entonces del sitio nuevo. La serie es continua pero <b>no es comparable</b> a ambos lados del corte.
@@ -1309,6 +1309,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             <div class="kpi-card recompras"><div class="kpi-icon">🧲</div><div class="kpi-label">Landing</div><div class="kpi-value" id="vistLanding">—</div><div class="kpi-sub" id="vistLandingSub">landing.chuculat.com</div></div>
             <div class="kpi-card tasa"><div class="kpi-icon">📅</div><div class="kpi-label">Agenda</div><div class="kpi-value" id="vistAgenda">—</div><div class="kpi-sub" id="vistAgendaSub">agendas.chuculat.com</div></div>
             <div class="kpi-card redimidos"><div class="kpi-icon">🫖</div><div class="kpi-label">Chai</div><div class="kpi-value" id="vistChai">—</div><div class="kpi-sub" id="vistChaiSub">chai.chuculat.com</div></div>
+            <div class="kpi-card"><div class="kpi-icon">🤍</div><div class="kpi-label">Choc. Blanco</div><div class="kpi-value" id="vistBlanco">—</div><div class="kpi-sub" id="vistBlancoSub">chocolateblanco.chuculat.com</div></div>
             <div class="kpi-card"><div class="kpi-icon">Σ</div><div class="kpi-label">Total vistas</div><div class="kpi-value" id="vistTotal">—</div><div class="kpi-sub">beacon</div></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-top:14px">
@@ -3861,11 +3862,12 @@ async function loadWebVistas(from,to){
     setSurf('vistLanding','vistLandingSub','landing','landing.chuculat.com');
     setSurf('vistAgenda','vistAgendaSub','agenda','agendas.chuculat.com');
     setSurf('vistChai','vistChaiSub','chai','chai.chuculat.com');
+    setSurf('vistBlanco','vistBlancoSub','chocolateblanco','chocolateblanco.chuculat.com');
     S('vistTotal', fmt(d.total||0));
     const cn=document.getElementById('vistCierreNota'); if(cn) cn.textContent=fmt(d.con_cierre||0)+' de '+fmt(d.total||0)+' vistas';
     // etiquetas bonitas de landing (path -> nombre)
     const LAND_LBL={'/home':'Home landing','/landing-navidad-logistica-800142':'Navidad · Logística','/landing-regalo-universal-navidad':'Navidad · Regalo Universal'};
-    const ico={tienda:'🍫',landing:'🧲',agenda:'📅',chai:'🫖'};
+    const ico={tienda:'🍫',landing:'🧲',agenda:'📅',chai:'🫖',chocolateblanco:'🤍'};
     const pgName=(r)=> (r.surface==='landing' && LAND_LBL[r.path]) ? (LAND_LBL[r.path]+' <span style="color:var(--gris);font-size:11px">'+esc(r.path)+'</span>') : esc(r.path);
     if(pb) pb.innerHTML = (d.top_paginas||[]).length ? (d.top_paginas||[]).map(r=>'<tr style="border-top:1px solid var(--beige)"><td style="padding:9px 14px;white-space:nowrap">'+(ico[r.surface]||'')+' '+esc(r.surface)+'</td><td style="padding:9px 14px;color:var(--chocolate)">'+pgName(r)+'</td><td style="padding:9px 14px;text-align:right;font-weight:700;color:var(--chocolate)">'+fmt(r.vistas)+'</td><td style="padding:9px 14px;text-align:right;color:var(--gris)">'+_seg(r.seg_prom)+'</td></tr>').join('') : '<tr><td colspan="4" style="padding:14px;color:var(--gris)">Sin vistas en el período</td></tr>';
     if(sb) sb.innerHTML = (d.por_source||[]).length ? (d.por_source||[]).map(r=>'<tr style="border-top:1px solid var(--beige)"><td style="padding:9px 14px;color:var(--chocolate)">'+esc(r.source)+'</td><td style="padding:9px 14px;text-align:right;font-weight:700;color:var(--chocolate)">'+fmt(r.vistas)+'</td></tr>').join('') : '<tr><td colspan="2" style="padding:14px;color:var(--gris)">—</td></tr>';
