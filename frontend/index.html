@@ -689,7 +689,8 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                     <th>Avance</th>
                     <th onclick="sortContador('compras')"      data-col="compras">     Estado    <i class="si">⇅</i></th>
                     <th onclick="sortContador('ultimaCompra')" data-col="ultimaCompra">Última    <i class="si">⇅</i></th>
-                    <th onclick="sortContador('puntos')"       data-col="puntos">      Pts.      <i class="si">⇅</i></th>
+                    <th onclick="sortContador('gastado')"      data-col="gastado">     Total gastado <i class="si">⇅</i></th>
+                    <th>Entregado</th>
                 </tr></thead><tbody id="bodyContador"></tbody></table>
             </div>
             <div class="pager-bar" id="contPager" style="display:none"></div>
@@ -3682,6 +3683,15 @@ function sortContador(col){
     contadorSort.dir = contadorSort.col===col ? (contadorSort.dir==='asc'?'desc':'asc') : 'desc';
     contadorSort.col = col; _renderContadorTable();
 }
+async function setEntrega(id,val,el){
+    if(el) el.disabled=true;
+    try{
+        const r=await (await fetch('https://app.rioagencymarketing.com/webhook/set-entrega-3x60?id='+encodeURIComponent(id)+'&value='+(val?1:0))).json();
+        if(r&&r.ok){ const c=contadorData.find(x=>x.id===id); if(c){ c.entregado=val; c.fechaEntrega=r.fecha||null; } if(el) el.title=val&&r.fecha?('Entregado '+r.fecha):'Marcar como entregado'; }
+        else if(el){ el.checked=!val; }
+    }catch(e){ if(el) el.checked=!val; }
+    finally{ if(el) el.disabled=false; }
+}
 function _renderContadorTable(){
     const q = (document.getElementById('searchContador').value||'').toLowerCase().trim();
     let rows = contadorData.filter(c => !q || (String(c.nombre)+' '+String(c.cedula)+' '+String(c.telefono)).toLowerCase().includes(q));
@@ -3692,7 +3702,7 @@ function _renderContadorTable(){
     document.getElementById('countContador').textContent = rows.length + (rows.length===1?' cliente':' clientes');
     _pgRender['cont'] = _renderContadorTable;
     const tbody = document.getElementById('bodyContador');
-    if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Aún no hay clientes con compras contadas</td></tr>'; const _b=document.getElementById('contPager'); if(_b){_b.style.display='none';_b.innerHTML='';} return; }
+    if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Aún no hay clientes con compras contadas</td></tr>'; const _b=document.getElementById('contPager'); if(_b){_b.style.display='none';_b.innerHTML='';} return; }
     tbody.innerHTML = pagePrep('cont', rows).map(c=>{
         const ok = c.compras >= contadorMeta;
         const faltan = Math.max(0, contadorMeta - c.compras);
@@ -3706,7 +3716,8 @@ function _renderContadorTable(){
             <td><span class="ctd-dots">${dots}</span></td>
             <td><span class="ctd-badge${ok?' ok':''}">${ok ? '✅ Completado' : (faltan===1?'Falta 1':'Faltan '+faltan)}</span></td>
             <td>${c.ultimaCompra ? fmtDate(c.ultimaCompra) : '—'}</td>
-            <td class="td-pts azul" style="text-align:right">${fmt(c.puntos||0)}</td>
+            <td class="td-pts azul" style="text-align:right">${fmtCOP(c.gastado||0)}</td>
+            <td style="text-align:center"><input type="checkbox" ${c.entregado?'checked':''} onchange="setEntrega('${c.id}',this.checked,this)" title="${c.fechaEntrega?('Entregado '+c.fechaEntrega):'Marcar como entregado'}"></td>
         </tr>`;}).join('');
     pagerBar('cont', 'contPager');
 }
