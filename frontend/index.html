@@ -1230,6 +1230,36 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             </div>
         </section>
 
+        <!-- 2c. Buscar por PRODUCTO -> compradores (accionable para campañas) -->
+        <section class="dash-section">
+            <div class="chart-card full">
+                <h3 style="color:var(--chocolate);margin-bottom:10px">🏷️ Compradores por producto <small style="font-weight:600;color:var(--gris);font-size:.8rem;text-transform:none">· selecciona clientes y etiquétalos en GHL para campañas</small></h3>
+                <div class="kpi-filter-bar" style="gap:12px;margin-bottom:10px">
+                    <div style="flex:1;min-width:260px">
+                        <label style="display:block;margin-bottom:4px">Busca un producto (nombre o código)</label>
+                        <div class="search-wrap"><input type="text" id="searchProdComp" placeholder="Ej: nibs, tableta, 652..." oninput="renderProdCompradores()"></div>
+                    </div>
+                    <div style="flex:1;min-width:260px" id="prodCompSelectWrap" hidden>
+                        <label style="display:block;margin-bottom:4px">Elige el producto</label>
+                        <select class="filter-select" id="prodCompSelect" onchange="renderProdCompradores(true)" style="width:100%"></select>
+                    </div>
+                </div>
+                <p class="section-note" id="prodCompNota">Escribe un producto para ver <strong>todos</strong> los clientes que lo han comprado en el período, con cédula, unidades y valor.</p>
+                <div id="prodCompActions" style="display:none;gap:10px;align-items:center;flex-wrap:wrap;background:var(--crema);border:1px solid var(--beige);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+                    <label style="display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer"><input type="checkbox" id="prodCompAll" onchange="toggleProdCompAll(this)"> Seleccionar todos</label>
+                    <span id="prodCompSelCount" style="color:var(--gris);font-size:13px">0 seleccionados</span>
+                    <span style="flex:1"></span>
+                    <input type="text" id="prodCompTag" placeholder="Etiqueta a aplicar (ej: campaña_nibs_nov)" style="min-width:240px;padding:7px 10px;border:1px solid var(--beige);border-radius:8px">
+                    <button class="btn-filter" id="prodCompApplyBtn" onclick="aplicarEtiquetaProd()">🏷️ Aplicar etiqueta en GHL</button>
+                </div>
+                <div id="prodCompMsg" style="display:none;margin-bottom:10px;font-size:13px"></div>
+                <div class="table-wrap"><table id="prodCompTable"><thead><tr>
+                    <th style="width:34px"></th><th>#</th><th>Cliente</th><th>Cédula</th><th style="text-align:right">Unidades</th><th style="text-align:right">Valor</th>
+                </tr></thead><tbody id="prodCompBody"></tbody></table></div>
+                <p class="section-note" style="margin-top:8px">Solo son etiquetables los clientes con cédula identificada (las compras sin cédula no se pueden cruzar con GHL). La etiqueta se <strong>suma</strong> a las que ya tenga el contacto.</p>
+            </div>
+        </section>
+
         <!-- 3. Comprados juntos + 5. Nuevos vs recurrentes -->
         <section class="dash-section">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px" id="destGrid2">
@@ -2387,9 +2417,76 @@ function renderDestacadas(){
     renderDestProdSelect(d);
     renderDestClientes();
     renderCliProductos();
+    prodIndex=null; renderProdCompradores();
     renderDestParejas(d);
     renderDestReactivar(d);
     renderDestNR(d);
+}
+
+// ── Compradores por producto (accionable: etiquetar en GHL para campañas) ──
+let prodIndex=null, prodMatches=[], prodSel=null;
+const prodCompSelected=new Set();
+function buildProdIndex(){
+    const d = ventasData && ventasData.destacadas;
+    const byProd = new Map();
+    for (const c of ((d&&d.clienteProductos)||[])) {
+        for (const p of (c.prods||[])) {
+            const code=String(p.code||'');
+            let g=byProd.get(code); if(!g){ g={code, name:p.name||code, buyers:new Map()}; byProd.set(code,g); }
+            const ced=String(c.ced||''); const key=ced||('n:'+(c.name||''));
+            let b=g.buyers.get(key); if(!b){ b={name:c.name||'(sin nombre)', ced, qty:0, subtotal:0}; g.buyers.set(key,b); }
+            b.qty+=Number(p.qty)||0; b.subtotal+=Number(p.subtotal)||0;
+        }
+    }
+    return byProd;
+}
+function renderProdCompradores(fromSelect){
+    const d = ventasData && ventasData.destacadas;
+    const tb = document.getElementById('prodCompBody'); if(!d||!tb) return;
+    if(!prodIndex) prodIndex=buildProdIndex();
+    const q=(document.getElementById('searchProdComp').value||'').toLowerCase().trim();
+    const selWrap=document.getElementById('prodCompSelectWrap'), sel=document.getElementById('prodCompSelect');
+    const actions=document.getElementById('prodCompActions'), nota=document.getElementById('prodCompNota');
+    document.getElementById('prodCompMsg').style.display='none';
+    if(!q){ selWrap.hidden=true; actions.style.display='none'; prodCompSelected.clear(); tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--gris);padding:20px">Escribe un producto para buscar sus compradores.</td></tr>'; nota.innerHTML='Escribe un producto para ver <strong>todos</strong> los clientes que lo han comprado en el período, con cédula, unidades y valor.'; return; }
+    if(!fromSelect){
+        prodMatches=[...prodIndex.values()].filter(g=> String(g.name).toLowerCase().includes(q) || String(g.code).toLowerCase().includes(q)).sort((a,b)=>b.buyers.size-a.buyers.size);
+        if(prodMatches.length>1){ selWrap.hidden=false; sel.innerHTML=prodMatches.map((g,i)=>`<option value="${i}">${esc(g.name)} (${esc(g.code)}) — ${g.buyers.size} clientes</option>`).join(''); sel.value='0'; }
+        else selWrap.hidden=true;
+    }
+    if(!prodMatches.length){ actions.style.display='none'; prodCompSelected.clear(); tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--gris);padding:20px">Sin producto que coincida con «'+esc(q)+'».</td></tr>'; nota.textContent='Sin coincidencias para «'+q+'».'; return; }
+    const idx=(prodMatches.length>1&&sel)?(parseInt(sel.value,10)||0):0;
+    prodSel=prodMatches[idx];
+    const buyers=[...prodSel.buyers.values()].sort((a,b)=>b.subtotal-a.subtotal);
+    prodCompSelected.clear(); const allChk=document.getElementById('prodCompAll'); if(allChk) allChk.checked=false;
+    actions.style.display='flex'; updateProdCompCount();
+    const etiquetables=buyers.filter(b=>b.ced&&b.ced.replace(/[^0-9]/g,'').length>=4).length;
+    nota.innerHTML='<strong>'+esc(prodSel.name)+'</strong> ('+esc(prodSel.code)+') — '+buyers.length+' clientes lo han comprado · '+etiquetables+' etiquetables (con cédula).';
+    tb.innerHTML=buyers.map((b,i)=>{
+        const taggable=!!(b.ced&&b.ced.replace(/[^0-9]/g,'').length>=4);
+        return `<tr>
+            <td style="text-align:center">${taggable?`<input type="checkbox" class="pc-chk" data-ced="${esc(b.ced)}" onchange="onProdCompChk(this)">`:'<span title="sin cédula, no etiquetable" style="color:var(--gris)">—</span>'}</td>
+            <td>${i+1}</td><td class="td-name">${esc(b.name||'—')}</td><td style="color:var(--gris);font-size:12px">${esc(b.ced||'')}</td>
+            <td style="text-align:right">${fmt(b.qty)}</td><td style="text-align:right;font-weight:700;color:var(--verde)">${fmtCOP(b.subtotal)}</td>
+        </tr>`;}).join('');
+}
+function onProdCompChk(el){ const c=el.dataset.ced; if(el.checked) prodCompSelected.add(c); else prodCompSelected.delete(c); updateProdCompCount(); }
+function toggleProdCompAll(el){ document.querySelectorAll('#prodCompBody .pc-chk').forEach(chk=>{ chk.checked=el.checked; const c=chk.dataset.ced; if(el.checked) prodCompSelected.add(c); else prodCompSelected.delete(c); }); updateProdCompCount(); }
+function updateProdCompCount(){ const e=document.getElementById('prodCompSelCount'); if(e) e.textContent=prodCompSelected.size+' seleccionados'; }
+async function aplicarEtiquetaProd(){
+    const tag=(document.getElementById('prodCompTag').value||'').trim();
+    const msg=document.getElementById('prodCompMsg');
+    if(!tag){ alert('Escribe la etiqueta a aplicar.'); return; }
+    const ceds=[...prodCompSelected]; if(!ceds.length){ alert('Selecciona al menos un cliente.'); return; }
+    if(!confirm('¿Aplicar la etiqueta "'+tag+'" a '+ceds.length+' cliente(s) en GHL?')) return;
+    const btn=document.getElementById('prodCompApplyBtn'); btn.disabled=true; const old=btn.textContent; btn.textContent='Aplicando...'; msg.style.display='none';
+    try{
+        const r=await (await fetch('https://app.rioagencymarketing.com/webhook/aplicar-etiqueta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag,ceds})})).json();
+        msg.style.display='block';
+        if(r&&r.ok){ msg.style.color='var(--verde)'; msg.innerHTML='✅ Etiqueta «'+esc(tag)+'» aplicada a <b>'+r.aplicados+'</b> de '+r.unicos+' clientes'+(r.sin_contacto?(' · '+r.sin_contacto+' sin contacto en GHL'):'')+(r.errores?(' · '+r.errores+' con error'):'')+'.'; }
+        else { msg.style.color='var(--cereza)'; msg.textContent='❌ No se pudo aplicar: '+((r&&r.error)||'error'); }
+    }catch(e){ msg.style.display='block'; msg.style.color='var(--cereza)'; msg.textContent='❌ Error de red al aplicar la etiqueta.'; }
+    finally{ btn.disabled=false; btn.textContent=old; }
 }
 
 function mesCorto(m){ // "2026-05" → "May 26"
