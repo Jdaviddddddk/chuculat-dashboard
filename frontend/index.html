@@ -1230,33 +1230,42 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
             </div>
         </section>
 
-        <!-- 2c. Buscar por PRODUCTO -> compradores (accionable para campañas) -->
+        <!-- 2c. Segmentador: filtra clientes por compra (producto/categoría/canal/cliente) y etiqueta en GHL -->
         <section class="dash-section">
             <div class="chart-card full">
-                <h3 style="color:var(--chocolate);margin-bottom:10px">🏷️ Compradores por producto <small style="font-weight:600;color:var(--gris);font-size:.8rem;text-transform:none">· selecciona clientes y etiquétalos en GHL para campañas</small></h3>
-                <div class="kpi-filter-bar" style="gap:12px;margin-bottom:10px">
-                    <div style="flex:1;min-width:260px">
-                        <label style="display:block;margin-bottom:4px">Busca un producto (nombre o código)</label>
-                        <div class="search-wrap"><input type="text" id="searchProdComp" placeholder="Ej: nibs, tableta, 652..." oninput="renderProdCompradores()"></div>
+                <h3 style="color:var(--chocolate);margin-bottom:6px">🏷️ Segmentar clientes por compra <small style="font-weight:600;color:var(--gris);font-size:.8rem;text-transform:none">· filtra por producto, categoría, canal y cliente (se cruzan) y etiquétalos en GHL · la <b>fecha</b> se controla con el filtro de arriba</small></h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:12px">
+                    <div>
+                        <label style="display:block;margin-bottom:4px">Canal <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('canal',true)">Todos</button> <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('canal',false)">Ninguno</button></label>
+                        <div id="segCanal" style="display:flex;flex-wrap:wrap;gap:6px"></div>
                     </div>
-                    <div style="flex:1;min-width:260px" id="prodCompSelectWrap" hidden>
-                        <label style="display:block;margin-bottom:4px">Elige el producto</label>
-                        <select class="filter-select" id="prodCompSelect" onchange="renderProdCompradores(true)" style="width:100%"></select>
+                    <div>
+                        <label style="display:block;margin-bottom:4px">Categorías <span id="segCatCount" style="color:var(--gris);font-size:12px">todas</span> <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('cat',true)">Todas</button> <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('cat',false)">Ninguna</button></label>
+                        <div id="segCatList" style="display:flex;flex-wrap:wrap;gap:6px;max-height:110px;overflow:auto"></div>
+                    </div>
+                    <div>
+                        <label style="display:block;margin-bottom:4px">Cliente (buscar)</label>
+                        <div class="search-wrap"><input type="text" id="segCliSearch" placeholder="cédula o nombre..." oninput="renderSeg()"></div>
                     </div>
                 </div>
-                <p class="section-note" id="prodCompNota">Escribe un producto para ver <strong>todos</strong> los clientes que lo han comprado en el período, con cédula, unidades y valor.</p>
-                <div id="prodCompActions" style="display:none;gap:10px;align-items:center;flex-wrap:wrap;background:var(--crema);border:1px solid var(--beige);border-radius:10px;padding:10px 12px;margin-bottom:10px">
-                    <label style="display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer"><input type="checkbox" id="prodCompAll" onchange="toggleProdCompAll(this)"> Seleccionar todos</label>
-                    <span id="prodCompSelCount" style="color:var(--gris);font-size:13px">0 seleccionados</span>
+                <div style="margin-bottom:12px">
+                    <label style="display:block;margin-bottom:4px">Productos <span id="segProdCount" style="color:var(--gris);font-size:12px">todos</span> <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('prod',true)">Todos</button> <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('prod',false)">Ninguno</button></label>
+                    <div class="search-wrap" style="margin-bottom:6px"><input type="text" id="segProdSearch" placeholder="buscar producto para marcarlo..." oninput="renderSegProdList()"></div>
+                    <div id="segProdList" style="display:flex;flex-wrap:wrap;gap:6px;max-height:140px;overflow:auto"></div>
+                </div>
+                <div id="segActions" style="display:none;gap:10px;align-items:center;flex-wrap:wrap;background:var(--crema);border:1px solid var(--beige);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+                    <label style="display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer"><input type="checkbox" id="segAll" onchange="toggleSegAll(this)"> Seleccionar todos</label>
+                    <span id="segSelCount" style="color:var(--gris);font-size:13px">0 seleccionados</span>
                     <span style="flex:1"></span>
-                    <input type="text" id="prodCompTag" placeholder="Etiqueta a aplicar (ej: campaña_nibs_nov)" style="min-width:240px;padding:7px 10px;border:1px solid var(--beige);border-radius:8px">
-                    <button class="btn-filter" id="prodCompApplyBtn" onclick="aplicarEtiquetaProd()">🏷️ Aplicar etiqueta en GHL</button>
+                    <input type="text" id="segTag" placeholder="Etiqueta a aplicar (ej: campaña_nibs_nov)" style="min-width:240px;padding:7px 10px;border:1px solid var(--beige);border-radius:8px">
+                    <button class="btn-filter" id="segApplyBtn" onclick="aplicarEtiquetaSeg()">🏷️ Aplicar etiqueta en GHL</button>
                 </div>
-                <div id="prodCompMsg" style="display:none;margin-bottom:10px;font-size:13px"></div>
-                <div class="table-wrap"><table id="prodCompTable"><thead><tr>
-                    <th style="width:34px"></th><th>#</th><th onclick="sortProdComp('name')" style="cursor:pointer">Cliente ⇅</th><th>Cédula</th><th onclick="sortProdComp('qty')" style="cursor:pointer;text-align:right">Unidades ⇅</th><th onclick="sortProdComp('subtotal')" style="cursor:pointer;text-align:right">Valor (producto) ⇅</th><th onclick="sortProdComp('ultima')" style="cursor:pointer;text-align:right">Última compra ⇅</th><th onclick="sortProdComp('gastado')" style="cursor:pointer;text-align:right">Total gastado ⇅</th>
-                </tr></thead><tbody id="prodCompBody"></tbody></table></div>
-                <p class="section-note" style="margin-top:8px">Solo son etiquetables los clientes con cédula identificada (las compras sin cédula no se pueden cruzar con GHL). La etiqueta se <strong>suma</strong> a las que ya tenga el contacto.</p>
+                <div id="segMsg" style="display:none;margin-bottom:10px;font-size:13px"></div>
+                <p class="section-note" id="segNota">Cargando…</p>
+                <div class="table-wrap"><table id="segTable"><thead><tr>
+                    <th style="width:34px"></th><th>#</th><th onclick="sortSeg('name')" style="cursor:pointer">Cliente ⇅</th><th>Cédula</th><th>Canal</th><th onclick="sortSeg('qty')" style="cursor:pointer;text-align:right">Unidades ⇅</th><th onclick="sortSeg('subtotal')" style="cursor:pointer;text-align:right">Valor ⇅</th><th onclick="sortSeg('ultima')" style="cursor:pointer;text-align:right">Última compra ⇅</th><th onclick="sortSeg('gastado')" style="cursor:pointer;text-align:right">Total gastado ⇅</th>
+                </tr></thead><tbody id="segBody"></tbody></table></div>
+                <p class="section-note" style="margin-top:8px">Unidades/Valor reflejan los productos filtrados. Solo etiquetables los clientes con cédula; la etiqueta se <strong>suma</strong> a las que ya tenga el contacto en GHL.</p>
             </div>
         </section>
 
@@ -2417,17 +2426,21 @@ function renderDestacadas(){
     renderDestProdSelect(d);
     renderDestClientes();
     renderCliProductos();
-    prodIndex=null; ensureProdCompExtra(); renderProdCompradores();
+    ensureProdCompExtra(); segBuildUniverse(); renderSeg();
     renderDestParejas(d);
     renderDestReactivar(d);
     renderDestNR(d);
 }
 
-// ── Compradores por producto (accionable: etiquetar en GHL para campañas) ──
-let prodIndex=null, prodMatches=[], prodSel=null, prodCompRows=[];
-let prodCompSort={col:'gastado',dir:'desc'};
+// ── Segmentador de clientes por compra (filtros cruzados + etiquetar en GHL) ──
+let segData=[], segCats=[], segProds=[];
+let segCanalSel=new Set(['b2c']);   // default B2C
+let segCatSel=new Set();            // vacío = todas
+let segProdSel=new Set();           // vacío = todos (codes)
+let segRows=[], segSort={col:'gastado',dir:'desc'};
+const segSelected=new Set();
+const CANALES_SEG=[['b2c','🍫 B2C'],['b2b','🏢 B2B'],['export','🌍 Export']];
 let prodCompExtra=null, prodCompExtraLoaded=false, prodCompExtraLoading=false;
-const prodCompSelected=new Set();
 // Última compra + total gastado por cédula (de get-contador-compras, campos GHL sincronizados).
 async function ensureProdCompExtra(){
     if(prodCompExtraLoaded||prodCompExtraLoading) return;
@@ -2437,80 +2450,78 @@ async function ensureProdCompExtra(){
     }catch(e){}
     prodCompExtra=m; prodCompExtraLoaded=true; prodCompExtraLoading=false;
 }
-function buildProdIndex(){
-    const d = ventasData && ventasData.destacadas;
-    const byProd = new Map();
-    for (const c of ((d&&d.clienteProductos)||[])) {
-        for (const p of (c.prods||[])) {
-            const code=String(p.code||'');
-            let g=byProd.get(code); if(!g){ g={code, name:p.name||code, buyers:new Map()}; byProd.set(code,g); }
-            const ced=String(c.ced||''); const key=ced||('n:'+(c.name||''));
-            let b=g.buyers.get(key); if(!b){ b={name:c.name||'(sin nombre)', ced, qty:0, subtotal:0}; g.buyers.set(key,b); }
-            b.qty+=Number(p.qty)||0; b.subtotal+=Number(p.subtotal)||0;
-        }
-    }
-    return byProd;
+function segBuildUniverse(){
+    const d=ventasData&&ventasData.destacadas; segData=(d&&d.clienteProductos)||[];
+    const cats=new Set(), prods=new Map();
+    for(const c of segData){ for(const p of (c.prods||[])){ if(p.cat) cats.add(p.cat); if(p.code&&!prods.has(p.code)) prods.set(p.code,{code:p.code,name:p.name}); } }
+    segCats=[...cats].sort((a,b)=>String(a).localeCompare(String(b),'es'));
+    segProds=[...prods.values()].sort((a,b)=>String(a.name).localeCompare(String(b.name),'es'));
+    segCatSel=new Set(); segProdSel=new Set();
+    const sp=document.getElementById('segProdSearch'); if(sp) sp.value='';
+    const sc=document.getElementById('segCliSearch'); if(sc) sc.value='';
+    segRenderCanal(); segRenderCats(); renderSegProdList();
 }
-function renderProdCompradores(fromSelect){
-    const d = ventasData && ventasData.destacadas;
-    const tb = document.getElementById('prodCompBody'); if(!d||!tb) return;
-    if(!prodIndex) prodIndex=buildProdIndex();
-    const q=(document.getElementById('searchProdComp').value||'').toLowerCase().trim();
-    const selWrap=document.getElementById('prodCompSelectWrap'), sel=document.getElementById('prodCompSelect');
-    const actions=document.getElementById('prodCompActions'), nota=document.getElementById('prodCompNota');
-    document.getElementById('prodCompMsg').style.display='none';
-    if(!q){ selWrap.hidden=true; actions.style.display='none'; prodCompSelected.clear(); prodCompRows=[]; tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--gris);padding:20px">Escribe un producto para buscar sus compradores.</td></tr>'; nota.innerHTML='Escribe un producto para ver <strong>todos</strong> los clientes que lo han comprado en el período, con cédula, unidades, valor, <strong>última compra</strong> y <strong>total gastado</strong>.'; return; }
-    if(!fromSelect){
-        prodMatches=[...prodIndex.values()].filter(g=> String(g.name).toLowerCase().includes(q) || String(g.code).toLowerCase().includes(q)).sort((a,b)=>b.buyers.size-a.buyers.size);
-        if(prodMatches.length>1){ selWrap.hidden=false; sel.innerHTML=prodMatches.map((g,i)=>`<option value="${i}">${esc(g.name)} (${esc(g.code)}) — ${g.buyers.size} clientes</option>`).join(''); sel.value='0'; }
-        else selWrap.hidden=true;
+function segChip(label,type,val,on){ return `<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--chocolate);cursor:pointer;background:${on?'rgba(0,171,225,.08)':'var(--crema)'};border:1px solid ${on?'var(--azul)':'var(--beige)'};border-radius:50px;padding:3px 10px"><input type="checkbox" ${on?'checked':''} onchange="segToggle('${type}',this)" data-val="${esc(val)}"> ${esc(label)}</label>`; }
+function segRenderCanal(){ const e=document.getElementById('segCanal'); if(e) e.innerHTML=CANALES_SEG.map(([v,l])=>segChip(l,'canal',v,segCanalSel.has(v))).join(''); }
+function segRenderCats(){ const cc=document.getElementById('segCatCount'); if(cc) cc.textContent=segCatSel.size?segCatSel.size+' de '+segCats.length:'todas'; const e=document.getElementById('segCatList'); if(e) e.innerHTML=segCats.map(c=>segChip(c,'cat',c,segCatSel.has(c))).join('')||'<span style="color:var(--gris);font-size:12px">—</span>'; }
+function renderSegProdList(){ const q=(document.getElementById('segProdSearch').value||'').toLowerCase().trim(); let list=segProds; if(q) list=list.filter(p=>(p.name+' '+p.code).toLowerCase().includes(q)); const pc=document.getElementById('segProdCount'); if(pc) pc.textContent=segProdSel.size?segProdSel.size+' de '+segProds.length:'todos'; document.getElementById('segProdList').innerHTML=list.slice(0,400).map(p=>segChip(p.name+' ('+p.code+')','prod',p.code,segProdSel.has(p.code))).join('')||'<span style="color:var(--gris);font-size:12px">Sin coincidencias</span>'; }
+function segToggle(type,cb){ const v=cb.dataset.val; const set=type==='canal'?segCanalSel:type==='cat'?segCatSel:segProdSel; if(cb.checked)set.add(v); else set.delete(v); if(type==='canal')segRenderCanal(); else if(type==='cat')segRenderCats(); else renderSegProdList(); renderSeg(); }
+function segSelAll(type,on){ if(type==='canal'){ segCanalSel=on?new Set(CANALES_SEG.map(x=>x[0])):new Set(); segRenderCanal(); } else if(type==='cat'){ segCatSel=on?new Set(segCats):new Set(); segRenderCats(); } else { segProdSel=on?new Set(segProds.map(p=>p.code)):new Set(); renderSegProdList(); } renderSeg(); }
+function renderSeg(){
+    const tb=document.getElementById('segBody'); if(!tb) return;
+    if(!segData.length){ document.getElementById('segNota').textContent='Sin datos de ventas cargados.'; document.getElementById('segActions').style.display='none'; tb.innerHTML=''; return; }
+    const qCli=(document.getElementById('segCliSearch').value||'').toLowerCase().trim();
+    const catsActive=segCatSel.size>0, prodsActive=segProdSel.size>0;
+    const rows=[];
+    for(const c of segData){
+        if(segCanalSel.size && !((c.canales||[]).some(ch=>segCanalSel.has(ch)))) continue;
+        if(qCli && !((String(c.name||'')+' '+String(c.ced||'')).toLowerCase().includes(qCli))) continue;
+        let qty=0,sub=0,matched=false;
+        for(const p of (c.prods||[])){ if(catsActive&&!segCatSel.has(p.cat))continue; if(prodsActive&&!segProdSel.has(p.code))continue; matched=true; qty+=Number(p.qty)||0; sub+=Number(p.subtotal)||0; }
+        if(!matched) continue;
+        const cedD=String(c.ced||'').replace(/[^0-9]/g,''); const ex=(prodCompExtra&&cedD)?prodCompExtra.get(cedD):null;
+        rows.push({name:c.name, ced:c.ced, canal:(c.canales||[]).map(x=>String(x).toUpperCase()).join('/'), qty, subtotal:sub, ultima:ex?ex.ultima:null, gastado:ex?ex.gastado:null});
     }
-    if(!prodMatches.length){ actions.style.display='none'; prodCompSelected.clear(); prodCompRows=[]; tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--gris);padding:20px">Sin producto que coincida con «'+esc(q)+'».</td></tr>'; nota.textContent='Sin coincidencias para «'+q+'».'; return; }
-    const idx=(prodMatches.length>1&&sel)?(parseInt(sel.value,10)||0):0;
-    prodSel=prodMatches[idx];
-    const em=prodCompExtra;
-    prodCompRows=[...prodSel.buyers.values()].map(b=>{ const ced=String(b.ced||'').replace(/[^0-9]/g,''); const ex=(em&&ced)?em.get(ced):null; return {name:b.name, ced:b.ced, qty:b.qty, subtotal:b.subtotal, ultima:ex?ex.ultima:null, gastado:ex?ex.gastado:null}; });
-    prodCompSelected.clear(); const allChk=document.getElementById('prodCompAll'); if(allChk) allChk.checked=false;
-    actions.style.display='flex'; updateProdCompCount();
-    const etiquetables=prodCompRows.filter(b=>b.ced&&String(b.ced).replace(/[^0-9]/g,'').length>=4).length;
-    nota.innerHTML='<strong>'+esc(prodSel.name)+'</strong> ('+esc(prodSel.code)+') — '+prodCompRows.length+' clientes lo han comprado · '+etiquetables+' etiquetables (con cédula).';
-    paintProdComp();
-    if(!prodCompExtraLoaded){ ensureProdCompExtra().then(()=>{ const m=prodCompExtra; if(m&&prodCompRows.length){ prodCompRows.forEach(r=>{ const ced=String(r.ced||'').replace(/[^0-9]/g,''); const ex=ced?m.get(ced):null; if(ex){ r.ultima=ex.ultima; r.gastado=ex.gastado; } }); paintProdComp(); } }); }
+    segRows=rows; segSelected.clear(); const a=document.getElementById('segAll'); if(a)a.checked=false;
+    const etiq=rows.filter(r=>r.ced&&String(r.ced).replace(/[^0-9]/g,'').length>=4).length;
+    document.getElementById('segActions').style.display = rows.length?'flex':'none';
+    updateSegCount();
+    document.getElementById('segNota').innerHTML = rows.length? ('<strong>'+rows.length+'</strong> clientes coinciden con los filtros · '+etiq+' etiquetables (con cédula). Marca los que quieras (o "Seleccionar todos") y aplica una etiqueta.') : 'Ningún cliente coincide con los filtros actuales.';
+    paintSeg();
+    if(!prodCompExtraLoaded){ ensureProdCompExtra().then(()=>{ const m=prodCompExtra; if(m){ segRows.forEach(r=>{ const ced=String(r.ced||'').replace(/[^0-9]/g,''); const ex=ced?m.get(ced):null; if(ex){r.ultima=ex.ultima;r.gastado=ex.gastado;} }); paintSeg(); } }); }
 }
-function sortProdComp(col){ prodCompSort.dir = prodCompSort.col===col ? (prodCompSort.dir==='asc'?'desc':'asc') : 'desc'; prodCompSort.col=col; paintProdComp(); }
-function paintProdComp(){
-    const tb=document.getElementById('prodCompBody'); if(!tb) return;
-    const col=prodCompSort.col, s=prodCompSort.dir==='asc'?1:-1;
-    const rows=[...prodCompRows].sort((a,b)=>{
+function sortSeg(col){ segSort.dir=segSort.col===col?(segSort.dir==='asc'?'desc':'asc'):'desc'; segSort.col=col; paintSeg(); }
+function paintSeg(){
+    const tb=document.getElementById('segBody'); if(!tb) return;
+    const col=segSort.col, s=segSort.dir==='asc'?1:-1;
+    const rows=[...segRows].sort((a,b)=>{
         if(col==='name') return s*String(a.name||'').localeCompare(String(b.name||''),'es');
-        let av=a[col], bv=b[col];
-        const na=(av==null||av===''), nb=(bv==null||bv==='');
-        if(na&&nb) return 0; if(na) return 1; if(nb) return -1;
+        let av=a[col],bv=b[col]; const na=(av==null||av===''),nb=(bv==null||bv==='');
+        if(na&&nb)return 0; if(na)return 1; if(nb)return -1;
         if(col==='ultima') return s*String(av).localeCompare(String(bv));
         return s*((Number(av)||0)-(Number(bv)||0));
     });
-    tb.innerHTML=rows.map((b,i)=>{
-        const taggable=!!(b.ced&&String(b.ced).replace(/[^0-9]/g,'').length>=4);
-        const chk=prodCompSelected.has(b.ced)?'checked':'';
+    tb.innerHTML=rows.map((b,i)=>{ const taggable=!!(b.ced&&String(b.ced).replace(/[^0-9]/g,'').length>=4); const chk=segSelected.has(b.ced)?'checked':'';
         return `<tr>
-            <td style="text-align:center">${taggable?`<input type="checkbox" class="pc-chk" data-ced="${esc(b.ced)}" ${chk} onchange="onProdCompChk(this)">`:'<span title="sin cédula, no etiquetable" style="color:var(--gris)">—</span>'}</td>
+            <td style="text-align:center">${taggable?`<input type="checkbox" class="seg-chk" data-ced="${esc(b.ced)}" ${chk} onchange="onSegChk(this)">`:'<span title="sin cédula, no etiquetable" style="color:var(--gris)">—</span>'}</td>
             <td>${i+1}</td><td class="td-name">${esc(b.name||'—')}</td><td style="color:var(--gris);font-size:12px">${esc(b.ced||'')}</td>
+            <td style="font-size:11px;color:var(--gris)">${esc(b.canal||'')}</td>
             <td style="text-align:right">${fmt(b.qty)}</td>
             <td style="text-align:right;font-weight:700;color:var(--verde)">${fmtCOP(b.subtotal)}</td>
             <td style="text-align:right">${b.ultima?fmtDate(b.ultima):'<span style="color:var(--gris)">—</span>'}</td>
             <td style="text-align:right;font-weight:700;color:var(--chocolate)">${b.gastado!=null?fmtCOP(b.gastado):'<span style="color:var(--gris)">—</span>'}</td>
-        </tr>`;}).join('');
+        </tr>`;}).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--gris);padding:20px">Sin resultados</td></tr>';
 }
-function onProdCompChk(el){ const c=el.dataset.ced; if(el.checked) prodCompSelected.add(c); else prodCompSelected.delete(c); updateProdCompCount(); }
-function toggleProdCompAll(el){ document.querySelectorAll('#prodCompBody .pc-chk').forEach(chk=>{ chk.checked=el.checked; const c=chk.dataset.ced; if(el.checked) prodCompSelected.add(c); else prodCompSelected.delete(c); }); updateProdCompCount(); }
-function updateProdCompCount(){ const e=document.getElementById('prodCompSelCount'); if(e) e.textContent=prodCompSelected.size+' seleccionados'; }
-async function aplicarEtiquetaProd(){
-    const tag=(document.getElementById('prodCompTag').value||'').trim();
-    const msg=document.getElementById('prodCompMsg');
+function onSegChk(el){ const c=el.dataset.ced; if(el.checked) segSelected.add(c); else segSelected.delete(c); updateSegCount(); }
+function toggleSegAll(el){ document.querySelectorAll('#segBody .seg-chk').forEach(chk=>{ chk.checked=el.checked; const c=chk.dataset.ced; if(el.checked) segSelected.add(c); else segSelected.delete(c); }); updateSegCount(); }
+function updateSegCount(){ const e=document.getElementById('segSelCount'); if(e) e.textContent=segSelected.size+' seleccionados'; }
+async function aplicarEtiquetaSeg(){
+    const tag=(document.getElementById('segTag').value||'').trim();
+    const msg=document.getElementById('segMsg');
     if(!tag){ alert('Escribe la etiqueta a aplicar.'); return; }
-    const ceds=[...prodCompSelected]; if(!ceds.length){ alert('Selecciona al menos un cliente.'); return; }
+    const ceds=[...segSelected]; if(!ceds.length){ alert('Selecciona al menos un cliente.'); return; }
     if(!confirm('¿Aplicar la etiqueta "'+tag+'" a '+ceds.length+' cliente(s) en GHL?')) return;
-    const btn=document.getElementById('prodCompApplyBtn'); btn.disabled=true; const old=btn.textContent; btn.textContent='Aplicando...'; msg.style.display='none';
+    const btn=document.getElementById('segApplyBtn'); btn.disabled=true; const old=btn.textContent; btn.textContent='Aplicando...'; msg.style.display='none';
     try{
         const r=await (await fetch('https://app.rioagencymarketing.com/webhook/aplicar-etiqueta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag,ceds})})).json();
         msg.style.display='block';
@@ -2519,7 +2530,6 @@ async function aplicarEtiquetaProd(){
     }catch(e){ msg.style.display='block'; msg.style.color='var(--cereza)'; msg.textContent='❌ Error de red al aplicar la etiqueta.'; }
     finally{ btn.disabled=false; btn.textContent=old; }
 }
-
 function mesCorto(m){ // "2026-05" → "May 26"
     const [y,mm]=String(m).split('-'); return (MESES_CORTO[parseInt(mm,10)-1]||m)+' '+String(y).slice(2);
 }
