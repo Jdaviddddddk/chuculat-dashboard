@@ -2350,9 +2350,19 @@ async function loadB2B() {
     const to  =document.getElementById('b2bDateTo').value;
     const url = VENTAS_URL + (from||to ? '?date_start='+(from||'')+( to ? '&date_end='+to : '') : '');
     try {
-        const res  = await fetch(url);
-        const data = await res.json();
-        if (!data.meta) throw new Error('Respuesta inválida');
+        // get-ventas es pesado e intermitente (a veces responde en 3s, a veces se pasa
+        // de los ~30s del gateway y devuelve vacío). Reintentar hasta obtener una
+        // respuesta válida, con timeout por intento, para que la pestaña no quede colgada.
+        let data = null;
+        for (let _att=0; _att<4 && !data; _att++){
+            try {
+                const _c=new AbortController(); const _t=setTimeout(()=>_c.abort(),28000);
+                const res=await fetch(url,{signal:_c.signal}); clearTimeout(_t);
+                const d=await res.json(); if (d && d.meta) data=d;
+            } catch(_e){ /* timeout o JSON vacío → reintenta */ }
+            if(!data && _att<3) await new Promise(r=>setTimeout(r,1500));
+        }
+        if (!data) throw new Error('get-ventas no respondió (reintentos agotados)');
         ventasData = data;
         ventasLoadedAt = Date.now();
         // La primera carga usa el rango por defecto (1-ene → hoy) = base sin filtro
