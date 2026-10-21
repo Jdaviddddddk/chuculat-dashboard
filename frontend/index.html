@@ -2474,7 +2474,7 @@ function renderSeg(){
     const catsActive=segCatSel.size>0, prodsActive=segProdSel.size>0;
     const rows=[];
     for(const c of segData){
-        if(segCanalSel.size && !((c.canales||[]).some(ch=>segCanalSel.has(ch)))) continue;
+        if(!((c.canales||[]).some(ch=>segCanalSel.has(ch)))) continue;
         if(qCli && !((String(c.name||'')+' '+String(c.ced||'')).toLowerCase().includes(qCli))) continue;
         let qty=0,sub=0,matched=false;
         for(const p of (c.prods||[])){ if(catsActive&&!segCatSel.has(p.cat))continue; if(prodsActive&&!segProdSel.has(p.code))continue; matched=true; qty+=Number(p.qty)||0; sub+=Number(p.subtotal)||0; }
