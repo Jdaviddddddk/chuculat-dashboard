@@ -1236,8 +1236,12 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                 <h3 style="color:var(--chocolate);margin-bottom:6px">🏷️ Segmentar clientes por compra <small style="font-weight:600;color:var(--gris);font-size:.8rem;text-transform:none">· filtra por producto, categoría, canal y cliente (se cruzan) y etiquétalos en GHL · la <b>fecha</b> se controla con el filtro de arriba</small></h3>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:12px">
                     <div>
-                        <label style="display:block;margin-bottom:4px">Canal <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('canal',true)">Todos</button> <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('canal',false)">Ninguno</button></label>
+                        <label style="display:block;margin-bottom:4px">Centro de costos <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('canal',true)">Todos</button> <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('canal',false)">Ninguno</button></label>
                         <div id="segCanal" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+                    </div>
+                    <div>
+                        <label style="display:block;margin-bottom:4px">Canal de venta <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('venta',true)">Todos</button> <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('venta',false)">Ninguno</button></label>
+                        <div id="segVenta" style="display:flex;flex-wrap:wrap;gap:6px"></div>
                     </div>
                     <div>
                         <label style="display:block;margin-bottom:4px">Categorías <span id="segCatCount" style="color:var(--gris);font-size:12px">todas</span> <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('cat',true)">Todas</button> <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('cat',false)">Ninguna</button></label>
@@ -1263,7 +1267,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                 <div id="segMsg" style="display:none;margin-bottom:10px;font-size:13px"></div>
                 <p class="section-note" id="segNota">Cargando…</p>
                 <div class="table-wrap"><table id="segTable"><thead><tr>
-                    <th style="width:34px"></th><th>#</th><th onclick="sortSeg('name')" style="cursor:pointer">Cliente ⇅</th><th>Cédula</th><th>Canal</th><th onclick="sortSeg('qty')" style="cursor:pointer;text-align:right">Unidades ⇅</th><th onclick="sortSeg('subtotal')" style="cursor:pointer;text-align:right">Valor ⇅</th><th onclick="sortSeg('ultima')" style="cursor:pointer;text-align:right">Última compra ⇅</th><th onclick="sortSeg('gastado')" style="cursor:pointer;text-align:right">Total gastado ⇅</th>
+                    <th style="width:34px"></th><th>#</th><th onclick="sortSeg('name')" style="cursor:pointer">Cliente ⇅</th><th>Cédula</th><th>Centro</th><th>Canal de venta</th><th onclick="sortSeg('qty')" style="cursor:pointer;text-align:right">Unidades ⇅</th><th onclick="sortSeg('subtotal')" style="cursor:pointer;text-align:right">Valor ⇅</th><th onclick="sortSeg('ultima')" style="cursor:pointer;text-align:right">Última compra ⇅</th><th onclick="sortSeg('gastado')" style="cursor:pointer;text-align:right">Total gastado ⇅</th>
                 </tr></thead><tbody id="segBody"></tbody></table></div>
                 <p class="section-note" style="margin-top:8px">Unidades/Valor reflejan los productos filtrados. Solo etiquetables los clientes con cédula; la etiqueta se <strong>suma</strong> a las que ya tenga el contacto en GHL.</p>
             </div>
@@ -2449,14 +2453,16 @@ let segCatSel=new Set();            // vacío = todas
 let segProdSel=new Set();           // vacío = todos (codes)
 let segRows=[], segSort={col:'gastado',dir:'desc'};
 const segSelected=new Set();
-const CANALES_SEG=[['b2c','🍫 B2C'],['b2b','🏢 B2B'],['export','🌍 Export']];
+const CANALES_SEG=[['b2c','🍫 B2C'],['b2b','🏢 B2B'],['export','🌍 Exportaciones']];
+const VENTA_SEG=[['POS','🏪 POS'],['Página web','🌐 Página web'],['Site de agendas','📅 Site de agendas'],['Bot','🤖 Bot']];
+let segVentaSel=new Set(VENTA_SEG.map(x=>x[0]));   // default: todos los canales de venta
 let prodCompExtra=null, prodCompExtraLoaded=false, prodCompExtraLoading=false;
 // Última compra + total gastado por cédula (de get-contador-compras, campos GHL sincronizados).
 async function ensureProdCompExtra(){
     if(prodCompExtraLoaded||prodCompExtraLoading) return;
     prodCompExtraLoading=true; const m=new Map();
     try{ const d=await (await fetch('https://app.rioagencymarketing.com/webhook/get-contador-compras')).json();
-        for(const c of ((d&&d.clientes)||[])){ const ced=String(c.cedula||'').replace(/[^0-9]/g,''); if(ced) m.set(ced,{ultima:c.ultimaCompra||null, gastado:Number(c.gastado||0)||0}); }
+        for(const c of ((d&&d.clientes)||[])){ const ced=String(c.cedula||'').replace(/[^0-9]/g,''); if(ced) m.set(ced,{ultima:c.ultimaCompra||null, gastado:Number(c.gastado||0)||0, canalVenta:c.canalVenta||null}); }
     }catch(e){}
     prodCompExtra=m; prodCompExtraLoaded=true; prodCompExtraLoading=false;
 }
@@ -2469,14 +2475,15 @@ function segBuildUniverse(){
     segCatSel=new Set(); segProdSel=new Set();
     const sp=document.getElementById('segProdSearch'); if(sp) sp.value='';
     const sc=document.getElementById('segCliSearch'); if(sc) sc.value='';
-    segRenderCanal(); segRenderCats(); renderSegProdList();
+    segRenderCanal(); segRenderVenta(); segRenderCats(); renderSegProdList();
 }
 function segChip(label,type,val,on){ return `<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--chocolate);cursor:pointer;background:${on?'rgba(0,171,225,.08)':'var(--crema)'};border:1px solid ${on?'var(--azul)':'var(--beige)'};border-radius:50px;padding:3px 10px"><input type="checkbox" ${on?'checked':''} onchange="segToggle('${type}',this)" data-val="${esc(val)}"> ${esc(label)}</label>`; }
 function segRenderCanal(){ const e=document.getElementById('segCanal'); if(e) e.innerHTML=CANALES_SEG.map(([v,l])=>segChip(l,'canal',v,segCanalSel.has(v))).join(''); }
+function segRenderVenta(){ const e=document.getElementById('segVenta'); if(e) e.innerHTML=VENTA_SEG.map(([v,l])=>segChip(l,'venta',v,segVentaSel.has(v))).join(''); }
 function segRenderCats(){ const cc=document.getElementById('segCatCount'); if(cc) cc.textContent=segCatSel.size?segCatSel.size+' de '+segCats.length:'todas'; const e=document.getElementById('segCatList'); if(e) e.innerHTML=segCats.map(c=>segChip(c,'cat',c,segCatSel.has(c))).join('')||'<span style="color:var(--gris);font-size:12px">—</span>'; }
 function renderSegProdList(){ const q=(document.getElementById('segProdSearch').value||'').toLowerCase().trim(); let list=segProds; if(q) list=list.filter(p=>(p.name+' '+p.code).toLowerCase().includes(q)); const pc=document.getElementById('segProdCount'); if(pc) pc.textContent=segProdSel.size?segProdSel.size+' de '+segProds.length:'todos'; document.getElementById('segProdList').innerHTML=list.slice(0,400).map(p=>segChip(p.name+' ('+p.code+')','prod',p.code,segProdSel.has(p.code))).join('')||'<span style="color:var(--gris);font-size:12px">Sin coincidencias</span>'; }
-function segToggle(type,cb){ const v=cb.dataset.val; const set=type==='canal'?segCanalSel:type==='cat'?segCatSel:segProdSel; if(cb.checked)set.add(v); else set.delete(v); if(type==='canal')segRenderCanal(); else if(type==='cat')segRenderCats(); else renderSegProdList(); renderSeg(); }
-function segSelAll(type,on){ if(type==='canal'){ segCanalSel=on?new Set(CANALES_SEG.map(x=>x[0])):new Set(); segRenderCanal(); } else if(type==='cat'){ segCatSel=on?new Set(segCats):new Set(); segRenderCats(); } else { segProdSel=on?new Set(segProds.map(p=>p.code)):new Set(); renderSegProdList(); } renderSeg(); }
+function segToggle(type,cb){ const v=cb.dataset.val; const set=type==='canal'?segCanalSel:type==='venta'?segVentaSel:type==='cat'?segCatSel:segProdSel; if(cb.checked)set.add(v); else set.delete(v); if(type==='canal')segRenderCanal(); else if(type==='venta')segRenderVenta(); else if(type==='cat')segRenderCats(); else renderSegProdList(); renderSeg(); }
+function segSelAll(type,on){ if(type==='canal'){ segCanalSel=on?new Set(CANALES_SEG.map(x=>x[0])):new Set(); segRenderCanal(); } else if(type==='venta'){ segVentaSel=on?new Set(VENTA_SEG.map(x=>x[0])):new Set(); segRenderVenta(); } else if(type==='cat'){ segCatSel=on?new Set(segCats):new Set(); segRenderCats(); } else { segProdSel=on?new Set(segProds.map(p=>p.code)):new Set(); renderSegProdList(); } renderSeg(); }
 function renderSeg(){
     const tb=document.getElementById('segBody'); if(!tb) return;
     if(!segData.length){ document.getElementById('segNota').textContent='Sin datos de ventas cargados.'; document.getElementById('segActions').style.display='none'; tb.innerHTML=''; return; }
@@ -2485,12 +2492,15 @@ function renderSeg(){
     const rows=[];
     for(const c of segData){
         if(!((c.canales||[]).some(ch=>segCanalSel.has(ch)))) continue;
+        const _cedV=String(c.ced||'').replace(/[^0-9]/g,''); const _exV=(prodCompExtra&&_cedV)?prodCompExtra.get(_cedV):null;
+        const _venta=new Set(c.canalesVenta||[]); if(_exV&&_exV.canalVenta) _venta.add(_exV.canalVenta);
+        if(![..._venta].some(v=>segVentaSel.has(v))) continue;
         if(qCli && !((String(c.name||'')+' '+String(c.ced||'')).toLowerCase().includes(qCli))) continue;
         let qty=0,sub=0,matched=false;
         for(const p of (c.prods||[])){ if(catsActive&&!segCatSel.has(p.cat))continue; if(prodsActive&&!segProdSel.has(p.code))continue; matched=true; qty+=Number(p.qty)||0; sub+=Number(p.subtotal)||0; }
         if(!matched) continue;
         const cedD=String(c.ced||'').replace(/[^0-9]/g,''); const ex=(prodCompExtra&&cedD)?prodCompExtra.get(cedD):null;
-        rows.push({name:c.name, ced:c.ced, canal:(c.canales||[]).map(x=>String(x).toUpperCase()).join('/'), qty, subtotal:sub, ultima:ex?ex.ultima:null, gastado:ex?ex.gastado:null});
+        rows.push({name:c.name, ced:c.ced, canal:(c.canales||[]).map(x=>String(x).toUpperCase()).join('/'), venta:[..._venta].join(' / '), qty, subtotal:sub, ultima:ex?ex.ultima:null, gastado:ex?ex.gastado:null});
     }
     segRows=rows; segSelected.clear(); const a=document.getElementById('segAll'); if(a)a.checked=false;
     const etiq=rows.filter(r=>r.ced&&String(r.ced).replace(/[^0-9]/g,'').length>=4).length;
@@ -2498,7 +2508,7 @@ function renderSeg(){
     updateSegCount();
     document.getElementById('segNota').innerHTML = rows.length? ('<strong>'+rows.length+'</strong> clientes coinciden con los filtros · '+etiq+' etiquetables (con cédula). Marca los que quieras (o "Seleccionar todos") y aplica una etiqueta.') : 'Ningún cliente coincide con los filtros actuales.';
     paintSeg();
-    if(!prodCompExtraLoaded){ ensureProdCompExtra().then(()=>{ const m=prodCompExtra; if(m){ segRows.forEach(r=>{ const ced=String(r.ced||'').replace(/[^0-9]/g,''); const ex=ced?m.get(ced):null; if(ex){r.ultima=ex.ultima;r.gastado=ex.gastado;} }); paintSeg(); } }); }
+    if(!prodCompExtraLoaded){ ensureProdCompExtra().then(()=>{ renderSeg(); }); }
 }
 function sortSeg(col){ segSort.dir=segSort.col===col?(segSort.dir==='asc'?'desc':'asc'):'desc'; segSort.col=col; paintSeg(); }
 function paintSeg(){
@@ -2516,11 +2526,12 @@ function paintSeg(){
             <td style="text-align:center">${taggable?`<input type="checkbox" class="seg-chk" data-ced="${esc(b.ced)}" ${chk} onchange="onSegChk(this)">`:'<span title="sin cédula, no etiquetable" style="color:var(--gris)">—</span>'}</td>
             <td>${i+1}</td><td class="td-name">${esc(b.name||'—')}</td><td style="color:var(--gris);font-size:12px">${esc(b.ced||'')}</td>
             <td style="font-size:11px;color:var(--gris)">${esc(b.canal||'')}</td>
+            <td style="font-size:11px;color:var(--gris)">${esc(b.venta||'')}</td>
             <td style="text-align:right">${fmt(b.qty)}</td>
             <td style="text-align:right;font-weight:700;color:var(--verde)">${fmtCOP(b.subtotal)}</td>
             <td style="text-align:right">${b.ultima?fmtDate(b.ultima):'<span style="color:var(--gris)">—</span>'}</td>
             <td style="text-align:right;font-weight:700;color:var(--chocolate)">${b.gastado!=null?fmtCOP(b.gastado):'<span style="color:var(--gris)">—</span>'}</td>
-        </tr>`;}).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--gris);padding:20px">Sin resultados</td></tr>';
+        </tr>`;}).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--gris);padding:20px">Sin resultados</td></tr>';
 }
 function onSegChk(el){ const c=el.dataset.ced; if(el.checked) segSelected.add(c); else segSelected.delete(c); updateSegCount(); }
 function toggleSegAll(el){ document.querySelectorAll('#segBody .seg-chk').forEach(chk=>{ chk.checked=el.checked; const c=chk.dataset.ced; if(el.checked) segSelected.add(c); else segSelected.delete(c); }); updateSegCount(); }
