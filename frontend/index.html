@@ -2456,10 +2456,10 @@ const segSelected=new Set();
 const CANALES_SEG=[['b2c','🍫 B2C'],['b2b','🏢 B2B'],['export','🌍 Exportaciones']];
 const VENTA_SEG=[['POS','🏪 POS'],['Página web','🌐 Página web'],['Site de agendas','📅 Site de agendas'],['Bot','🤖 Bot']];
 let segVentaSel=new Set(VENTA_SEG.map(x=>x[0]));   // default: todos los canales de venta
-let prodCompExtra=null, prodCompExtraLoaded=false, prodCompExtraLoading=false;
+let prodCompExtra=null, prodCompExtraLoaded=false, prodCompExtraLoading=false; let prodCompExtraP=null;
 // Última compra + total gastado por cédula (de get-contador-compras, campos GHL sincronizados).
-async function ensureProdCompExtra(){
-    if(prodCompExtraLoaded||prodCompExtraLoading) return;
+function ensureProdCompExtra(){ return prodCompExtraP||(prodCompExtraP=_loadProdCompExtra()); }
+async function _loadProdCompExtra(){
     prodCompExtraLoading=true; const m=new Map();
     try{ const d=await (await fetch('https://app.rioagencymarketing.com/webhook/get-contador-compras')).json();
         for(const c of ((d&&d.clientes)||[])){ const ced=String(c.cedula||'').replace(/[^0-9]/g,''); if(ced) m.set(ced,{ultima:c.ultimaCompra||null, gastado:Number(c.gastado||0)||0, canalVenta:c.canalVenta||null}); }
