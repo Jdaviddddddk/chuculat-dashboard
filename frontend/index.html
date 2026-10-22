@@ -2494,7 +2494,7 @@ function renderSeg(){
         if(!((c.canales||[]).some(ch=>segCanalSel.has(ch)))) continue;
         const _cedV=String(c.ced||'').replace(/[^0-9]/g,''); const _exV=(prodCompExtra&&_cedV)?prodCompExtra.get(_cedV):null;
         const _venta=new Set(c.canalesVenta||[]); if(_exV&&_exV.canalVenta) _venta.add(_exV.canalVenta);
-        if(![..._venta].some(v=>segVentaSel.has(v))) continue;
+        if(segVentaSel.size<VENTA_SEG.length && ![..._venta].some(v=>segVentaSel.has(v))) continue;
         if(qCli && !((String(c.name||'')+' '+String(c.ced||'')).toLowerCase().includes(qCli))) continue;
         let qty=0,sub=0,matched=false;
         for(const p of (c.prods||[])){ if(catsActive&&!segCatSel.has(p.cat))continue; if(prodsActive&&!segProdSel.has(p.code))continue; matched=true; qty+=Number(p.qty)||0; sub+=Number(p.subtotal)||0; }
