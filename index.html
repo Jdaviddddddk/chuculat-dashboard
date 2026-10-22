@@ -1244,8 +1244,9 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                         <div id="segVenta" style="display:flex;flex-wrap:wrap;gap:6px"></div>
                     </div>
                     <div>
-                        <label style="display:block;margin-bottom:4px">Categorías <span id="segCatCount" style="color:var(--gris);font-size:12px">todas</span> <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('cat',true)">Todas</button> <button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segSelAll('cat',false)">Ninguna</button></label>
-                        <div id="segCatList" style="display:flex;flex-wrap:wrap;gap:6px;max-height:110px;overflow:auto"></div>
+                        <label style="display:block;margin-bottom:4px">Última compra hace (días)</label>
+                        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="number" min="0" id="segDiasMin" placeholder="desde" oninput="renderSeg()" style="width:80px;padding:6px 8px;border:1px solid var(--beige);border-radius:8px"> a <input type="number" min="0" id="segDiasMax" placeholder="hasta" oninput="renderSeg()" style="width:80px;padding:6px 8px;border:1px solid var(--beige);border-radius:8px"> días</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"><button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segDias(0,30)">≤30</button><button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segDias(31,60)">31-60</button><button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segDias(61,90)">61-90</button><button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segDias(91,180)">91-180</button><button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segDias(181,'')">181+</button><button class="btn-filter secondary" style="padding:1px 8px;font-size:11px" onclick="segDias('','')">Todos</button></div>
                     </div>
                     <div>
                         <label style="display:block;margin-bottom:4px">Cliente (buscar)</label>
@@ -1267,7 +1268,7 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
                 <div id="segMsg" style="display:none;margin-bottom:10px;font-size:13px"></div>
                 <p class="section-note" id="segNota">Cargando…</p>
                 <div class="table-wrap"><table id="segTable"><thead><tr>
-                    <th style="width:34px"></th><th>#</th><th onclick="sortSeg('name')" style="cursor:pointer">Cliente ⇅</th><th>Cédula</th><th>Centro</th><th>Canal de venta</th><th onclick="sortSeg('qty')" style="cursor:pointer;text-align:right">Unidades ⇅</th><th onclick="sortSeg('subtotal')" style="cursor:pointer;text-align:right">Valor ⇅</th><th onclick="sortSeg('ultima')" style="cursor:pointer;text-align:right">Última compra ⇅</th><th onclick="sortSeg('gastado')" style="cursor:pointer;text-align:right">Total gastado ⇅</th>
+                    <th style="width:34px"></th><th>#</th><th onclick="sortSeg('name')" style="cursor:pointer">Cliente ⇅</th><th>Centro</th><th>Canal de venta</th><th onclick="sortSeg('qty')" style="cursor:pointer;text-align:right">Unidades ⇅</th><th onclick="sortSeg('subtotal')" style="cursor:pointer;text-align:right">Valor ⇅</th><th onclick="sortSeg('ultima')" style="cursor:pointer;text-align:right">Última compra (fecha) ⇅</th><th onclick="sortSeg('dias')" style="cursor:pointer;text-align:right">Última compra (días) ⇅</th>
                 </tr></thead><tbody id="segBody"></tbody></table></div>
                 <p class="section-note" style="margin-top:8px">Unidades/Valor reflejan los productos filtrados. Solo etiquetables los clientes con cédula; la etiqueta se <strong>suma</strong> a las que ya tenga el contacto en GHL.</p>
             </div>
@@ -2488,7 +2489,10 @@ function renderSeg(){
     const tb=document.getElementById('segBody'); if(!tb) return;
     if(!segData.length){ document.getElementById('segNota').textContent='Sin datos de ventas cargados.'; document.getElementById('segActions').style.display='none'; tb.innerHTML=''; return; }
     const qCli=(document.getElementById('segCliSearch').value||'').toLowerCase().trim();
-    const catsActive=segCatSel.size>0, prodsActive=segProdSel.size>0;
+    const prodsActive=segProdSel.size>0;
+    const dMinV=document.getElementById('segDiasMin').value, dMaxV=document.getElementById('segDiasMax').value;
+    const dMin=dMinV===''?null:Number(dMinV), dMax=dMaxV===''?null:Number(dMaxV), diasOn=(dMin!=null||dMax!=null);
+    const _hoy=new Date(); const _hoyU=Date.UTC(_hoy.getFullYear(),_hoy.getMonth(),_hoy.getDate());
     const rows=[];
     for(const c of segData){
         if(!((c.canales||[]).some(ch=>segCanalSel.has(ch)))) continue;
@@ -2497,10 +2501,12 @@ function renderSeg(){
         if(segVentaSel.size<VENTA_SEG.length && ![..._venta].some(v=>segVentaSel.has(v))) continue;
         if(qCli && !((String(c.name||'')+' '+String(c.ced||'')).toLowerCase().includes(qCli))) continue;
         let qty=0,sub=0,matched=false;
-        for(const p of (c.prods||[])){ if(catsActive&&!segCatSel.has(p.cat))continue; if(prodsActive&&!segProdSel.has(p.code))continue; matched=true; qty+=Number(p.qty)||0; sub+=Number(p.subtotal)||0; }
+        for(const p of (c.prods||[])){ if(prodsActive&&!segProdSel.has(p.code))continue; matched=true; qty+=Number(p.qty)||0; sub+=Number(p.subtotal)||0; }
         if(!matched) continue;
+        const _ex2=(prodCompExtra&&_cedV)?prodCompExtra.get(_cedV):null; let dias=null; if(_ex2&&_ex2.ultima){ const [yy,mm,dd]=String(_ex2.ultima).slice(0,10).split('-').map(Number); if(yy&&mm&&dd) dias=Math.max(0,Math.round((_hoyU-Date.UTC(yy,mm-1,dd))/86400000)); }
+        if(diasOn){ if(dias==null) continue; if(dMin!=null&&dias<dMin) continue; if(dMax!=null&&dias>dMax) continue; }
         const cedD=String(c.ced||'').replace(/[^0-9]/g,''); const ex=(prodCompExtra&&cedD)?prodCompExtra.get(cedD):null;
-        rows.push({name:c.name, ced:c.ced, canal:(c.canales||[]).map(x=>String(x).toUpperCase()).join('/'), venta:[..._venta].join(' / '), qty, subtotal:sub, ultima:ex?ex.ultima:null, gastado:ex?ex.gastado:null});
+        rows.push({name:c.name, ced:c.ced, canal:(c.canales||[]).map(x=>String(x).toUpperCase()).join('/'), venta:[..._venta].join(' / '), qty, subtotal:sub, ultima:ex?ex.ultima:null, dias});
     }
     segRows=rows; segSelected.clear(); const a=document.getElementById('segAll'); if(a)a.checked=false;
     const etiq=rows.filter(r=>r.ced&&String(r.ced).replace(/[^0-9]/g,'').length>=4).length;
@@ -2510,6 +2516,7 @@ function renderSeg(){
     paintSeg();
     if(!prodCompExtraLoaded){ ensureProdCompExtra().then(()=>{ renderSeg(); }); }
 }
+function segDias(a,b){ document.getElementById('segDiasMin').value=a; document.getElementById('segDiasMax').value=b; renderSeg(); }
 function sortSeg(col){ segSort.dir=segSort.col===col?(segSort.dir==='asc'?'desc':'asc'):'desc'; segSort.col=col; paintSeg(); }
 function paintSeg(){
     const tb=document.getElementById('segBody'); if(!tb) return;
@@ -2524,14 +2531,14 @@ function paintSeg(){
     tb.innerHTML=rows.map((b,i)=>{ const taggable=!!(b.ced&&String(b.ced).replace(/[^0-9]/g,'').length>=4); const chk=segSelected.has(b.ced)?'checked':'';
         return `<tr>
             <td style="text-align:center">${taggable?`<input type="checkbox" class="seg-chk" data-ced="${esc(b.ced)}" ${chk} onchange="onSegChk(this)">`:'<span title="sin cédula, no etiquetable" style="color:var(--gris)">—</span>'}</td>
-            <td>${i+1}</td><td class="td-name">${esc(b.name||'—')}</td><td style="color:var(--gris);font-size:12px">${esc(b.ced||'')}</td>
+            <td>${i+1}</td><td class="td-name">${esc(b.name||'—')}</td>
             <td style="font-size:11px;color:var(--gris)">${esc(b.canal||'')}</td>
             <td style="font-size:11px;color:var(--gris)">${esc(b.venta||'')}</td>
             <td style="text-align:right">${fmt(b.qty)}</td>
             <td style="text-align:right;font-weight:700;color:var(--verde)">${fmtCOP(b.subtotal)}</td>
             <td style="text-align:right">${b.ultima?fmtDate(b.ultima):'<span style="color:var(--gris)">—</span>'}</td>
-            <td style="text-align:right;font-weight:700;color:var(--chocolate)">${b.gastado!=null?fmtCOP(b.gastado):'<span style="color:var(--gris)">—</span>'}</td>
-        </tr>`;}).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--gris);padding:20px">Sin resultados</td></tr>';
+            <td style="text-align:right;font-weight:700;color:var(--chocolate)">${b.dias!=null?b.dias+' d':'<span style="color:var(--gris)">—</span>'}</td>
+        </tr>`;}).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--gris);padding:20px">Sin resultados</td></tr>';
 }
 function onSegChk(el){ const c=el.dataset.ced; if(el.checked) segSelected.add(c); else segSelected.delete(c); updateSegCount(); }
 function toggleSegAll(el){ document.querySelectorAll('#segBody .seg-chk').forEach(chk=>{ chk.checked=el.checked; const c=chk.dataset.ced; if(el.checked) segSelected.add(c); else segSelected.delete(c); }); updateSegCount(); }
