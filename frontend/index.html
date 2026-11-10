@@ -1461,6 +1461,41 @@ td { padding: 11px 12px; color: var(--chocolate); vertical-align: middle; word-b
         <div id="botwebCanal" style="margin-top:12px"></div>
     </section>
 
+
+    <!-- Google Analytics (GA4) -->
+    <section class="dash-section" id="sec-ga">
+        <div class="section-title">📈 Google Analytics (GA4) <span class="tbl-tag fecha">Por fechas</span></div>
+        <div id="gaAviso" style="display:none;background:#fff8e1;border:1px solid #ffe0a3;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#8a6d00">
+            ⏳ <b>Sin datos todavía.</b> Tag Manager del sitio debe enviar a la propiedad <b>G-FBFFGDYY1E</b> (Website Chuculat). Apenas se publique ese cambio, los números aparecen aquí solos.
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+            <div class="kpi-card otorgados"><div class="kpi-icon">👥</div><div class="kpi-label">Usuarios activos</div><div class="kpi-value" id="gaUsuarios">—</div><div class="kpi-sub" id="gaUsuariosSub">—</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">🆕</div><div class="kpi-label">Usuarios nuevos</div><div class="kpi-value" id="gaNuevos">—</div><div class="kpi-sub" id="gaNuevosSub">—</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">🔁</div><div class="kpi-label">Sesiones</div><div class="kpi-value" id="gaSesiones">—</div><div class="kpi-sub" id="gaSesionesSub">—</div></div>
+            <div class="kpi-card redimidos"><div class="kpi-icon">👁️</div><div class="kpi-label">Vistas de página</div><div class="kpi-value" id="gaVistas">—</div><div class="kpi-sub" id="gaVistasSub">—</div></div>
+            <div class="kpi-card tasa"><div class="kpi-icon">⚡</div><div class="kpi-label">Interacción</div><div class="kpi-value" id="gaEng">—</div><div class="kpi-sub" id="gaEngSub">—</div></div>
+            <div class="kpi-card otorgados"><div class="kpi-icon">🛒</div><div class="kpi-label">Compras</div><div class="kpi-value" id="gaCompras">—</div><div class="kpi-sub" id="gaComprasSub">—</div></div>
+            <div class="kpi-card recompras"><div class="kpi-icon">💰</div><div class="kpi-label">Ingresos</div><div class="kpi-value" id="gaIngresos">—</div><div class="kpi-sub" id="gaIngresosSub">—</div></div>
+        </div>
+        <div style="font-weight:700;color:var(--chocolate);font-size:.95rem;margin:18px 0 6px">Embudo de la tienda <small style="font-weight:600;color:var(--gris)">· eventos que envía el sitio a GA4</small></div>
+        <div id="gaEmbudo" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
+        <div class="chart-card" style="height:300px;margin-bottom:16px"><canvas id="gaChart"></canvas></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
+            <div style="background:#fff;border:1px solid var(--beige);border-radius:12px;overflow:auto">
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead><tr style="background:var(--crema);color:var(--chocolate);text-align:left"><th style="padding:10px 14px">Fuente / medio</th><th style="padding:10px 14px;text-align:right">Sesiones</th><th style="padding:10px 14px;text-align:right">Usuarios</th></tr></thead>
+                    <tbody id="gaFuentesBody"><tr><td colspan="3" style="padding:14px;color:var(--gris)">Cargando…</td></tr></tbody>
+                </table>
+            </div>
+            <div style="background:#fff;border:1px solid var(--beige);border-radius:12px;overflow:auto">
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead><tr style="background:var(--crema);color:var(--chocolate);text-align:left"><th style="padding:10px 14px">Página</th><th style="padding:10px 14px;text-align:right">Vistas</th><th style="padding:10px 14px;text-align:right">Usuarios</th></tr></thead>
+                    <tbody id="gaPaginasBody"><tr><td colspan="3" style="padding:14px;color:var(--gris)">Cargando…</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
 </div><!-- /panelWeb -->
 
 </main>
@@ -4013,6 +4048,7 @@ async function loadWebKpis(from,to){
     loadVentasCanal(from,to);
     loadWebVistas(from,to);
     loadVentasBot('web',from,to);
+    loadGA(from,to);
 }
 const VENTAS_BOT_URL='https://app.rioagencymarketing.com/webhook/get-ventas-bot';
 async function loadVentasBot(pfx,from,to){
@@ -4027,6 +4063,37 @@ async function loadVentasBot(pfx,from,to){
     S('Exp', fmt(d.experiencias.pedidos)); const es=G('ExpSub'); if(es) es.textContent=fmtCOP(d.experiencias.monto);
     const cbox=G('Canal');
     if(cbox){ const cs=(d.por_canal||[]); cbox.innerHTML = cs.length ? '<div style="display:flex;flex-wrap:wrap;gap:8px">'+cs.map(c=>'<span style="background:var(--crema);border:1px solid var(--beige);border-radius:50px;padding:5px 12px;font-size:12px;color:var(--chocolate)">🤖 <b>'+esc(c.canal)+'</b> · '+fmt(c.pedidos)+' ped · '+fmtCOP(c.monto)+'</span>').join('')+'</div>' : ''; }
+}
+
+// ── GOOGLE ANALYTICS (GA4) ────────────────────────────────────────────────
+const GA_URL = 'https://app.rioagencymarketing.com/webhook/get-ga-kpis';
+let webChartGA=null;
+async function loadGA(from,to){
+    const S=(k,v)=>{const el=document.getElementById(k); if(el) el.innerHTML=v;};
+    const fb=document.getElementById('gaFuentesBody'), pb=document.getElementById('gaPaginasBody');
+    let d=null; try{ d=await (await fetch(GA_URL+'?date_start='+from+'&date_end='+to)).json(); }catch(e){}
+    if(!d || !d.resumen){ ['gaUsuarios','gaNuevos','gaSesiones','gaVistas','gaEng','gaCompras','gaIngresos'].forEach(k=>S(k,'—')); const em='<tr><td colspan="3" style="padding:14px;color:var(--gris)">No se pudo leer Google Analytics</td></tr>'; if(fb) fb.innerHTML=em; if(pb) pb.innerHTML=em; return; }
+    const r=d.resumen, dl=r.delta||{};
+    const dur=s=>{ s=Math.round(s||0); return s>=60?(Math.floor(s/60)+'m '+(s%60)+'s'):(s+'s'); };
+    const av=document.getElementById('gaAviso'); if(av) av.style.display = d.tieneDatos ? 'none' : 'block';
+    S('gaUsuarios',fmt(r.activos)); S('gaUsuariosSub','vs período anterior'+_deltaHtml(dl.activos));
+    S('gaNuevos',fmt(r.nuevos)); S('gaNuevosSub','primera visita'+_deltaHtml(dl.nuevos));
+    S('gaSesiones',fmt(r.sesiones)); S('gaSesionesSub','vs período anterior'+_deltaHtml(dl.sesiones));
+    S('gaVistas',fmt(r.vistas)); S('gaVistasSub','vs período anterior'+_deltaHtml(dl.vistas));
+    S('gaEng',(Math.round((r.engagement||0)*1000)/10)+'%'); S('gaEngSub','duración media '+dur(r.duracion));
+    S('gaCompras',fmt(r.compras)); S('gaComprasSub','vs período anterior'+_deltaHtml(dl.compras));
+    S('gaIngresos',fmtCOP(r.ingresos)); S('gaIngresosSub','vs período anterior'+_deltaHtml(dl.ingresos));
+    const e=d.eventos||{}; const ET=[['page_view','Vistas'],['view_item','Ver producto'],['add_to_cart','Al carrito'],['begin_checkout','Ir a pagar'],['purchase','Compra'],['generate_lead','WhatsApp']];
+    S('gaEmbudo',ET.map(([k,l])=>'<span style="background:var(--crema);border:1px solid var(--beige);border-radius:50px;padding:5px 12px;font-size:12px;color:var(--chocolate)">'+l+' <b>'+fmt(e[k]||0)+'</b></span>').join(''));
+    const rowsHtml=(arr,k,a,b)=> arr.length ? arr.map(x=>'<tr style="border-top:1px solid var(--beige)"><td style="padding:9px 14px;color:var(--chocolate)">'+esc(x[k])+'</td><td style="padding:9px 14px;text-align:right;font-weight:700">'+fmt(x[a])+'</td><td style="padding:9px 14px;text-align:right">'+fmt(x[b])+'</td></tr>').join('') : '<tr><td colspan="3" style="padding:14px;color:var(--gris)">Sin datos</td></tr>';
+    if(fb) fb.innerHTML=rowsHtml(d.fuentes||[],'fuente','sesiones','usuarios');
+    if(pb) pb.innerHTML=rowsHtml(d.paginas||[],'ruta','vistas','usuarios');
+    const c=document.getElementById('gaChart'); if(c && window.Chart){ if(webChartGA) webChartGA.destroy(); const sr=d.serie||[];
+        webChartGA=new Chart(c,{type:'line',data:{labels:sr.map(x=>x.fecha.slice(5)),datasets:[
+            {label:'Usuarios',data:sr.map(x=>x.usuarios),borderColor:'#6b3a1f',backgroundColor:'rgba(107,58,31,.1)',tension:.3,fill:true},
+            {label:'Sesiones',data:sr.map(x=>x.sesiones),borderColor:'#e0a526',tension:.3},
+            {label:'Vistas',data:sr.map(x=>x.vistas),borderColor:'#3a8f5c',tension:.3}]},
+            options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}}); }
 }
 const WEB_VISTAS_URL = 'https://app.rioagencymarketing.com/webhook/get-web-vistas';
 async function loadWebVistas(from,to){
