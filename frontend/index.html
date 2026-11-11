@@ -2524,9 +2524,20 @@ async function _loadProdCompExtra(){
     prodCompExtra=m; prodCompExtraLoaded=true; prodCompExtraLoading=false;
 }
 function segBuildUniverse(){
-    const d=ventasData&&ventasData.destacadas; segData=(d&&d.clienteProductos)||[];
+    const d=ventasData&&ventasData.destacadas;
+    // segClientes: una fila por cliente con items [code, centro, canalVenta, qty, valor] (+ las ventas GENERALES:
+    // consumidor final y cliente genérico internacional, marcadas generico:true). Solo la usa esta tabla.
+    const PD=(d&&d.segProductos)||{};
+    if(d&&d.segClientes){
+        segData=d.segClientes.map(c=>({ced:c.ced,name:c.name,generico:!!c.generico,
+            items:(c.items||[]).map(a=>({code:a[0],name:(PD[a[0]]||[])[0]||a[0],cat:(PD[a[0]]||[])[1]||'',ch:a[1],cv:a[2],qty:a[3],sub:a[4]}))}));
+    } else {
+        // respaldo (payload viejo sin segClientes): se arma desde clienteProductos, sin desglose por centro
+        segData=((d&&d.clienteProductos)||[]).map(c=>({ced:c.ced,name:c.name,generico:false,
+            items:(c.prods||[]).map(p=>({code:p.code,name:p.name,cat:p.cat,ch:(c.canales||[])[0]||'b2c',cv:(c.canalesVenta||[])[0]||'POS',qty:p.qty,sub:p.subtotal}))}));
+    }
     const cats=new Set(), prods=new Map();
-    for(const c of segData){ for(const p of (c.prods||[])){ if(p.cat) cats.add(p.cat); if(p.code&&!prods.has(p.code)) prods.set(p.code,{code:p.code,name:p.name}); } }
+    for(const c of segData){ for(const p of (c.items||[])){ if(p.cat) cats.add(p.cat); if(p.code&&!prods.has(p.code)) prods.set(p.code,{code:p.code,name:p.name}); } }
     segCats=[...cats].sort((a,b)=>String(a).localeCompare(String(b),'es'));
     segProds=[...prods.values()].sort((a,b)=>String(a.name).localeCompare(String(b.name),'es'));
     segCatSel=new Set(); segProdSel=new Set();
@@ -2551,24 +2562,33 @@ function renderSeg(){
     const _hoy=new Date(); const _hoyU=Date.UTC(_hoy.getFullYear(),_hoy.getMonth(),_hoy.getDate());
     const rows=[];
     for(const c of segData){
-        if(!((c.canales||[]).some(ch=>segCanalSel.has(ch)))) continue;
         const _cedV=String(c.ced||'').replace(/[^0-9]/g,''); const _exV=(prodCompExtra&&_cedV)?prodCompExtra.get(_cedV):null;
-        const _venta=new Set(c.canalesVenta||[]); if(_exV&&_exV.canalVenta) _venta.add(_exV.canalVenta);
-        if(segVentaSel.size<VENTA_SEG.length && ![..._venta].some(v=>segVentaSel.has(v))) continue;
         if(qCli && !((String(c.name||'')+' '+String(c.ced||'')).toLowerCase().includes(qCli))) continue;
-        let qty=0,sub=0,matched=false;
-        for(const p of (c.prods||[])){ if(prodsActive&&!segProdSel.has(p.code))continue; matched=true; qty+=Number(p.qty)||0; sub+=Number(p.subtotal)||0; }
+        // Cada item cuenta solo si cumple centro de costos + canal de venta + producto: así B2B y Exportación suman
+        // exactamente lo vendido ahí (el total del cliente ya no mezcla sus compras de otros centros).
+        // El Bot se reconoce además por el campo GHL (las facturas históricas lo traen como "Página web").
+        const _ghl=_exV&&_exV.canalVenta; const _todosV=segVentaSel.size>=VENTA_SEG.length;
+        let qty=0,sub=0,matched=false; const _chs=new Set(), _cvs=new Set();
+        for(const p of (c.items||[])){
+            if(!segCanalSel.has(p.ch)) continue;
+            const _cvEf=(_ghl==='Bot'&&p.cv==='Página web')?'Bot':p.cv;
+            if(!_todosV && !segVentaSel.has(p.cv) && !segVentaSel.has(_cvEf)) continue;
+            if(prodsActive&&!segProdSel.has(p.code)) continue;
+            matched=true; qty+=Number(p.qty)||0; sub+=Number(p.sub)||0; _chs.add(p.ch); _cvs.add(_cvEf);
+        }
         if(!matched) continue;
+        const _venta=_cvs;
         const _ex2=(prodCompExtra&&_cedV)?prodCompExtra.get(_cedV):null; let dias=null; if(_ex2&&_ex2.ultima){ const [yy,mm,dd]=String(_ex2.ultima).slice(0,10).split('-').map(Number); if(yy&&mm&&dd) dias=Math.max(0,Math.round((_hoyU-Date.UTC(yy,mm-1,dd))/86400000)); }
         if(diasOn){ if(dias==null) continue; if(dMin!=null&&dias<dMin) continue; if(dMax!=null&&dias>dMax) continue; }
         const cedD=String(c.ced||'').replace(/[^0-9]/g,''); const ex=(prodCompExtra&&cedD)?prodCompExtra.get(cedD):null;
-        rows.push({name:c.name, ced:c.ced, canal:(c.canales||[]).map(x=>String(x).toUpperCase()).join('/'), venta:[..._venta].join(' / '), qty, subtotal:sub, ultima:ex?ex.ultima:null, dias});
+        rows.push({name:c.name, ced:c.ced, generico:!!c.generico, canal:[..._chs].map(x=>String(x).toUpperCase()).join('/'), venta:[..._venta].join(' / '), qty, subtotal:sub, ultima:ex?ex.ultima:null, dias});
     }
     segRows=rows; segSelected.clear(); const a=document.getElementById('segAll'); if(a)a.checked=false;
-    const etiq=rows.filter(r=>r.ced&&String(r.ced).replace(/[^0-9]/g,'').length>=4).length;
+    const etiq=rows.filter(r=>!r.generico&&r.ced&&String(r.ced).replace(/[^0-9]/g,'').length>=4).length;
+    const nGen=rows.filter(r=>r.generico).length, nCli=rows.length-nGen;
     document.getElementById('segActions').style.display = rows.length?'flex':'none';
     updateSegCount();
-    document.getElementById('segNota').innerHTML = rows.length? ('<strong>'+rows.length+'</strong> clientes coinciden con los filtros · '+etiq+' etiquetables (con cédula). Marca los que quieras (o "Seleccionar todos") y aplica una etiqueta.') : 'Ningún cliente coincide con los filtros actuales.';
+    document.getElementById('segNota').innerHTML = rows.length? ('<strong>'+nCli+'</strong> clientes coinciden con los filtros'+(nGen?' (+ '+nGen+' fila'+(nGen>1?'s':'')+' de ventas generales: cuentan en unidades y valor, no son etiquetables)':'')+' · '+etiq+' etiquetables (con cédula). Marca los que quieras (o "Seleccionar todos") y aplica una etiqueta.') : 'Ningún cliente coincide con los filtros actuales.';
     paintSeg();
     if(!prodCompExtraLoaded){ ensureProdCompExtra().then(()=>{ renderSeg(); }); }
 }
@@ -2584,10 +2604,10 @@ function paintSeg(){
         if(col==='ultima') return s*String(av).localeCompare(String(bv));
         return s*((Number(av)||0)-(Number(bv)||0));
     });
-    tb.innerHTML=rows.map((b,i)=>{ const taggable=!!(b.ced&&String(b.ced).replace(/[^0-9]/g,'').length>=4); const chk=segSelected.has(b.ced)?'checked':'';
+    tb.innerHTML=rows.map((b,i)=>{ const taggable=!!(!b.generico&&b.ced&&String(b.ced).replace(/[^0-9]/g,'').length>=4); const chk=segSelected.has(b.ced)?'checked':'';
         return `<tr>
-            <td style="text-align:center">${taggable?`<input type="checkbox" class="seg-chk" data-ced="${esc(b.ced)}" ${chk} onchange="onSegChk(this)">`:'<span title="sin cédula, no etiquetable" style="color:var(--gris)">—</span>'}</td>
-            <td>${i+1}</td><td class="td-name">${esc(b.name||'—')}</td>
+            <td style="text-align:center">${taggable?`<input type="checkbox" class="seg-chk" data-ced="${esc(b.ced)}" ${chk} onchange="onSegChk(this)">`:'<span title="'+(b.generico?'venta general: no es un cliente, no se etiqueta':'sin cédula, no etiquetable')+'" style="color:var(--gris)">—</span>'}</td>
+            <td>${i+1}</td><td class="td-name">${esc(b.name||'—')}${b.generico?' <span class="tbl-tag" style="background:#fff3e0;color:#b36b00">general</span>':''}</td>
             <td style="font-size:11px;color:var(--gris)">${esc(b.canal||'')}</td>
             <td style="font-size:11px;color:var(--gris)">${esc(b.venta||'')}</td>
             <td style="text-align:right">${fmt(b.qty)}</td>
